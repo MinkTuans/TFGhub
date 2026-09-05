@@ -5,6 +5,7 @@ export default defineConfig({
     tsconfigPaths: true,
   },
   test: {
+    env: { JWT_SECRET: 'api-e2e-tests-only-explicit-signing-secret' },
     globals: true,
     root: './',
     include: ['**/*.e2e-spec.ts'],

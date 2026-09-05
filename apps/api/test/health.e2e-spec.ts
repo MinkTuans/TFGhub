@@ -1,6 +1,6 @@
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
-import { AppModule } from '../src/app.module';
+import { AppModule } from '../src/app.module.js';
 
 describe('GET /health', () => {
   it('reports readiness', async () => {
