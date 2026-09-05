@@ -5,6 +5,17 @@
       "cache": false,
       "persistent": true
     },
+    "api#dev": {
+      "cache": false,
+      "persistent": true,
+      "passThroughEnv": [
+        "API_PORT",
+        "DATABASE_URL",
+        "JWT_SECRET",
+        "NODE_ENV",
+        "WEB_ORIGIN"
+      ]
+    },
     "test": {
       "dependsOn": ["^test"],
       "outputs": []
