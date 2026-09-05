@@ -34,8 +34,9 @@ From the repository root:
 ```bash
 docker compose up -d postgres
 pnpm install
+set -a && . ./.env && set +a
 pnpm --filter @indieforge/database prisma migrate deploy
-set -a && . ./.env && set +a && pnpm dev
+pnpm dev
 ```
 
 `docker compose up -d postgres` starts only the `postgres` service defined in `docker-compose.yml`. `prisma migrate deploy` applies committed migrations without creating a new one. The `pnpm dev` process starts the Next.js web app at [http://localhost:3000](http://localhost:3000) and the Nest API at [http://localhost:3001](http://localhost:3001); confirm the API with `curl http://localhost:3001/health`.
@@ -74,6 +75,7 @@ To test migrations from an empty local Compose database, this destructive comman
 ```bash
 docker compose down -v
 docker compose up -d postgres
+set -a && . ./.env && set +a
 pnpm --filter @indieforge/database prisma migrate deploy
 ```
 

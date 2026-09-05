@@ -12,8 +12,9 @@ cp .env.example .env
 # Set JWT_SECRET in .env, for example with: openssl rand -hex 32
 docker compose up -d postgres
 pnpm install
+set -a && . ./.env && set +a
 pnpm --filter @indieforge/database prisma migrate deploy
-set -a && . ./.env && set +a && pnpm dev
+pnpm dev
 ```
 
 The final command keeps the API and web development servers running. Open the web app at [http://localhost:3000](http://localhost:3000), the API at [http://localhost:3001](http://localhost:3001), and its health check at [http://localhost:3001/health](http://localhost:3001/health).

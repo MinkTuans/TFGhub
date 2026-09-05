@@ -2,7 +2,7 @@
 
 Base URL: `http://localhost:3001`. JSON request bodies use `Content-Type: application/json`. Identifiers and timestamps below are illustrative; use the returned identifiers in later requests.
 
-Authentication is cookie-based. `POST /auth/register` and `POST /auth/login` issue the HTTP-only `indieforge_access` cookie; protected routes require that cookie. The examples use curl's cookie jar so no credential is pasted into a real browser session.
+Authentication is cookie-based. `POST /auth/register` and `POST /auth/login` issue the HTTP-only `indieforge_access` cookie; protected routes require that cookie. The HTTP examples below show the cookie as a placeholder request header; see the development guide for a curl cookie-jar example.
 
 ## Register
 
@@ -49,6 +49,15 @@ Cookie: indieforge_access=...
 
 Missing, expired, malformed, or bearer-token-only authentication returns `401`.
 
+## Logout
+
+```http
+POST /auth/logout
+Cookie: indieforge_access=...
+```
+
+`204 No Content`, with `Set-Cookie: indieforge_access=; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; SameSite=Lax; Path=/`. The response has no body and clears the browser session cookie.
+
 ## Developer profile
 
 ```http
@@ -84,6 +93,24 @@ Content-Type: application/json
 ```
 
 Slugs use lowercase letters and digits separated by single hyphens. Client-supplied visibility, moderation state, and owner values are ignored; creation is always a clear draft. Duplicate slugs return `409`.
+
+## Update an owned game (`PATCH /games/:id`)
+
+```http
+PATCH /games/cmexamplegame1
+Cookie: indieforge_access=...
+Content-Type: application/json
+
+{"title":"Orbit Orchard: Seedling"}
+```
+
+`200 OK` returns the updated game-summary shape:
+
+```json
+{"id":"cmexamplegame1","slug":"orbit-orchard","title":"Orbit Orchard: Seedling","description":"Grow fruit in zero gravity.","visibility":"DRAFT","accessMode":"GUEST_ALLOWED","moderationState":"CLEAR","createdAt":"2026-09-05T12:00:00.000Z","updatedAt":"2026-09-05T12:05:00.000Z"}
+```
+
+The body must contain at least one of `title` (1–80 characters), `description` (at most 2,000 characters), or `accessMode` (`GUEST_ALLOWED` or `AUTH_REQUIRED`). `slug`, ownership, visibility, and moderation state cannot be changed by this endpoint. Only the owner may update the game: a missing session returns `401`, and an authenticated non-owner or an unknown game returns `403`.
 
 ## List owned games
 
