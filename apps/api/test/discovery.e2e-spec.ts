@@ -93,7 +93,7 @@ describe('Public game discovery HTTP boundary', () => {
       .expect(200, { games: [], nextCursor: null });
   });
 
-  it('searches public clear games and returns a stable cursor continuation', async () => {
+  it('preserves search filtering and id ordering across cursor continuations', async () => {
     addGame({
       id: 'game-3',
       slug: 'space-three',
@@ -101,9 +101,21 @@ describe('Public game discovery HTTP boundary', () => {
       createdAt: new Date('2026-09-05T12:03:00.000Z'),
     });
     addGame({
-      id: 'game-2',
-      slug: 'space-two',
-      title: 'Space Two',
+      id: 'game-2-a',
+      slug: 'space-tie-a',
+      title: 'Space Tie A',
+      createdAt: new Date('2026-09-05T12:02:00.000Z'),
+    });
+    addGame({
+      id: 'game-2-b',
+      slug: 'space-tie-b',
+      title: 'Space Tie B',
+      createdAt: new Date('2026-09-05T12:02:00.000Z'),
+    });
+    addGame({
+      id: 'game-2-c',
+      slug: 'space-tie-c',
+      title: 'Space Tie C',
       createdAt: new Date('2026-09-05T12:02:00.000Z'),
     });
     addGame({
@@ -111,6 +123,13 @@ describe('Public game discovery HTTP boundary', () => {
       slug: 'space-one',
       description: 'Explore SPACE',
       createdAt: new Date('2026-09-05T12:01:00.000Z'),
+    });
+    addGame({
+      id: 'game-unrelated',
+      slug: 'unrelated-public-game',
+      title: 'Puzzle game',
+      description: 'No matching terms',
+      createdAt: new Date('2026-09-05T12:01:30.000Z'),
     });
 
     const first = await request(app.getHttpServer())
@@ -126,8 +145,8 @@ describe('Public game discovery HTTP boundary', () => {
           createdAt: '2026-09-05T12:03:00.000Z',
         },
         {
-          slug: 'space-two',
-          title: 'Space Two',
+          slug: 'space-tie-c',
+          title: 'Space Tie C',
           description: 'A public game',
           developer: { displayName: 'Demo developer' },
           createdAt: '2026-09-05T12:02:00.000Z',
@@ -137,20 +156,60 @@ describe('Public game discovery HTTP boundary', () => {
     });
 
     const second = await request(app.getHttpServer())
-      .get(`/discover?cursor=${encodeURIComponent(first.body.nextCursor)}`)
+      .get(
+        `/discover?query=space&limit=2&cursor=${encodeURIComponent(first.body.nextCursor)}`,
+      )
       .expect(200);
     expect(second.body).toEqual({
       games: [
         {
-          slug: 'space-one',
-          title: 'Demo game',
-          description: 'Explore SPACE',
+          slug: 'space-tie-b',
+          title: 'Space Tie B',
+          description: 'A public game',
           developer: { displayName: 'Demo developer' },
-          createdAt: '2026-09-05T12:01:00.000Z',
+          createdAt: '2026-09-05T12:02:00.000Z',
+        },
+        {
+          slug: 'space-tie-a',
+          title: 'Space Tie A',
+          description: 'A public game',
+          developer: { displayName: 'Demo developer' },
+          createdAt: '2026-09-05T12:02:00.000Z',
         },
       ],
-      nextCursor: null,
+      nextCursor: expect.any(String),
     });
+
+    const third = await request(app.getHttpServer())
+      .get(
+        `/discover?query=space&limit=2&cursor=${encodeURIComponent(second.body.nextCursor)}`,
+      )
+      .expect(200, {
+        games: [
+          {
+            slug: 'space-one',
+            title: 'Demo game',
+            description: 'Explore SPACE',
+            developer: { displayName: 'Demo developer' },
+            createdAt: '2026-09-05T12:01:00.000Z',
+          },
+        ],
+        nextCursor: null,
+      });
+
+    const slugs = [
+      ...first.body.games,
+      ...second.body.games,
+      ...third.body.games,
+    ].map((game: { slug: string }) => game.slug);
+    expect(slugs).toEqual([
+      'space-three',
+      'space-tie-c',
+      'space-tie-b',
+      'space-tie-a',
+      'space-one',
+    ]);
+    expect(new Set(slugs)).toHaveLength(slugs.length);
   });
 
   it('does not expose drafts by slug', async () => {
