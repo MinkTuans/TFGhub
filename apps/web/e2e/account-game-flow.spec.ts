@@ -1,6 +1,37 @@
 import { randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
 
+for (const route of ["register", "login"] as const) {
+  test(`${route} native submission keeps credentials out of the URL without JavaScript`, async ({
+    browser,
+    baseURL,
+  }) => {
+    const context = await browser.newContext({
+      javaScriptEnabled: false,
+      baseURL,
+    });
+    const page = await context.newPage();
+    await page.goto(`/${route}`);
+    await page.getByLabel("Email").fill("native-submit@example.com");
+    await page.getByLabel("Password").fill("native-password123");
+    const [request] = await Promise.all([
+      page.waitForRequest((request) => request.isNavigationRequest()),
+      page
+        .getByRole("button", {
+          name: route === "register" ? "Create account" : "Log in",
+        })
+        .click(),
+    ]);
+    expect(request.method()).toBe("POST");
+    expect(new URL(request.url()).search).toBe("");
+    expect(new URL(page.url()).search).toBe("");
+    expect(new URLSearchParams(request.postData() ?? "").get("password")).toBe(
+      "native-password123",
+    );
+    await context.close();
+  });
+}
+
 test("register, save a profile, create a private draft, and sign back in", async ({
   page,
   context,

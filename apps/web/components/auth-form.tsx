@@ -35,7 +35,7 @@ export function AuthForm({ mode }: { mode: "register" | "login" }) {
     }
   }
   return (
-    <form onSubmit={submit} className="form-stack">
+    <form method="post" onSubmit={submit} className="form-stack">
       <label>
         Email
         <input name="email" type="email" autoComplete="email" required />

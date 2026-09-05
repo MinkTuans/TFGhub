@@ -9,16 +9,32 @@ vi.mock("next/navigation", () => ({
 }));
 afterEach(() => vi.unstubAllGlobals());
 
+test.each(["register", "login"] as const)(
+  "%s rejects invalid credentials before sending an HTTP request",
+  (mode) => {
+    const fetch = vi.fn();
+    vi.stubGlobal("fetch", fetch);
+    render(<AuthForm mode={mode} />);
+    fireEvent.change(screen.getByLabelText("Email"), {
+      target: { value: "not-an-email" },
+    });
+    fireEvent.change(screen.getByLabelText("Password"), {
+      target: { value: "short" },
+    });
+    fireEvent.submit(screen.getByLabelText("Email").closest("form")!);
+    expect(screen.getByRole("alert")).toBeVisible();
+    expect(fetch).not.toHaveBeenCalled();
+  },
+);
+
 test("registration reports the API conflict and permits another attempt", async () => {
   vi.stubGlobal(
     "fetch",
-    vi
-      .fn()
-      .mockResolvedValue(
-        new Response(JSON.stringify({ message: "Email already registered" }), {
-          status: 409,
-        }),
-      ),
+    vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ message: "Email already registered" }), {
+        status: 409,
+      }),
+    ),
   );
   render(<AuthForm mode="register" />);
   fireEvent.change(screen.getByLabelText("Email"), {
@@ -39,13 +55,11 @@ test("registration reports the API conflict and permits another attempt", async 
 test("draft creation keeps input visible after a duplicate slug rejection", async () => {
   vi.stubGlobal(
     "fetch",
-    vi
-      .fn()
-      .mockResolvedValue(
-        new Response(JSON.stringify({ message: "Game slug already exists" }), {
-          status: 409,
-        }),
-      ),
+    vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ message: "Game slug already exists" }), {
+        status: 409,
+      }),
+    ),
   );
   render(<GameForm />);
   fireEvent.change(screen.getByLabelText("Title"), {
