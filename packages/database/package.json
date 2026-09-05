@@ -11,7 +11,8 @@
     "build": "tsc --module NodeNext --moduleResolution NodeNext --target ES2023 --strict --declaration --outDir dist src/index.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit --module ESNext --moduleResolution bundler --target ES2023 --strict src/*.ts",
-    "generate": "prisma generate"
+    "generate": "prisma generate",
+    "prisma": "prisma"
   },
   "dependencies": {
     "@prisma/client": "^6.0.0"
