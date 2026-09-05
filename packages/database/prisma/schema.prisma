@@ -1,0 +1,62 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  USER
+  MODERATOR
+  ADMIN
+}
+
+enum GameVisibility {
+  DRAFT
+  PUBLIC
+  UNLISTED
+}
+
+enum GameAccessMode {
+  GUEST_ALLOWED
+  AUTH_REQUIRED
+}
+
+enum ModerationState {
+  CLEAR
+  FLAGGED
+  QUARANTINED
+}
+
+model User {
+  id           String            @id @default(cuid())
+  email        String            @unique
+  passwordHash String
+  role         UserRole          @default(USER)
+  createdAt    DateTime          @default(now())
+  profile      DeveloperProfile?
+  games        Game[]
+}
+
+model DeveloperProfile {
+  userId      String   @id
+  displayName String
+  bio         String   @default("")
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Game {
+  id              String          @id @default(cuid())
+  ownerId         String
+  slug            String          @unique
+  title           String
+  description     String          @default("")
+  visibility      GameVisibility  @default(DRAFT)
+  accessMode      GameAccessMode  @default(GUEST_ALLOWED)
+  moderationState ModerationState @default(CLEAR)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  owner           User            @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+}
