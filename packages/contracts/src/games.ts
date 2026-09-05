@@ -25,5 +25,27 @@ export const GameSummary = z.object({
   updatedAt: z.string().datetime(),
 });
 
+export const DiscoverGamesInput = z.object({
+  query: z.string().trim().max(200).optional(),
+  cursor: z.string().min(1).max(512).optional(),
+  limit: z.coerce.number().int().positive().optional(),
+});
+
+export const PublicGameSummary = z.object({
+  slug: z.string(),
+  title: z.string(),
+  description: z.string(),
+  developer: z.object({ displayName: z.string() }),
+  createdAt: z.string().datetime(),
+});
+
+export const DiscoverGamesResponse = z.object({
+  games: z.array(PublicGameSummary),
+  nextCursor: z.string().nullable(),
+});
+
 export type UpdateGameInput = z.infer<typeof UpdateGameInput>;
 export type GameSummary = z.infer<typeof GameSummary>;
+export type DiscoverGamesInput = z.infer<typeof DiscoverGamesInput>;
+export type PublicGameSummary = z.infer<typeof PublicGameSummary>;
+export type DiscoverGamesResponse = z.infer<typeof DiscoverGamesResponse>;
