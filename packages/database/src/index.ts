@@ -1,2 +1,2 @@
 export { database } from './client.js';
-export type { UserRole } from '@prisma/client';
+export type { UserRole } from '../generated/client/index.js';

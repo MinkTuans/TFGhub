@@ -110,4 +110,24 @@ describe('GamesService', () => {
       }),
     ).rejects.toThrow(ConflictException);
   });
+
+  it.each([
+    { code: 'P2002', meta: { target: ['id'] } },
+    new Error('Database connection lost'),
+  ])(
+    'propagates the original non-slug persistence error: %j',
+    async (error) => {
+      const { service, games } = fixture();
+      vi.mocked(games.create).mockRejectedValue(error);
+
+      await expect(
+        service.create('owner-1', {
+          title: 'Demo game',
+          slug: 'demo-game',
+          description: '',
+          accessMode: 'GUEST_ALLOWED',
+        }),
+      ).rejects.toBe(error);
+    },
+  );
 });

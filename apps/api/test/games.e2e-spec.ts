@@ -58,7 +58,9 @@ describe('Developer profile and game draft HTTP boundary', () => {
           return user;
         },
         async findByEmail(email: string) {
-          return [...users.values()].find((user) => user.email === email) ?? null;
+          return (
+            [...users.values()].find((user) => user.email === email) ?? null
+          );
         },
         async findById(id: string) {
           return users.get(id) ?? null;
@@ -70,7 +72,11 @@ describe('Developer profile and game draft HTTP boundary', () => {
           if ([...games.values()].some((game) => game.slug === input.slug)) {
             throw { code: 'P2002', meta: { target: ['slug'] } };
           }
-          const game: StoredGame = { id: `game-${games.size + 1}`, ...input, ...dates };
+          const game: StoredGame = {
+            id: `game-${games.size + 1}`,
+            ...input,
+            ...dates,
+          };
           games.set(game.id, game);
           return game;
         },
@@ -81,7 +87,14 @@ describe('Developer profile and game draft HTTP boundary', () => {
           const game = games.get(id);
           return game ? { id: game.id, ownerId: game.ownerId } : null;
         },
-        async update(id: string, input: { title?: string; description?: string; accessMode?: 'GUEST_ALLOWED' | 'AUTH_REQUIRED' }) {
+        async update(
+          id: string,
+          input: {
+            title?: string;
+            description?: string;
+            accessMode?: 'GUEST_ALLOWED' | 'AUTH_REQUIRED';
+          },
+        ) {
           const game = games.get(id)!;
           const updated: StoredGame = {
             ...game,
@@ -182,12 +195,16 @@ describe('Developer profile and game draft HTTP boundary', () => {
 
     const response = await developer.get('/games/mine').expect(200);
     expect(response.body).toHaveLength(1);
-    expect(response.body[0]).toMatchObject({
+    expect(response.body[0]).toEqual({
       id: 'game-1',
       slug: 'demo-game',
       title: 'Demo game',
+      description: '',
       visibility: 'DRAFT',
+      accessMode: 'GUEST_ALLOWED',
       moderationState: 'CLEAR',
+      createdAt: '2026-09-05T12:00:00.000Z',
+      updatedAt: '2026-09-05T12:00:00.000Z',
     });
   });
 
@@ -203,9 +220,17 @@ describe('Developer profile and game draft HTTP boundary', () => {
       })
       .expect(200)
       .expect((response) => {
-        expect(response.body.title).toBe('Changed');
-        expect(response.body.visibility).toBe('DRAFT');
-        expect(response.body.moderationState).toBe('CLEAR');
+        expect(response.body).toEqual({
+          id: 'game-1',
+          slug: 'demo-game',
+          title: 'Changed',
+          description: '',
+          visibility: 'DRAFT',
+          accessMode: 'GUEST_ALLOWED',
+          moderationState: 'CLEAR',
+          createdAt: '2026-09-05T12:00:00.000Z',
+          updatedAt: '2026-09-05T12:05:00.000Z',
+        });
       });
   });
 

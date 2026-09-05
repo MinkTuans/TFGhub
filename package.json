@@ -3,10 +3,11 @@
   "private": true,
   "packageManager": "pnpm@10.0.0",
   "scripts": {
-    "dev": "turbo dev",
-    "test": "turbo test",
+    "db:generate": "turbo run generate --filter=@indieforge/database --output-logs=errors-only",
+    "dev": "pnpm db:generate && turbo dev",
+    "test": "pnpm db:generate && turbo test",
     "lint": "turbo lint",
-    "typecheck": "turbo typecheck"
+    "typecheck": "pnpm db:generate && turbo typecheck"
   },
   "devDependencies": {
     "turbo": "^2"

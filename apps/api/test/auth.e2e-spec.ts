@@ -233,4 +233,99 @@ describe('Authentication HTTP boundary', () => {
       .expect('Access-Control-Allow-Origin', 'http://localhost:3000')
       .expect('Access-Control-Allow-Credentials', 'true');
   });
+
+  it('rejects a hostile login form without installing an attacker session', async () => {
+    await register();
+    const victim = request.agent(app.getHttpServer());
+    const response = await victim
+      .post('/auth/login')
+      .set('Origin', 'https://attacker.example')
+      .set('Sec-Fetch-Site', 'cross-site')
+      .type('form')
+      .send(credentials);
+
+    expect(response.status).toBe(403);
+    expect(response.headers['set-cookie']).toBeUndefined();
+    await victim.get('/auth/me').expect(401);
+  });
+
+  it.each([
+    'https://attacker.example',
+    'null',
+    'http://localhost:3000.attacker.example',
+  ])(
+    'rejects authentication mutations from untrusted Origin %s',
+    async (origin) => {
+      for (const route of ['register', 'login', 'logout']) {
+        const response = await request(app.getHttpServer())
+          .post(`/auth/${route}`)
+          .set('Origin', origin)
+          .send(credentials)
+          .expect(403);
+        expect(response.headers['set-cookie']).toBeUndefined();
+      }
+      expect(users.size).toBe(0);
+    },
+  );
+
+  it('requires an Origin when browser fetch metadata is present', async () => {
+    await request(app.getHttpServer())
+      .post('/auth/register')
+      .set('Sec-Fetch-Site', 'same-origin')
+      .send(credentials)
+      .expect(403);
+    expect(users.size).toBe(0);
+  });
+
+  it.each([
+    'application/x-www-form-urlencoded',
+    'text/plain',
+    'multipart/form-data',
+  ])(
+    'rejects unsupported mutation content type %s even without an Origin',
+    async (contentType) => {
+      const response = await request(app.getHttpServer())
+        .post('/auth/logout')
+        .set('Content-Type', contentType)
+        .send('email=dev%40example.com&password=password123')
+        .expect(415);
+      expect(response.headers['set-cookie']).toBeUndefined();
+    },
+  );
+
+  it('allows trusted browser JSON registration, login, and bodyless logout', async () => {
+    const browser = request.agent(app.getHttpServer());
+    await browser
+      .post('/auth/register')
+      .set('Origin', 'http://localhost:3000')
+      .send(credentials)
+      .expect(201);
+    await browser
+      .post('/auth/login')
+      .set('Origin', 'http://localhost:3000')
+      .set('Content-Type', 'application/json; charset=utf-8')
+      .send(credentials)
+      .expect(200);
+    await browser.get('/auth/me').expect(200);
+    await browser
+      .post('/auth/logout')
+      .set('Origin', 'http://localhost:3000')
+      .expect(204);
+    await browser.get('/auth/me').expect(401);
+  });
+
+  it.each([
+    ['post', '/games'],
+    ['patch', '/games/game-1'],
+    ['put', '/developers/me'],
+  ] as const)(
+    'rejects hostile Origin on %s %s before mutation handling',
+    async (method, route) => {
+      await request(app.getHttpServer())
+        [method](route)
+        .set('Origin', 'https://attacker.example')
+        .send({ title: 'Changed' })
+        .expect(403);
+    },
+  );
 });

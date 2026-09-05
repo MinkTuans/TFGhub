@@ -17,7 +17,7 @@
     "start:debug": "pnpm run build:packages && nest start --debug --watch",
     "start:prod": "node dist/main",
     "lint": "oxlint src/ test/",
-    "typecheck": "tsc --noEmit --project tsconfig.build.json",
+    "typecheck": "pnpm --workspace-root db:generate && tsc --noEmit --project tsconfig.build.json",
     "test": "pnpm run build:packages && vitest run",
     "test:watch": "pnpm run build:packages && vitest",
     "test:cov": "pnpm run build:packages && vitest run --coverage",

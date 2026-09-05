@@ -4,6 +4,8 @@ Base URL: `http://localhost:3001`. JSON request bodies use `Content-Type: applic
 
 Authentication is cookie-based. `POST /auth/register` and `POST /auth/login` issue the HTTP-only `indieforge_access` cookie; protected routes require that cookie. The HTTP examples below show the cookie as a placeholder request header; see the development guide for a curl cookie-jar example.
 
+Browser mutations require an `Origin` exactly matching `WEB_ORIGIN`; untrusted or opaque origins receive `403`. Mutation bodies require JSON (`415` for form content types). Bodyless logout and non-browser JSON clients without an `Origin` are supported.
+
 ## Register
 
 ```http

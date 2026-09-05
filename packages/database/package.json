@@ -8,9 +8,9 @@
     "default": "./dist/index.js"
   },
   "scripts": {
-    "build": "tsc --module NodeNext --moduleResolution NodeNext --target ES2023 --strict --declaration --outDir dist src/index.ts",
-    "test": "vitest run",
-    "typecheck": "tsc --noEmit --module ESNext --moduleResolution bundler --target ES2023 --strict src/*.ts",
+    "build": "pnpm --workspace-root db:generate && tsc --module NodeNext --moduleResolution NodeNext --target ES2023 --strict --declaration --outDir dist src/index.ts",
+    "test": "pnpm --workspace-root db:generate && vitest run",
+    "typecheck": "pnpm --workspace-root db:generate && tsc --noEmit --module ESNext --moduleResolution bundler --target ES2023 --strict src/*.ts",
     "generate": "prisma generate",
     "prisma": "prisma"
   },

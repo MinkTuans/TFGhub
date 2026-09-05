@@ -1,6 +1,10 @@
 {
   "$schema": "https://turborepo.com/schema.json",
   "tasks": {
+    "generate": {
+      "inputs": ["prisma/schema.prisma", "package.json"],
+      "outputs": ["generated/**"]
+    },
     "dev": {
       "cache": false,
       "persistent": true
