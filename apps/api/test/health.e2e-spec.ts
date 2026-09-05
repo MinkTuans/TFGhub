@@ -6,9 +6,12 @@ describe('GET /health', () => {
   it('reports readiness', async () => {
     const module = await Test.createTestingModule({ imports: [AppModule] }).compile();
     const app = module.createNestApplication();
-    await app.init();
 
-    await request(app.getHttpServer()).get('/health').expect(200, { status: 'ok' });
-    await app.close();
+    try {
+      await app.init();
+      await request(app.getHttpServer()).get('/health').expect(200, { status: 'ok' });
+    } finally {
+      await app.close();
+    }
   });
 });
