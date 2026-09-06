@@ -35,7 +35,7 @@ Internet
  web --SSR-----> api:3001
 ```
 
-Caddy obtains and renews TLS certificates when `DEPLOY_ADDRESS` is a public domain whose DNS points to the host. Its data and configuration directories use named volumes. Local deployment verification sets `DEPLOY_ADDRESS=:8080`, which makes Caddy serve plain HTTP without public DNS or ACME.
+Caddy obtains and renews TLS certificates when `DEPLOY_ADDRESS` is a public domain whose DNS points to the host. Its data and configuration directories use named volumes. Local deployment verification sets `DEPLOY_ADDRESS=:80` and publishes that container port as host port 8080, which makes Caddy serve plain HTTP without public DNS or ACME.
 
 The API, web application, migration job, and database communicate only on the default private Compose network. PostgreSQL, API, and web do not publish host ports.
 
@@ -70,7 +70,8 @@ All long-running services use `restart: unless-stopped`. The migration job does 
 
 `.env.production.example` documents every Compose input:
 
-- `DEPLOY_ADDRESS`: public domain for automatic HTTPS, or `:8080` for local smoke testing.
+- `DEPLOY_ADDRESS`: public domain for automatic HTTPS, or `:80` for local smoke testing.
+- `HTTP_PORT`: host port mapped to Caddy's HTTP listener; `80` in production and `8080` for local smoke testing.
 - `SITE_ORIGIN`: exact browser origin, normally `https://<DEPLOY_ADDRESS>`.
 - `POSTGRES_DB`: database name.
 - `POSTGRES_USER`: database user.
@@ -105,7 +106,7 @@ Deployment-specific automated checks cover five layers:
 2. `docker compose config` validates interpolation and service dependencies with a test environment.
 3. Docker builds both application images from a clean build context.
 4. A fresh disposable PostgreSQL volume applies every committed migration before API startup.
-5. A smoke script starts the complete stack on `http://localhost:8080`, waits for health, exercises registration, authenticated profile and draft flows through Caddy, verifies public catalog access, and tears the stack down including the disposable volume.
+5. A smoke script starts the complete stack with `DEPLOY_ADDRESS=:80`, `HTTP_PORT=8080`, and `SITE_ORIGIN=http://localhost:8080`; it waits for health, exercises registration, authenticated profile and draft flows through Caddy, verifies public catalog access, and tears the stack down including the disposable volume.
 
 The existing unit, HTTP integration, browser end-to-end, lint, typecheck, and production build suites remain release gates. Deployment verification must not depend on the developer's existing PostgreSQL volume or `.env` file.
 
