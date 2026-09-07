@@ -64,6 +64,27 @@ function storyGame(overrides: Partial<GameSummary> = {}): GameSummary {
   };
 }
 
+function platformerGame(overrides: Partial<GameSummary> = {}): GameSummary {
+  return {
+    ...codeGame({
+      sourceType: "PLATFORMER",
+      projectData: {
+        sourceType: "PLATFORMER",
+        canvas: { width: 640, height: 480 },
+        backgroundColor: "#111827",
+        player: { x: 24, y: 0, color: "#2563eb" },
+        goal: { x: 300, y: 416, color: "#16a34a" },
+        platforms: [
+          { x: 0, y: 440, width: 640, height: 40, color: "#6b7280" },
+        ],
+      },
+      artifactVersion: 1,
+      artifactReady: true,
+    }),
+    ...overrides,
+  };
+}
+
 test.each(["register", "login"] as const)(
   "%s rejects invalid credentials before sending an HTTP request",
   (mode) => {
@@ -231,6 +252,60 @@ test("story editor adds and removes scenes and choices", () => {
   expect(screen.queryByRole("group", { name: "Scene 2" })).toBeNull();
 });
 
+test("platformer editor adds and removes repeatable platforms", () => {
+  render(<GameWorkspace initialGame={platformerGame()} />);
+
+  expect(screen.getByRole("group", { name: "Platform 1" })).toBeVisible();
+  fireEvent.click(screen.getByRole("button", { name: "Add platform" }));
+  const added = screen.getByRole("group", { name: "Platform 2" });
+  expect(within(added).getByLabelText("X")).toHaveValue(0);
+  expect(within(added).getByLabelText("Width")).toHaveValue(160);
+  fireEvent.click(
+    within(added).getByRole("button", { name: "Remove platform" }),
+  );
+  expect(screen.queryByRole("group", { name: "Platform 2" })).toBeNull();
+});
+
+test("platformer editor rejects geometry outside the canvas before saving", () => {
+  const fetch = vi.fn();
+  vi.stubGlobal("fetch", fetch);
+  render(<GameWorkspace initialGame={platformerGame()} />);
+
+  const platform = screen.getByRole("group", { name: "Platform 1" });
+  fireEvent.change(within(platform).getByLabelText("Width"), {
+    target: { value: "641" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Save platformer" }));
+
+  expect(screen.getByRole("alert")).toHaveTextContent(
+    "Platform geometry must be inside the canvas",
+  );
+  expect(within(platform).getByLabelText("Width")).toHaveValue(641);
+  expect(fetch).not.toHaveBeenCalled();
+});
+
+test("platformer editor retains values after a failed save", async () => {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ message: "Platformer could not be saved" }), {
+        status: 503,
+      }),
+    ),
+  );
+  render(<GameWorkspace initialGame={platformerGame()} />);
+
+  fireEvent.change(screen.getByLabelText("Player X"), {
+    target: { value: "42" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Save platformer" }));
+
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "Platformer could not be saved",
+  );
+  expect(screen.getByLabelText("Player X")).toHaveValue(42);
+});
+
 test("story editor reports duplicate scene IDs and missing choice targets before saving", () => {
   const fetch = vi.fn();
   vi.stubGlobal("fetch", fetch);
@@ -325,6 +400,39 @@ test("story build refreshes the sandboxed preview and enables submission", async
         backgroundColor: "#112233",
         choices: [],
       },
+    ],
+  });
+});
+
+test("platformer build refreshes the sandboxed preview and enables submission", async () => {
+  const saved = platformerGame({ artifactReady: false });
+  const built = { ...saved, artifactVersion: 2, artifactReady: true };
+  const fetch = vi
+    .fn()
+    .mockResolvedValueOnce(new Response(JSON.stringify(saved)))
+    .mockResolvedValueOnce(new Response(JSON.stringify(built)));
+  vi.stubGlobal("fetch", fetch);
+  render(<GameWorkspace initialGame={platformerGame()} />);
+
+  fireEvent.click(screen.getByRole("button", { name: "Save platformer" }));
+  await screen.findByRole("button", { name: "Build preview" });
+  expect(screen.getByRole("button", { name: "Submit for review" })).toBeDisabled();
+
+  fireEvent.click(screen.getByRole("button", { name: "Build preview" }));
+  const preview = await screen.findByTitle("Game preview");
+  expect(preview).toHaveAttribute(
+    "src",
+    "http://localhost:3001/games/game-1/preview/?v=2",
+  );
+  expect(screen.getByRole("button", { name: "Submit for review" })).toBeEnabled();
+  expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({
+    sourceType: "PLATFORMER",
+    canvas: { width: 640, height: 480 },
+    backgroundColor: "#111827",
+    player: { x: 24, y: 0, color: "#2563eb" },
+    goal: { x: 300, y: 416, color: "#16a34a" },
+    platforms: [
+      { x: 0, y: 440, width: 640, height: 40, color: "#6b7280" },
     ],
   });
 });

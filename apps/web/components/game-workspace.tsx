@@ -5,6 +5,7 @@ import type { GameSummary } from "@indieforge/contracts";
 import { api, ApiError } from "../lib/api-client";
 import { CodeGameEditor } from "./code-game-editor";
 import { GamePreview } from "./game-preview";
+import { PlatformerGameEditor } from "./platformer-game-editor";
 import { StoryGameEditor } from "./story-game-editor";
 import { UploadEditor } from "./upload-editor";
 
@@ -65,6 +66,14 @@ export function GameWorkspace({ initialGame }: { initialGame: GameSummary }) {
       )}
       {game.sourceType === "STORY" && (
         <StoryGameEditor
+          gameId={game.id}
+          initialProject={game.projectData}
+          onBuilt={setGame}
+          onSaved={setGame}
+        />
+      )}
+      {game.sourceType === "PLATFORMER" && (
+        <PlatformerGameEditor
           gameId={game.id}
           initialProject={game.projectData}
           onBuilt={setGame}

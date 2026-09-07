@@ -271,3 +271,40 @@ test("a story game builds a sandboxed branching preview that reaches the selecte
   await game.getByRole("button", { name: choice }).click();
   await expect(game.getByRole("heading", { name: endingSpeaker })).toBeVisible();
 });
+
+test("a platformer game builds a collision-safe preview that reaches its goal by keyboard", async ({
+  page,
+}) => {
+  const suffix = randomUUID();
+  const title = `Platformer game ${suffix}`;
+  await page.goto("/register");
+  await page.getByLabel("Email").fill(`platformer-${suffix}@example.com`);
+  await page.getByLabel("Password").fill("password123");
+  await page.getByRole("button", { name: "Create account" }).click();
+  await page.getByRole("link", { name: "Create a draft" }).click();
+  await page.getByLabel("Title").fill(title);
+  await page.getByLabel("Slug").fill(`platformer-game-${suffix}`);
+  await page.getByLabel("Source type").selectOption("PLATFORMER");
+  await page.getByRole("button", { name: "Create draft" }).click();
+
+  await page.getByRole("link", { name: title }).click();
+  await page.getByRole("button", { name: "Save platformer" }).click();
+  await page.getByRole("button", { name: "Build preview" }).click();
+
+  const preview = page.getByTitle("Game preview");
+  const game = preview.contentFrame();
+  const canvas = game.locator("#game");
+  await expect.poll(async () =>
+    canvas.evaluate((element) => {
+      const context = (element as HTMLCanvasElement).getContext("2d");
+      return context
+        ? Array.from(context.getImageData(36, 428, 1, 1).data)
+        : [];
+    }),
+  ).toEqual([37, 99, 235, 255]);
+
+  await canvas.click();
+  await page.keyboard.down("ArrowRight");
+  await expect(game.getByRole("status")).toHaveText("Goal reached!");
+  await page.keyboard.up("ArrowRight");
+});
