@@ -13,3 +13,10 @@ ALTER TABLE "Game"
     ADD COLUMN "reviewNote" TEXT,
     ADD COLUMN "submittedAt" TIMESTAMP(3),
     ADD COLUMN "reviewedAt" TIMESTAMP(3);
+
+-- Preserve the existing public catalog. These legacy rows have no artifact
+-- directory (the later readiness migration keeps artifactReady=false), so they
+-- remain discoverable metadata but never receive a playable artifact URL.
+UPDATE "Game"
+SET "reviewState" = 'APPROVED'
+WHERE "visibility" = 'PUBLIC' AND "moderationState" = 'CLEAR';

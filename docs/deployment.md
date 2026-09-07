@@ -76,7 +76,7 @@ PUBLIC_ORIGIN=https://games.example.com
 curl --fail --show-error --connect-timeout 5 --max-time 30 "$PUBLIC_ORIGIN/api/health"
 ```
 
-Expect `{"status":"ok"}`. In a browser at that origin, register a disposable account, save a developer profile, reload `/studio`, create a draft, confirm it remains absent from discovery, and sign out and back in. A direct `/studio` reload must retain the session. Only existing public games are discoverable; this release cannot publish drafts.
+Expect `{"status":"ok"}`. In a browser at that origin, register a disposable account, save a developer profile, reload `/studio`, create a draft, build a small code/story/platformer game, confirm its sandboxed preview works, and sign out and back in. A direct `/studio` reload must retain the session. Send a built game for review, then use a separately granted moderator account to approve or reject it. Only approved, moderation-clear public games are discoverable; drafts and unreviewed artifacts remain private.
 
 From a checkout with dependencies and Playwright Chromium installed, the same account journey can target this stack:
 
@@ -97,34 +97,64 @@ compose stop
 compose up -d --wait
 ```
 
-`restart` does not apply changed environment variables or new images; use `up -d --build --wait` for those changes. `stop` preserves containers and data. `compose down` removes containers and networks but retains named volumes. Never run `down --volumes`, `down -v`, or volume pruning against this production project: these delete the database and Caddy state. The matching commands in the development guide and smoke script are exclusively for disposable data.
+`restart` does not apply changed environment variables or new images; use `up -d --build --wait` for those changes. `stop` preserves containers and data. `compose down` removes containers and networks but retains named volumes. Never run `down --volumes`, `down -v`, or volume pruning against this production project: these delete the database, game artifacts, and Caddy state. The matching commands in the development guide and smoke script are exclusively for disposable data.
 
 ## Back up
 
-Run before every upgrade or restore, and on a regular schedule. This Bash subshell leaves a `.partial` file on failure and publishes a timestamped dump only after `pg_dump` succeeds:
+Run before every upgrade or restore, and on a regular schedule. Database rows and
+their HTML5 artifact directories are one recovery unit: take both while API and
+web writes are stopped, record the same revision, and restore them together.
+This Bash function leaves `.partial` files on failure and publishes each member
+of a timestamped pair only after both archives validate:
 
 ```bash
-(
+backup_release() (
   set -e
   umask 077
   mkdir -p backups
   chmod 700 backups
-  backup_file="backups/$(date -u +%Y%m%dT%H%M%S)-$$.dump"
-  docker compose --project-name indieforge --env-file .env.production -f compose.production.yml \
+  backup_prefix="backups/$(date -u +%Y%m%dT%H%M%S)-$$"
+  database_backup="$backup_prefix.database.dump"
+  artifact_backup="$backup_prefix.artifacts.tar.gz"
+
+  # API is the single writer of game_storage. Stopping it makes this pair
+  # consistent without exposing the volume to any other long-running service.
+  compose stop api web
+  compose \
     exec -T postgres sh -c 'exec pg_dump --format=custom --username="$POSTGRES_USER" --dbname="$POSTGRES_DB"' \
-    > "$backup_file.partial"
-  mv "$backup_file.partial" "$backup_file"
-  compose exec -T postgres pg_restore --list < "$backup_file" > /dev/null
-  printf 'Backup: %s\n' "$backup_file"
+    > "$database_backup.partial"
+  compose run --rm --no-deps --entrypoint sh api -c \
+    'exec tar -C /var/lib/indieforge/games -czf - .' \
+    > "$artifact_backup.partial"
+  compose exec -T postgres pg_restore --list < "$database_backup.partial" > /dev/null
+  tar -tzf "$artifact_backup.partial" > /dev/null
+  mv "$database_backup.partial" "$database_backup"
+  mv "$artifact_backup.partial" "$artifact_backup"
+  printf 'Database backup: %s\nArtifact backup: %s\n' "$database_backup" "$artifact_backup"
   git rev-parse HEAD
+  compose up -d --wait
 )
+backup_release
 ```
 
-Record the revision alongside the backup in your operations records. The dump includes application data and the Prisma migration history, but not PostgreSQL cluster roles or `.env.production`. Keep an encrypted off-host copy, restrict access to both backups and secrets, define retention, monitor scheduled backup failures, and regularly test restores into an isolated database. A local backup alone will not survive host loss. Archive validated dumps even if a later deployment fails.
+If the function fails after stopping API/web, investigate the error before using
+`compose up -d --wait`; do not deploy from an unvalidated pair. Record the
+revision alongside both files in operations records. The database dump includes
+application data and Prisma migration history, while the artifact archive is a
+tar stream of the private `game_storage` named volume. Neither includes cluster
+roles or `.env.production`. Keep encrypted off-host copies, restrict access to
+both backups and secrets, define retention, monitor scheduled backup failures,
+and regularly test restores into an isolated database. A local backup alone
+will not survive host loss.
 
 ## Restore with explicit confirmation
 
-A restore replaces database contents and discards changes since the chosen backup. First make a fresh backup using the previous section, identify its revision and the revision compatible with the dump to restore, and verify the target project. Do not run an upgrade or a second operator session concurrently. Use a trusted custom-format dump; a dump can contain executable database commands.
+A restore replaces database contents and game artifact contents, discarding
+changes since the chosen backup pair. First make a fresh backup using the
+previous section, identify its revision and the revision compatible with the
+pair to restore, and verify the target project. Do not run an upgrade or a
+second operator session concurrently. Use trusted archives only: database dumps
+and tar archives can contain executable restore instructions or unsafe paths.
 
 `pg_restore --clean` only removes objects present in the archive; it does not remove tables or other objects introduced by later migrations. Exact recovery therefore requires a clean target database. The function below validates the archive and displays the actual target before asking for typed confirmation. It stops API, web, and the migration job, drops only the configured application database, recreates it from `template0`, and restores the archive in one transaction. It refuses the PostgreSQL maintenance/template database names.
 
@@ -133,16 +163,19 @@ Dropping the database cannot be rolled back with the restore transaction. A fail
 ```bash
 restore_database() {
   local backup_file="$1"
+  local artifact_file="${2:-}"
   local confirmation
   local target_database
   test -s "$backup_file" || return 1
+  test -z "$artifact_file" || test -s "$artifact_file" || return 1
   compose ps -a || return 1
   compose exec -T postgres pg_restore --list < "$backup_file" > /dev/null || return 1
+  test -z "$artifact_file" || tar -tzf "$artifact_file" > /dev/null || return 1
   target_database="$(compose exec -T postgres sh -c 'printf "%s" "$POSTGRES_DB"' < /dev/null)" || return 1
   case "$target_database" in
     ''|postgres|template0|template1) printf 'Refusing maintenance/empty database target.\n' >&2; return 1 ;;
   esac
-  printf 'DROP and recreate database %s in project indieforge from %s? Type RESTORE: ' "$target_database" "$backup_file"
+  printf 'DROP/recreate database %s and replace game artifacts in project indieforge? Type RESTORE: ' "$target_database"
   read -r confirmation
   test "$confirmation" = RESTORE || return 1
   compose stop api web migrate || return 1
@@ -150,22 +183,64 @@ restore_database() {
     dropdb --force --username="$POSTGRES_USER" -- "$POSTGRES_DB"
     createdb --username="$POSTGRES_USER" --owner="$POSTGRES_USER" --template=template0 -- "$POSTGRES_DB"
   ' || return 1
+  if test -n "$artifact_file"; then
+    compose run --rm --no-deps --entrypoint sh api -c '
+      set -e
+      find /var/lib/indieforge/games -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
+      exec tar -C /var/lib/indieforge/games --no-same-owner --no-same-permissions -xzf -
+    ' < "$artifact_file" || return 1
+  fi
   compose exec -T postgres sh -c \
     'exec pg_restore --clean --if-exists --no-owner --single-transaction --exit-on-error --username="$POSTGRES_USER" --dbname="$POSTGRES_DB"' \
     < "$backup_file" || return 1
   compose run --rm --no-deps migrate pnpm --filter @indieforge/database prisma migrate status || return 1
   compose up -d --wait || return 1
 }
-restore_database 'backups/<timestamp>.dump'
+restore_database 'backups/<timestamp>.database.dump' 'backups/<timestamp>.artifacts.tar.gz'
 ```
 
-Before calling this function, ensure the checkout and built images match the restored database's application revision. The migration-status check must confirm that this release's committed migration history matches the restored database before `up` can restart the application. Restoring an old dump while leaving incompatible newer images in place is not a rollback. After success, repeat migration logs, service health, and browser verification from the start section.
+The second argument is required for a complete application recovery; omitting it
+is only appropriate for a deliberate database-only operator repair. The
+artifact replacement occurs only after the typed confirmation, with API/web
+stopped, and clears the contents of `game_storage` without deleting its Docker
+volume. Before calling this function, ensure the checkout and built images
+match the restored database's application revision. The migration-status check
+must confirm that this release's committed migration history matches the
+restored database before `up` can restart the application. Restoring an old
+backup pair while leaving incompatible newer images in place is not a rollback.
+After success, repeat migration logs, service health, and browser verification
+from the start section.
 
-To regression-test the documented function on a validation host, run `node scripts/test-restore-runbook.mjs` with Docker access and the `postgres:16-alpine` image already present. It uses an isolated, unpublished PostgreSQL container with temporary data, executes the runbook function, proves a post-backup table is removed, and checks confirmation/failure handling. Application lifecycle and migration-status outcomes are controlled by the test harness; the dump, database recreation, restore, and SQL assertions use real PostgreSQL. The drill removes its container and temporary files even on failure.
+To regression-test the documented database function on a validation host, run `node scripts/test-restore-runbook.mjs` with Docker access and the `postgres:16-alpine` image already present. It uses an isolated, unpublished PostgreSQL container with temporary data, executes the runbook function, proves a post-backup table is removed, and checks confirmation/failure handling. Application lifecycle and migration-status outcomes are controlled by the test harness; the dump, database recreation, restore, and SQL assertions use real PostgreSQL. The drill removes its container and temporary files even on failure.
+
+## Moderator role assignment
+
+Roles are assigned only by an operator with PostgreSQL access; no public API
+can elevate a user. The function prompts for the email and a typed confirmation
+instead of placing the address in shell history. It changes exactly the matching
+user and prints the returned email/role so a missing account is visible.
+
+```bash
+grant_moderator() {
+  local email confirmation
+  read -r -p 'Existing account email to grant MODERATOR: ' email
+  test -n "$email" || return 1
+  printf 'Grant MODERATOR to %s in project indieforge? Type GRANT: ' "$email"
+  read -r confirmation
+  test "$confirmation" = GRANT || return 1
+  compose exec -T postgres psql --set ON_ERROR_STOP=1 --set "email=$email" \
+    --username="$POSTGRES_USER" --dbname="$POSTGRES_DB" \
+    --command 'UPDATE "User" SET "role" = '\''MODERATOR'\'' WHERE "email" = :'\''email'\'' RETURNING "email", "role";'
+}
+grant_moderator
+```
+
+Sign out and back in after an elevation so navigation updates. Use `ADMIN` only
+when the broader administrative role is actually required.
 
 ## Upgrade
 
-Schedule a maintenance window; this is a single-host deployment with downtime during migration. Save the current revision (`git rev-parse HEAD`) and a verified backup path before changing code. Review release notes and migrations for compatibility and restore requirements. Ensure `git status --short` is clean; keep `.env.production` and the project name in place.
+Schedule a maintenance window; this is a single-host deployment with downtime during migration. Save the current revision (`git rev-parse HEAD`) and a verified database/artifact backup pair before changing code. Review release notes and migrations for compatibility and restore requirements. Ensure `git status --short` is clean; keep `.env.production` and the project name in place.
 
 After the backup completes, execute these commands in order, stopping on any failure:
 
@@ -199,11 +274,19 @@ compose rm -f migrate
 compose up -d --wait
 ```
 
-For an incompatible migration, keep API/web stopped, make a fresh safety backup, check out and build the previous revision as above, and remove the stopped migration container. Then call `restore_database` with the verified pre-upgrade dump. Its explicit confirmation and success check control restart. This restores the database and migration history together; it also loses writes made after that dump. Repeat health and browser verification and retain the failed-release backup for investigation. Do not edit `_prisma_migrations` or invent reverse migrations as an emergency shortcut.
+For an incompatible migration, keep API/web stopped, make a fresh safety backup pair, check out and build the previous revision as above, and remove the stopped migration container. Then call `restore_database` with the verified pre-upgrade database and artifact archives. Its explicit confirmation and success check control restart. This restores database state, artifact bytes, and migration history together; it also loses writes made after that pair. Repeat health and browser verification and retain the failed-release backup for investigation. Do not edit `_prisma_migrations` or invent reverse migrations as an emergency shortcut.
 
 ## Persistent state, rotation, and availability
 
-The `indieforge_postgres_data` volume holds PostgreSQL data. `indieforge_caddy_data` stores certificates and private keys; `indieforge_caddy_config` stores Caddy configuration state. Preserve all three across restarts and upgrades. Repeatedly deleting certificate state forces reissuance and can hit certificate-authority limits. Protect certificate backups as secrets, and keep independent copies of the deployment configuration and environment through your secret-management process.
+The `indieforge_postgres_data` volume holds PostgreSQL data.
+`indieforge_game_storage` holds immutable uploaded and compiled game artifacts
+and is mounted only into the single API process. `indieforge_caddy_data` stores
+certificates and private keys; `indieforge_caddy_config` stores Caddy
+configuration state. Preserve all four across restarts and upgrades. Repeatedly
+deleting certificate state forces reissuance and can hit certificate-authority
+limits. Protect certificate/artifact backups as sensitive data, and keep
+independent copies of deployment configuration and environment through your
+secret-management process.
 
 Changing `JWT_SECRET` and recreating the API invalidates existing sessions; users must sign in again. Coordinate this with the maintenance window. Changing `POSTGRES_PASSWORD` in `.env.production` alone does not rotate an existing database role: the PostgreSQL image initializes credentials only on an empty data volume. Stop API/web, change the role password inside PostgreSQL using a secure administrative session, update the protected environment file to the same new hexadecimal value, and recreate the API/migration services before health checks. Avoid passwords in command arguments or shell history. Changing the origin also requires API recreation; switching from HTTP to HTTPS requires secure cookies and a fresh login.
 

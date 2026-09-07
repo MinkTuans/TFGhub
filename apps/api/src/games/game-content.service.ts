@@ -27,7 +27,18 @@ import {
   type WorkspaceUpdate,
 } from './games.service.js';
 
-export const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
+const fixedUploadBytes = 25 * 1024 * 1024;
+
+export function uploadLimitFromEnvironment(value: string | undefined): number {
+  if (value !== undefined && value !== String(fixedUploadBytes)) {
+    throw new Error(`GAME_UPLOAD_MAX_BYTES must be ${fixedUploadBytes}`);
+  }
+  return fixedUploadBytes;
+}
+
+export const MAX_UPLOAD_BYTES = uploadLimitFromEnvironment(
+  process.env.GAME_UPLOAD_MAX_BYTES,
+);
 const MAX_EXPANDED_BYTES = 100 * 1024 * 1024;
 const MAX_ENTRIES = 1000;
 

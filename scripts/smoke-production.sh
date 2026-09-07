@@ -128,7 +128,7 @@ draft_response="$({
     --cookie "$cookie_jar" \
     --header 'Content-Type: application/json' \
     --header 'Origin: http://localhost:8080' \
-    --data "{\"title\":\"Disposable smoke draft\",\"slug\":\"$draft_slug\",\"description\":\"Created by the production smoke journey.\",\"accessMode\":\"GUEST_ALLOWED\"}" \
+    --data "{\"title\":\"Disposable smoke draft\",\"slug\":\"$draft_slug\",\"description\":\"Created by the production smoke journey.\",\"accessMode\":\"GUEST_ALLOWED\",\"sourceType\":\"CODE\"}" \
     http://localhost:8080/api/games
 })"
 RESPONSE="$draft_response" EXPECTED_SLUG="$draft_slug" node --input-type=module <<'NODE'
@@ -137,8 +137,49 @@ import assert from 'node:assert/strict';
 const body = JSON.parse(process.env.RESPONSE);
 assert.equal(body.slug, process.env.EXPECTED_SLUG);
 assert.equal(body.visibility, 'DRAFT');
+assert.equal(body.sourceType, 'CODE');
 NODE
 echo "authenticated draft: PASS"
+
+draft_id="$(RESPONSE="$draft_response" node --input-type=module <<'NODE'
+const body = JSON.parse(process.env.RESPONSE);
+process.stdout.write(body.id);
+NODE
+)"
+project_response="$({
+  curl --silent --show-error --fail-with-body \
+    --cookie "$cookie_jar" \
+    --header 'Content-Type: application/json' \
+    --header 'Origin: http://localhost:8080' \
+    --request PUT \
+    --data '{"sourceType":"CODE","html":"<main>Artifact smoke</main>","css":"","javascript":""}' \
+    "http://localhost:8080/api/games/$draft_id/project"
+})"
+RESPONSE="$project_response" node --input-type=module <<'NODE'
+import assert from 'node:assert/strict';
+
+const body = JSON.parse(process.env.RESPONSE);
+assert.equal(body.artifactReady, false);
+assert.equal(body.sourceType, 'CODE');
+NODE
+
+build_response="$({
+  curl --silent --show-error --fail-with-body \
+    --cookie "$cookie_jar" \
+    --header 'Content-Type: application/json' \
+    --header 'Origin: http://localhost:8080' \
+    --data '{}' \
+    "http://localhost:8080/api/games/$draft_id/build"
+})"
+RESPONSE="$build_response" node --input-type=module <<'NODE'
+import assert from 'node:assert/strict';
+
+const body = JSON.parse(process.env.RESPONSE);
+assert.equal(body.artifactVersion, 1);
+assert.equal(body.artifactReady, true);
+NODE
+compose exec -T api sh -c "test -f /var/lib/indieforge/games/$draft_id/1/index.html"
+echo "durable artifact storage: PASS"
 
 owned_games_response="$(curl --silent --show-error --fail-with-body --cookie "$cookie_jar" http://localhost:8080/api/games/mine)"
 RESPONSE="$owned_games_response" EXPECTED_SLUG="$draft_slug" node --input-type=module <<'NODE'

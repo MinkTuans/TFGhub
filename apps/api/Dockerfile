@@ -26,6 +26,11 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends openssl \
     && rm -rf /var/lib/apt/lists/*
 
+# Docker copies this node-owned directory into a newly created named volume.
+# The API remains the only service that mounts the artifact volume.
+RUN mkdir -p /var/lib/indieforge/games \
+    && chown -R node:node /var/lib/indieforge
+
 ENV COREPACK_HOME=/home/node/.cache/node/corepack
 RUN corepack enable \
     && corepack prepare pnpm@10.0.0 --activate \

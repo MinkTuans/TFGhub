@@ -59,6 +59,23 @@ describe('contracts', () => {
     ).toBe(false);
   });
 
+  it.each([
+    ['canvas', { width: 1921, height: 480 }, { x: 32, y: 32 }, { x: 600, y: 400 }],
+    ['player', { width: 640, height: 480 }, { x: 640, y: 32 }, { x: 600, y: 400 }],
+    ['goal', { width: 640, height: 480 }, { x: 32, y: 32 }, { x: 600, y: 480 }],
+  ])('rejects a platformer %s outside its canvas', (_field, canvas, player, goal) => {
+    expect(
+      gameProjectInput().safeParse({
+        sourceType: 'PLATFORMER',
+        canvas,
+        backgroundColor: '#101010',
+        player: { ...player, color: '#ffffff' },
+        goal: { ...goal, color: '#00ff00' },
+        platforms: [{ x: 0, y: 440, width: 640, height: 40, color: '#888888' }],
+      }).success,
+    ).toBe(false);
+  });
+
   it('bounds each code source field to 50,000 characters', () => {
     const schema = gameProjectInput();
     const withinLimit = 'a'.repeat(50_000);

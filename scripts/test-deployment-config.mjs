@@ -17,6 +17,7 @@ JWT_SECRET=${jwtSecret}
 `;
 
 const environmentExample = await readFile('.env.production.example', 'utf8');
+const deploymentRunbook = await readFile('docs/deployment.md', 'utf8');
 const postgresPasswordDocumentation =
   environmentExample.match(/(?:^#.*\n)+POSTGRES_PASSWORD=/m)?.[0] ?? '';
 assert.match(postgresPasswordDocumentation, /URL-safe hexadecimal/i);
@@ -119,6 +120,23 @@ try {
   }
 
   assert.equal(services.api.environment.JWT_SECRET, jwtSecret);
+  assert.equal(
+    services.api.environment.GAME_STORAGE_ROOT,
+    '/var/lib/indieforge/games',
+  );
+  assert.equal(services.api.environment.GAME_UPLOAD_MAX_BYTES, '26214400');
+  assert.deepEqual(services.api.volumes, [
+    {
+      type: 'volume',
+      source: 'game_storage',
+      target: '/var/lib/indieforge/games',
+      volume: {},
+    },
+  ]);
+  assert.ok(
+    configuration.volumes.game_storage !== undefined,
+    'game artifact storage must be declared as a named volume',
+  );
   assert.deepEqual(
     Object.entries(services)
       .filter(([, service]) => service.build?.dockerfile === 'apps/api/Dockerfile')
@@ -127,6 +145,22 @@ try {
     'the API image must be built once and shared with the migration job',
   );
   assert.equal(services.migrate.image, services.api.image);
+
+  assert.match(
+    deploymentRunbook,
+    /game_storage.*artifact.*backup|artifact.*backup.*game_storage/is,
+    'the runbook must pair artifact-volume backups with the database dump',
+  );
+  assert.match(
+    deploymentRunbook,
+    /artifact.*restore|restore.*artifact/is,
+    'the runbook must restore the matching artifact archive with the database',
+  );
+  assert.match(
+    deploymentRunbook,
+    /role.*MODERATOR|MODERATOR.*role/is,
+    'the runbook must document an operator-only moderator role grant',
+  );
   console.log('deployment configuration valid');
 } finally {
   await rm(temporaryDirectory, { recursive: true, force: true });

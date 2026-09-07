@@ -4,7 +4,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { ArtifactStorage } from '../game-artifacts/artifact-storage.js';
-import { GameContentService } from './game-content.service.js';
+import {
+  GameContentService,
+  uploadLimitFromEnvironment,
+} from './game-content.service.js';
 import type {
   GamesRepository,
   StoredGame,
@@ -643,5 +646,15 @@ describe('GameContentService with real artifacts and ZIP streams', () => {
     await expect(
       service.playCapability('demo', { id: 'visitor', role: 'USER' }),
     ).rejects.toMatchObject({ status: 404 });
+  });
+});
+
+describe('production upload limit configuration', () => {
+  it('accepts only the documented fixed production upload limit', () => {
+    expect(uploadLimitFromEnvironment(undefined)).toBe(25 * 1024 * 1024);
+    expect(uploadLimitFromEnvironment('26214400')).toBe(25 * 1024 * 1024);
+    expect(() => uploadLimitFromEnvironment('26214401')).toThrow(
+      'GAME_UPLOAD_MAX_BYTES must be 26214400',
+    );
   });
 });

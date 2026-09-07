@@ -20,6 +20,11 @@ assert.match(api, /pnpm --filter api build/);
 assert.match(api, /USER node/);
 assert.match(api, /CMD \["node", "apps\/api\/dist\/main\.js"\]/);
 assert.match(apiRuntime, /apt-get install -y --no-install-recommends openssl/);
+assert.match(
+  apiRuntime,
+  /mkdir -p \/var\/lib\/indieforge\/games[\s\S]*chown -R node:node \/var\/lib\/indieforge/,
+  'the API image must seed a node-owned artifact directory so a fresh named volume is writable',
+);
 assert.match(web, /ARG NEXT_PUBLIC_API_URL=\/api/);
 assert.match(web, /pnpm --filter web build/);
 assert.match(web, /USER node/);

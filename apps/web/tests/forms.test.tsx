@@ -427,6 +427,10 @@ test("story build refreshes the sandboxed preview and enables submission", async
     "sandbox",
     "allow-scripts allow-pointer-lock",
   );
+  expect(preview).toHaveAttribute(
+    "sandbox",
+    "allow-scripts allow-pointer-lock",
+  );
   expect(screen.getByRole("button", { name: "Submit for review" })).toBeEnabled();
   expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({
     sourceType: "STORY",
