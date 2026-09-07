@@ -306,25 +306,25 @@
 - Produces: add/remove/edit scene and choice controls plus build/preview.
 - Consumes: `StoryProjectInput` and shared save/build APIs.
 
-- [ ] **Step 1: Write failing story-builder tests**
+- [x] **Step 1: Write failing story-builder tests**
 
   Assert add/remove scene, add/remove choice, duplicate scene and missing target
   validation, retained input after API error, build preview, and a branching
   browser journey that reaches the selected target scene.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
   Run: `pnpm --filter web test && PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/google-chrome pnpm --filter web e2e --grep "story game"`
 
   Expected: tests fail because the builder is absent.
 
-- [ ] **Step 3: Implement the story builder**
+- [x] **Step 3: Implement the story builder**
 
   Keep scene/choice arrays in React state with UUID keys used only by the UI;
   submit the bounded contract shape. Render native labeled fields/buttons and
   reuse save/build/preview/submit behavior.
 
-- [ ] **Step 4: Verify GREEN and commit**
+- [x] **Step 4: Verify GREEN and commit**
 
   Run: `pnpm --filter web test && pnpm --filter web typecheck && pnpm --filter web lint && PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/google-chrome pnpm --filter web e2e --grep "story game" && git add apps/web && git commit -m "feat(web): add no-code story builder"`
 
