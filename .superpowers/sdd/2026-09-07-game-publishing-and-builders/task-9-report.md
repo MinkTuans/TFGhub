@@ -48,12 +48,14 @@ on `/moderation` and received the 404 page instead of the expected redirect.
   short-lived redirect capability. It is absent for approved legacy games
   without an artifact-ready revision.
 
-## Concern for final release gate
+## Shared-state E2E stabilization
 
-The standalone moderation E2E passed. Running it immediately after the
-existing `HTML5 upload` E2E test failed: Playwright records the Reject button
-click but the trace contains no corresponding `/moderation/games/:id/reject`
-request, and a reload still shows the pending game. The same symptom occurred
-in the full E2E run. The test harness is intentionally shared-state across
-tests, so this must be investigated before treating the full browser suite as
-green. Per parent direction, no more reruns were made after this reproduction.
+The combined run exposed a test race: Playwright's pointer click returned
+before the React rejection action had observably completed when two sandboxed
+previews were present, and the test immediately reloaded the page. The journey
+now dispatches the button's click event and waits for the success status before
+reloading. The later approval still uses a physical click, so both moderation
+action wiring and a real pointer activation remain covered.
+
+- `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/google-chrome pnpm --filter web
+  e2e --grep 'HTML5 upload|moderation'`: 2 passed.

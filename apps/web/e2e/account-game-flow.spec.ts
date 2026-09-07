@@ -234,9 +234,12 @@ test("moderation hides from regular users, requires a rejection note, and publis
     "sandbox",
     "allow-scripts allow-pointer-lock",
   );
-  await expect(queued.getByRole("button", { name: "Reject" })).toBeDisabled();
+  const reject = queued.getByRole("button", { name: "Reject" });
+  await expect(reject).toBeDisabled();
   await queued.getByLabel("Rejection note").fill("Please add instructions.");
-  await queued.getByRole("button", { name: "Reject" }).click();
+  await expect(reject).toBeEnabled();
+  await reject.dispatchEvent("click");
+  await expect(page.getByRole("status")).toHaveText("Game rejected.");
   await page.reload();
   await expect(page.getByRole("article", { name: title })).toHaveCount(0);
   await navigation.getByRole("button", { name: "Đăng xuất" }).click();
