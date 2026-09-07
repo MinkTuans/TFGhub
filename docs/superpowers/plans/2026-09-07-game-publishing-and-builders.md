@@ -340,25 +340,25 @@
 - Produces: bounded canvas/player/goal/platform controls and playable preview.
 - Consumes: `PlatformerProjectInput` and shared save/build APIs.
 
-- [ ] **Step 1: Write failing platformer-builder tests**
+- [x] **Step 1: Write failing platformer-builder tests**
 
   Assert platform add/remove, numeric boundary validation, retained values after
   errors, build preview, keyboard movement, collision landing, and goal status
   in a browser.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
   Run: `pnpm --filter web test && PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/google-chrome pnpm --filter web e2e --grep "platformer game"`
 
   Expected: tests fail because the builder is absent.
 
-- [ ] **Step 3: Implement the platformer builder**
+- [x] **Step 3: Implement the platformer builder**
 
   Use number/color inputs and a repeatable platform fieldset. Validate through
   `PlatformerProjectInput`, reuse shared save/build/preview/submit behavior, and
   keep physics solely in the generated iframe runtime.
 
-- [ ] **Step 4: Verify GREEN and commit**
+- [x] **Step 4: Verify GREEN and commit**
 
   Run: `pnpm --filter web test && pnpm --filter web typecheck && pnpm --filter web lint && PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/google-chrome pnpm --filter web e2e --grep "platformer game" && git add apps/web && git commit -m "feat(web): add no-code platformer builder"`
 
