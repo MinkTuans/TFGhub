@@ -6,6 +6,7 @@
     "db:generate": "turbo run generate --filter=@indieforge/database --output-logs=errors-only",
     "dev": "pnpm db:generate && turbo dev",
     "test": "pnpm db:generate && turbo test",
+    "test:containers": "node scripts/test-container-contract.mjs",
     "lint": "turbo lint",
     "typecheck": "pnpm db:generate && turbo typecheck"
   },
