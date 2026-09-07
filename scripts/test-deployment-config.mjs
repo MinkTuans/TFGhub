@@ -28,34 +28,74 @@ const temporaryDirectory = await mkdtemp(
   join(tmpdir(), 'indieforge-deployment-config-'),
 );
 const environmentFile = join(temporaryDirectory, '.env.production');
+const adsenseEnvironment = {
+  NEXT_PUBLIC_ADSENSE_ENABLED: '',
+  NEXT_PUBLIC_ADSENSE_CLIENT: '',
+  NEXT_PUBLIC_ADSENSE_GAME_LEFT_TOP_SLOT: '',
+  NEXT_PUBLIC_ADSENSE_GAME_LEFT_BOTTOM_SLOT: '',
+};
+const render = (overrides = {}) => JSON.parse(execFileSync(
+  'docker',
+  ['compose', '--env-file', environmentFile, '-f', 'compose.production.yml', 'config', '--format', 'json'],
+  { encoding: 'utf8', env: {
+    ...process.env,
+    ...Object.fromEntries(environment.trim().split('\n').map((line) => {
+      const separator = line.indexOf('=');
+      return [line.slice(0, separator), line.slice(separator + 1)];
+    })),
+    ...adsenseEnvironment, COOKIE_SECURE: '', ...overrides,
+  } },
+));
+// Exercise the production guard with the actual values passed to the web build.
+const resolveAdsense = (args) => JSON.parse(execFileSync(
+  process.execPath,
+  ['--experimental-strip-types', '--disable-warning=ExperimentalWarning', '--input-type=module', '-e',
+    'import { adsenseConfig } from "./apps/web/lib/adsense-config.ts"; process.stdout.write(JSON.stringify(adsenseConfig()));'],
+  { encoding: 'utf8', env: { ...process.env, ...adsenseEnvironment, ...args } },
+));
 
 try {
   await writeFile(environmentFile, environment);
 
-  const rendered = execFileSync(
-    'docker',
-    [
-      'compose',
-      '--env-file',
-      environmentFile,
-      '-f',
-      'compose.production.yml',
-      'config',
-      '--format',
-      'json',
-    ],
-    { encoding: 'utf8', env: { ...process.env, COOKIE_SECURE: '' } },
-  );
-  const configuration = JSON.parse(rendered);
+  const configuration = render();
   const { services } = configuration;
 
   assert.equal(services.api.environment.COOKIE_SECURE, 'true');
-  const previewConfiguration = JSON.parse(execFileSync(
-    'docker',
-    ['compose', '--env-file', environmentFile, '-f', 'compose.production.yml', 'config', '--format', 'json'],
-    { encoding: 'utf8', env: { ...process.env, COOKIE_SECURE: 'false' } },
-  ));
+  const previewConfiguration = render({ COOKIE_SECURE: 'false' });
   assert.equal(previewConfiguration.services.api.environment.COOKIE_SECURE, 'false');
+
+  assert.deepEqual(services.web.build.args, {
+    NEXT_PUBLIC_API_URL: '/api',
+    NEXT_PUBLIC_ADSENSE_ENABLED: 'false',
+    NEXT_PUBLIC_ADSENSE_CLIENT: '',
+    NEXT_PUBLIC_ADSENSE_GAME_LEFT_TOP_SLOT: '',
+    NEXT_PUBLIC_ADSENSE_GAME_LEFT_BOTTOM_SLOT: '',
+  });
+  assert.deepEqual(resolveAdsense(services.web.build.args), { enabled: false });
+  const validAdsense = {
+    NEXT_PUBLIC_ADSENSE_ENABLED: 'true',
+    NEXT_PUBLIC_ADSENSE_CLIENT: 'ca-pub-1234567890',
+    NEXT_PUBLIC_ADSENSE_GAME_LEFT_TOP_SLOT: '1234567890',
+    NEXT_PUBLIC_ADSENSE_GAME_LEFT_BOTTOM_SLOT: '0987654321',
+  };
+  for (const [name, overrides] of [
+    ['enabled without IDs', { NEXT_PUBLIC_ADSENSE_ENABLED: 'true' }],
+    ...Object.keys(adsenseEnvironment).filter((name) => name !== 'NEXT_PUBLIC_ADSENSE_ENABLED')
+      .flatMap((name) => [
+        [`missing ${name}`, { ...validAdsense, [name]: '' }],
+        [`malformed ${name}`, { ...validAdsense, [name]: 'invalid' }],
+      ]),
+    ['disabled with valid IDs', { ...validAdsense, NEXT_PUBLIC_ADSENSE_ENABLED: 'false' }],
+    ['nonliteral enable flag', { ...validAdsense, NEXT_PUBLIC_ADSENSE_ENABLED: 'TRUE' }],
+  ]) {
+    assert.deepEqual(resolveAdsense(render(overrides).services.web.build.args), { enabled: false }, name);
+  }
+  assert.deepEqual(resolveAdsense(render(validAdsense).services.web.build.args), {
+    enabled: true,
+    client: 'ca-pub-1234567890',
+    slots: { gameLeftTop: '1234567890', gameLeftBottom: '0987654321' },
+  });
+  console.log('AdSense build args, disabled default, and invalid-ID guard: PASS');
 
   assert.deepEqual(Object.keys(services).sort(), [
     'api',
@@ -135,7 +175,14 @@ try {
   ]);
   assert.ok(
     configuration.volumes.game_storage !== undefined,
-    'game artifact storage must be declared as a named volume',
+    'game artifact and cover storage must be declared as a named volume',
+  );
+  assert.deepEqual(
+    Object.entries(services)
+      .filter(([, service]) => service.volumes?.some((volume) => volume.source === 'game_storage'))
+      .map(([name]) => name),
+    ['api'],
+    'only the API may mount game storage; covers must not be exposed as proxy/web files',
   );
   assert.deepEqual(
     Object.entries(services)

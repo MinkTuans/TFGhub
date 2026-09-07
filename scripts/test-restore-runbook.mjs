@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { chmod, mkdtemp, mkdir, readFile, rm, stat, symlink, unlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -73,13 +74,23 @@ compose() {
   esac
 }
 ${restoreFunction}
-restore_database "$DRILL_BACKUP" "$DRILL_ARTIFACT_BACKUP"
+restore_database "$DRILL_BACKUP" "$DRILL_ARTIFACT_BACKUP" "$DRILL_CHECKSUMS"
 `;
 const backup = join(directory, "before.dump");
 const artifactRoot = join(directory, "games");
 const artifactBackup = join(directory, "before.artifacts.tar.gz");
+const checksumFile = join(directory, "before.sha256");
+const coverPath = join("covers", "game-id", "1", "cover");
+const coverMetadataPath = join("covers", "game-id", "1", ".indieforge-cover.json");
+const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
 const invoke = async (confirmation, overrides = {}) => {
   await writeFile(lifecycleFile, "");
+  if (!overrides.DRILL_CHECKSUMS) {
+    await writeFile(checksumFile, execFileSync("sha256sum", [
+      overrides.DRILL_BACKUP ?? backup,
+      overrides.DRILL_ARTIFACT_BACKUP ?? artifactBackup,
+    ]));
+  }
   const result = spawnSync("bash", ["-c", harness], {
     input: `${confirmation}\n`,
     encoding: "utf8",
@@ -93,6 +104,7 @@ const invoke = async (confirmation, overrides = {}) => {
       DRILL_LIFECYCLE: lifecycleFile,
       DRILL_VERIFY_EXIT: "0",
       DRILL_RESTORE_FAIL: "0",
+      DRILL_CHECKSUMS: checksumFile,
       ...overrides,
     },
   });
@@ -142,7 +154,19 @@ try {
   await writeFile(join(artifactRoot, "before-game", "1", "index.html"), "before");
   await chmod(join(artifactRoot, "before-game", "1", "index.html"), 0o444);
   await chmod(join(artifactRoot, "before-game", "1"), 0o555);
+  await mkdir(join(artifactRoot, "covers", "game-id", "1"), { recursive: true });
+  const coverBytes = Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aX1cAAAAASUVORK5CYII=", "base64",
+  );
+  const coverMetadata = JSON.stringify({ contentType: "image/png" });
+  await writeFile(join(artifactRoot, coverPath), coverBytes);
+  await writeFile(join(artifactRoot, coverMetadataPath), coverMetadata);
+  await chmod(join(artifactRoot, coverPath), 0o444);
+  await chmod(join(artifactRoot, coverMetadataPath), 0o444);
+  await chmod(join(artifactRoot, "covers", "game-id", "1"), 0o555);
   execFileSync("tar", ["-C", artifactRoot, "-czf", artifactBackup, "."]);
+  await mkdir(join(artifactRoot, "covers", "game-id", "2"));
+  await writeFile(join(artifactRoot, "covers", "game-id", "2", "cover"), "later cover");
   await mkdir(join(artifactRoot, "after-game", "1"), { recursive: true });
   await writeFile(join(artifactRoot, "after-game", "1", "index.html"), "after");
   await chmod(join(artifactRoot, "after-game", "1", "index.html"), 0o444);
@@ -179,6 +203,15 @@ try {
   assert.equal(sql("SELECT count(*) FROM before_backup"), "2");
   console.log("declined confirmation preserves database: PASS");
 
+  const wrongChecksums = join(directory, "wrong.sha256");
+  await writeFile(wrongChecksums, `${"0".repeat(64)}  ${backup}\n${"0".repeat(64)}  ${artifactBackup}\n`);
+  const checksumFailure = await invoke("RESTORE", { DRILL_CHECKSUMS: wrongChecksums });
+  assert.notEqual(checksumFailure.status, 0, "checksum mismatch must abort restore");
+  assert.equal(checksumFailure.lifecycle, "", "checksum mismatch must fail before services stop");
+  assert.equal(sql("SELECT count(*) FROM before_backup"), "2");
+  assert.equal(await readFile(join(artifactRoot, "covers", "game-id", "2", "cover"), "utf8"), "later cover");
+  console.log("checksum mismatch preserves database, covers, and service state: PASS");
+
   const restored = await invoke("RESTORE");
   assert.equal(restored.status, 0, restored.stderr);
   assert.equal(sql("SELECT count(*) FROM before_backup"), "1");
@@ -193,6 +226,13 @@ try {
     "before",
   );
   await assert.rejects(stat(join(artifactRoot, "after-game")));
+  await assert.rejects(stat(join(artifactRoot, "covers", "game-id", "2")));
+  assert.equal(sha256(await readFile(join(artifactRoot, "before-game", "1", "index.html"))), sha256("before"));
+  assert.equal(sha256(await readFile(join(artifactRoot, coverPath))), sha256(coverBytes));
+  assert.equal(sha256(await readFile(join(artifactRoot, coverMetadataPath))), sha256(coverMetadata));
+  assert.equal((await stat(join(artifactRoot, coverPath))).mode & 0o777, 0o444, "cover bytes must remain sealed and non-executable");
+  assert.equal((await stat(join(artifactRoot, "covers", "game-id", "1"))).mode & 0o777, 0o555);
+  console.log("restore preserves cover/artifact SHA-256 and removes later cover versions: PASS");
   assert.equal(
     (await stat(join(artifactRoot, "before-game", "1"))).mode & 0o777,
     0o555,

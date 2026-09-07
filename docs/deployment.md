@@ -1,4 +1,4 @@
-# Production deployment
+# TFG production deployment
 
 This runbook operates one Linux host running Caddy, Next.js, the API, a one-shot Prisma migration job, and PostgreSQL 16. Run commands from the repository root in Bash. Replace the example repository URL, revision, hostname, and IP before running them.
 
@@ -58,6 +58,32 @@ compose config --quiet
 
 Unset any exported variables that would override `.env.production`, especially `POSTGRES_PASSWORD`, `JWT_SECRET`, `COOKIE_SECURE`, and the origin/address settings. Shell environment overrides the environment file. Never use the local `docker-compose.yml` for this deployment.
 
+## AdSense build configuration
+
+Keep the current test deployment at `NEXT_PUBLIC_ADSENSE_ENABLED=false`, with
+empty IDs. The web image receives all four public build arguments from Compose:
+
+```dotenv
+NEXT_PUBLIC_ADSENSE_ENABLED=false
+NEXT_PUBLIC_ADSENSE_CLIENT=
+NEXT_PUBLIC_ADSENSE_GAME_LEFT_TOP_SLOT=
+NEXT_PUBLIC_ADSENSE_GAME_LEFT_BOTTOM_SLOT=
+```
+
+The enable flag must be exactly `true`, the client must match `^ca-pub-\d+$`,
+and both slots must match `^\d+$` before the adapter renders an AdSense script
+or ad element. Missing or malformed values disable it. Disabled slots display
+`Quảng cáo` placeholders and make no Google request, even when valid IDs are
+present. These values are public and compiled into the web image: rebuild and
+recreate web after changing them; setting runtime environment variables alone
+does not update the browser bundle.
+
+CSP must be deliberately expanded and reviewed before enabling real AdSense.
+Validate the required script, frame, image, and connection origins against the
+provider's current requirements; valid IDs alone are not release approval.
+Preserve the executable game's sandbox and CSP. This release neither enables
+real ads nor adds Google origins to game-content policy.
+
 ## Start and verify
 
 ```bash
@@ -77,6 +103,68 @@ curl --fail --show-error --connect-timeout 5 --max-time 30 "$PUBLIC_ORIGIN/api/h
 ```
 
 Expect `{"status":"ok"}`. In a browser at that origin, register a disposable account, save a developer profile, reload `/studio`, create a draft, build a small code/story/platformer game, confirm its sandboxed preview works, and sign out and back in. A direct `/studio` reload must retain the session. Send a built game for review, then use a separately granted moderator account to approve or reject it. Only approved, moderation-clear public games are discoverable; drafts and unreviewed artifacts remain private.
+
+### TFG desktop acceptance
+
+Check 1280×720, 1440×900, and 1920×1080 in light and dark themes. The brand is
+`TFG`, and navigation, account forms, Studio, moderation, and player controls
+use Vietnamese. Home presents all four creation methods; Discover shows real
+covers or a deterministic 16:9 fallback. Narrow windows collapse the player
+sidebars below the game; dedicated mobile interaction is outside this release.
+
+The `Giao diện` control cycles `system` → `light` → `dark`. The default follows
+the operating system, including system changes while the page is open. Manual
+selection persists across navigation and reload in local storage (`tfg-theme`).
+If storage is unavailable, the control still works for the current page.
+
+At each desktop size, the entire three-column player must fit below the header:
+two disabled ad slots on the left, the game in the center, and up to six related
+games excluding the current slug on the right. Confirm the iframe has
+`scrolling="no"` and `sandbox="allow-scripts allow-pointer-lock"`. Verify a
+non-16:9 viewport as well as the default 16×9: the game retains its declared
+ratio without stretching or cropping. Click `Mở toàn màn hình`, then
+`Thoát toàn màn hình` (and also test Escape); the same iframe and game state
+must survive with an unchanged URL and no reload. Unsupported/rejected
+fullscreen displays an accessible Vietnamese status. In browser network logs,
+there must be zero requests to `googlesyndication.com` or `doubleclick.net`.
+
+### Cover upload and persistence
+
+Routes below are API-relative; the public proxy adds `/api`:
+
+```text
+POST /games/:id/cover             owner multipart upload (cover)
+GET  /games/:id/cover/:version    authenticated owner preview
+GET  /covers/:slug/:version       approved public cover
+```
+
+Upload exactly one multipart file named `cover`, with no additional fields.
+JPEG, PNG, and WebP are accepted up to and including 5 MiB (5,242,880 bytes);
+the declared MIME type must match its detected signature. SVG, GIF, malformed
+signatures, and MIME mismatches return `400`; oversized uploads return `413`.
+Signature checks do not perform full image decoding or malware scanning.
+Authentication, ownership, and same-origin protections remain required. A
+successful upload returns the updated game summary with an incremented
+`coverVersion` and `coverContentType`. Cover-only changes preserve the review
+state. Changing viewport metadata with `PATCH /games/:id` resets pending or
+approved games to a draft, so resubmit and approve before public verification.
+
+Owner reads are `private, no-store`; public reads require a `PUBLIC`, `CLEAR`,
+`APPROVED` game and use versioned immutable caching. Both return the image MIME
+type and `X-Content-Type-Options: nosniff`; only the current positive cover
+version is readable at the origin; previously fetched immutable responses may
+remain cached after a later change. Test a draft's owner preview, an anonymous denial, and a
+public cover after approval. See [API examples](api/foundation.md#game-covers).
+
+The API writes covers atomically under
+`GAME_STORAGE_ROOT/covers/<game-id>/<version>/cover` with adjacent
+`.indieforge-cover.json` metadata. They share `game_storage` with HTML5
+artifacts, with sealed `0444` files and `0555` version directories, but are
+served only through the cover controller as image bytes. Do not register
+`covers/` as executable game artifacts or expose it through Caddy/Next.js static
+hosting. Back up the entire root, including hidden metadata. On a validation
+stack, record artifact/cover counts and SHA-256, restart only API, and confirm
+identical bytes plus successful game play and public cover reads.
 
 From a checkout with dependencies and Playwright Chromium installed, the same account journey can target this stack:
 
@@ -102,13 +190,15 @@ compose stop
 compose up -d --wait
 ```
 
-`restart` does not apply changed environment variables or new images; use `up -d --build --wait` for those changes. `stop` preserves containers and data. `compose down` removes containers and networks but retains named volumes. Never run `down --volumes`, `down -v`, or volume pruning against this production project: these delete the database, game artifacts, and Caddy state. The matching commands in the development guide and smoke script are exclusively for disposable data.
+`restart` does not apply changed environment variables or new images; use `up -d --build --wait` for those changes. `stop` preserves containers and data. `compose down` removes containers and networks but retains named volumes. Never run `down --volumes`, `down -v`, or volume pruning against this production project: these delete the database, game artifacts, covers, and Caddy state. The matching commands in the development guide and smoke script are exclusively for disposable data.
 
 ## Back up
 
 Run before every upgrade or restore, and on a regular schedule. Database rows and
-their HTML5 artifact directories are one recovery unit: take both while API and
-web writes are stopped, record the same revision, and restore them together.
+their HTML5 artifacts and cover directories are one recovery unit: take the
+database and entire game-storage root while API and web writes are stopped,
+record the same revision, and restore them together. The `.artifacts.tar.gz`
+filename includes `covers/` and its metadata, not just executable artifacts.
 This Bash function leaves `.partial` files on failure and publishes each member
 of a timestamped pair only after both archives validate:
 
@@ -156,7 +246,11 @@ backup_release() (
   tar -tzf "$artifact_backup.partial" > /dev/null
   mv "$database_backup.partial" "$database_backup"
   mv "$artifact_backup.partial" "$artifact_backup"
+  sha256sum -- "$database_backup" "$artifact_backup" > "$backup_prefix.sha256.partial"
+  sha256sum --check --status "$backup_prefix.sha256.partial"
+  mv "$backup_prefix.sha256.partial" "$backup_prefix.sha256"
   printf 'Database backup: %s\nArtifact backup: %s\n' "$database_backup" "$artifact_backup"
+  printf 'SHA-256 manifest: %s\n' "$backup_prefix.sha256"
   git rev-parse HEAD
 )
 backup_release
@@ -166,15 +260,19 @@ If the function fails, it restarts only services that were running on entry;
 investigate the error and do not deploy from an unvalidated pair. Record the
 revision alongside both files in operations records. The database dump includes
 application data and Prisma migration history, while the artifact archive is a
-tar stream of the private `game_storage` named volume. Neither includes cluster
-roles or `.env.production`. Keep encrypted off-host copies, restrict access to
+tar stream of the entire private `game_storage` named volume, including covers
+and hidden image metadata. Keep the owner-only `.sha256` manifest with both
+archives and verify it before restore. Its paths are relative to the checkout;
+preserve the recorded filenames and run verification from the repository root.
+Neither archive includes cluster roles or `.env.production`. Keep encrypted
+off-host copies, restrict access to
 both backups and secrets, define retention, monitor scheduled backup failures,
 and regularly test restores into an isolated database. A local backup alone
 will not survive host loss.
 
 ## Restore with explicit confirmation
 
-A restore replaces database contents and game artifact contents, discarding
+A restore replaces database contents, game artifacts, and covers, discarding
 changes since the chosen backup pair. First make a fresh backup using the
 previous section, identify its revision and the revision compatible with the
 pair to restore, and verify the target project. Do not run an upgrade or a
@@ -200,6 +298,7 @@ function proceeds to restore and restart.
 restore_database() {
   local backup_file="$1"
   local artifact_file="${2:-}"
+  local checksum_file="${3:-}"
   local confirmation
   local target_database
   local restore_token="restore-$(date -u +%Y%m%dT%H%M%S)-$$"
@@ -252,6 +351,14 @@ restore_database() {
   }
   test -s "$backup_file" || return 1
   test -z "$artifact_file" || test -s "$artifact_file" || return 1
+  if test -n "$checksum_file"; then
+    test -n "$artifact_file" && test -s "$checksum_file" || return 1
+    # Compare exactly this pair, including filenames, before stopping services.
+    (set -o pipefail; sha256sum -- "$backup_file" "$artifact_file" | cmp -s -- "$checksum_file" -) || {
+      printf 'Backup checksum or filename mismatch.\n' >&2
+      return 1
+    }
+  fi
   compose ps -a || return 1
   compose exec -T postgres pg_restore --list < "$backup_file" > /dev/null || return 1
   test -z "$artifact_file" || tar -tzf "$artifact_file" > /dev/null || return 1
@@ -259,7 +366,7 @@ restore_database() {
   case "$target_database" in
     ''|postgres|template0|template1) printf 'Refusing maintenance/empty database target.\n' >&2; return 1 ;;
   esac
-  printf 'DROP/recreate database %s and replace game artifacts in project indieforge? Type RESTORE: ' "$target_database"
+  printf 'DROP/recreate database %s and replace game artifacts and covers in project indieforge? Type RESTORE: ' "$target_database"
   read -r confirmation
   test "$confirmation" = RESTORE || return 1
   compose stop api web migrate || return 1
@@ -286,12 +393,16 @@ restore_database() {
   fi
   compose up -d --wait || return 1
 }
-restore_database 'backups/<timestamp>.database.dump' 'backups/<timestamp>.artifacts.tar.gz'
+restore_database 'backups/<timestamp>.database.dump' 'backups/<timestamp>.artifacts.tar.gz' 'backups/<timestamp>.sha256'
 ```
 
 The second argument is required for a complete application recovery; omitting it
-is only appropriate for a deliberate database-only operator repair. The
-artifact replacement occurs only after typed confirmation, with API/web
+is only appropriate for a deliberate database-only operator repair. Pass the
+third argument for all backups made by this runbook; a checksum or filename
+mismatch aborts before services stop or data changes. The optional third
+argument retains compatibility with legacy pairs whose integrity was verified
+separately. SHA-256 detects changed bytes; it does not authenticate an untrusted
+archive. The artifact replacement occurs only after typed confirmation, with API/web
 stopped. It moves only direct children of the exact `game_storage` mount, so
 version directories restored with their sealed `0555` permissions never require
 in-place deletion; the prior tree is removed only after database migration
@@ -304,7 +415,7 @@ backup pair while leaving incompatible newer images in place is not a rollback.
 After success, repeat migration logs, service health, and browser verification
 from the start section.
 
-To regression-test the documented database function on a validation host, run `node scripts/test-restore-runbook.mjs` with Docker access and the `postgres:16-alpine` image already present. It uses an isolated, unpublished PostgreSQL container with temporary data, executes the runbook function, proves a post-backup table is removed, and checks confirmation/failure handling. Application lifecycle and migration-status outcomes are controlled by the test harness; the dump, database recreation, restore, and SQL assertions use real PostgreSQL. The drill removes its container and temporary files even on failure.
+To regression-test the documented functions on a validation host, run `node scripts/test-deployment-runbook.mjs` and `node scripts/test-restore-runbook.mjs` with Docker access and the `postgres:16-alpine` image already present. They archive and restore sealed HTML5 files and a cover at `covers/game-id/1/cover`, comparing SHA-256 for both image bytes and metadata. The restore drill uses an isolated, unpublished PostgreSQL container, proves post-backup tables and later artifact/cover versions are removed, and checks checksum, confirmation, and failure handling. Application lifecycle and migration-status outcomes are controlled by the harness; archive operations, the dump, database recreation, restore, and SQL assertions are real. Each drill removes its container and temporary files even on failure.
 
 ## Moderator role assignment
 
@@ -409,7 +520,8 @@ For an incompatible migration, keep API/web stopped, make a fresh safety backup 
 
 The `indieforge_postgres_data` volume holds PostgreSQL data.
 `indieforge_game_storage` holds immutable uploaded and compiled game artifacts
-and is mounted only into the single API process. `indieforge_caddy_data` stores
+plus versioned image covers and their metadata, and is mounted only into the
+single API process. `indieforge_caddy_data` stores
 certificates and private keys; `indieforge_caddy_config` stores Caddy
 configuration state. Preserve all four across restarts and upgrades. Repeatedly
 deleting certificate state forces reissuance and can hit certificate-authority

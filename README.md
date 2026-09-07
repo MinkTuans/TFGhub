@@ -1,15 +1,15 @@
-# IndieForge
+# TFG
 
-IndieForge is a monorepo for a small-game platform. This foundation slice provides account sessions, developer profiles, private game drafts, and a public-game read API.
+TFG là nền tảng tạo, chia sẻ và chơi game nhỏ trên trình duyệt. Giao diện tiếng Việt hỗ trợ tài khoản, hồ sơ nhà phát triển, Studio, duyệt game và khám phá game đã được phê duyệt.
 
-## Quick start
+## Chạy trên máy phát triển
 
-Prerequisites: Node.js 22 (the repository is verified with Node 22), pnpm 10 (Corepack is recommended), and Docker with Docker Compose v2. Docker runs PostgreSQL 16; no local PostgreSQL installation is required.
+Cần Node.js 22, pnpm 10 (có thể dùng Corepack), Docker và Docker Compose v2. PostgreSQL 16 chạy trong Docker, không cần cài trực tiếp trên máy.
 
 ```bash
 corepack enable
 cp .env.example .env
-# Set JWT_SECRET in .env, for example with: openssl rand -hex 32
+# Tạo JWT_SECRET trong .env bằng: openssl rand -hex 32
 docker compose up -d postgres
 pnpm install --frozen-lockfile
 set -a && . ./.env && set +a
@@ -18,18 +18,22 @@ pnpm --filter @indieforge/database prisma migrate deploy
 pnpm dev
 ```
 
-The final command keeps the API and web development servers running. Open the web app at [http://localhost:3000](http://localhost:3000), the API at [http://localhost:3001](http://localhost:3001), and its health check at [http://localhost:3001/health](http://localhost:3001/health).
+Lệnh cuối giữ máy chủ web và API hoạt động. Mở [ứng dụng web](http://localhost:3000), [API](http://localhost:3001) hoặc [kiểm tra trạng thái API](http://localhost:3001/health).
 
-`set -a && . ./.env && set +a` exports the root environment file for Turbo and the API. Use a shell with POSIX `source`/`.` support (such as bash or zsh), or export the same keys through your shell or process manager.
+`set -a && . ./.env && set +a` nạp biến môi trường cho Turbo và API. Dùng Bash, Zsh hoặc trình quản lý tiến trình để xuất các biến tương ứng.
 
-`pnpm db:generate` explicitly prepares Prisma Client; installation and `migrate deploy` do not guarantee generation. Development, builds, typechecks, and tests that use the database also prepare it automatically, reusing Turbo's generated-client cache when the schema and dependencies are unchanged.
+`pnpm db:generate` tạo Prisma Client; cài thư viện và chạy `migrate deploy` chưa đủ để tạo client. Các lệnh phát triển, build, kiểm tra kiểu và kiểm thử cần cơ sở dữ liệu cũng tự chuẩn bị client và dùng lại bộ nhớ đệm khi phù hợp.
 
-See [the development guide](docs/development.md) for the complete workflow and [the foundation API guide](docs/api/foundation.md) for endpoint examples.
+Xem [hướng dẫn phát triển](docs/development.md) và [tài liệu API](docs/api/foundation.md) để biết quy trình và ví dụ gọi API.
 
-## Production deployment
+## Triển khai
 
-Use [the production operations runbook](docs/deployment.md) for the single-host Docker Compose stack, HTTPS or bare-IP HTTP preview setup, backups, restores, upgrades, and rollback.
+Xem [hướng dẫn vận hành](docs/deployment.md) cho Docker Compose trên một máy chủ, HTTPS hoặc bản xem thử HTTP qua IP, sao lưu, khôi phục, nâng cấp và quay lui. Ảnh bìa và nội dung game cùng nằm trong volume `game_storage`; cần sao lưu toàn bộ volume cùng cơ sở dữ liệu.
 
-## Scope of this slice
+## Tính năng hiện có
 
-Build upload, malware scanning, game runtime hosting, analytics, donations, and game publishing are planned, but are not delivered here. In particular, new games are always drafts: the public catalog endpoints only return already-public, clear games and this slice has no endpoint to publish a draft.
+Studio hỗ trợ tải game HTML5 dạng ZIP, viết HTML/CSS/JavaScript, dựng truyện tương tác và tạo game platformer. Chủ sở hữu có thể tải ảnh bìa JPEG, PNG hoặc WebP tối đa 5 MiB, chọn tỉ lệ khung hình, xem bản nháp và gửi game để duyệt. Game được phê duyệt xuất hiện trong Khám phá và chạy trong iframe có sandbox.
+
+Giao diện có chế độ sáng, tối hoặc theo hệ thống; lựa chọn được lưu trên trình duyệt. Trình chơi trên máy tính giữ tỉ lệ game, hỗ trợ toàn màn hình và hiển thị game liên quan. Quảng cáo mặc định tắt (`NEXT_PUBLIC_ADSENSE_ENABLED=false`); các ô chỉ hiển thị chữ “Quảng cáo”.
+
+Quét mã độc, phân tích sử dụng và quyên góp chưa được triển khai. Trải nghiệm cảm ứng chuyên biệt trên điện thoại nằm ngoài phạm vi bản phát hành này. Tên kỹ thuật `indieforge` trong package, cookie và volume được giữ để tương thích triển khai.

@@ -5,6 +5,7 @@
   "scripts": {
     "db:generate": "turbo run generate --filter=@indieforge/database --output-logs=errors-only",
     "dev": "pnpm db:generate && turbo dev",
+    "build": "pnpm --filter api build && pnpm --filter web build",
     "test": "pnpm db:generate && turbo test",
     "test:containers": "node scripts/test-container-contract.mjs",
     "test:deploy-config": "node scripts/test-deployment-config.mjs",

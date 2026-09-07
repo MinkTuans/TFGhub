@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { chmod, mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -24,6 +25,11 @@ const grantFunction = grantBlock.slice(
   grantBlock.lastIndexOf("\ngrant_moderator\n"),
 );
 const lifecycle = join(directory, "lifecycle");
+const storageRoot = join(directory, "games");
+const coverPath = "covers/game-id/1/cover";
+const coverMetadataPath = "covers/game-id/1/.indieforge-cover.json";
+const artifactPath = "game-id/1/index.html";
+const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
 const backupHarness = `
 git() { printf 'drill revision\\n'; }
 compose() {
@@ -38,7 +44,12 @@ compose() {
     exec)
       if [[ "$*" == *pg_dump* ]]; then printf 'drill database dump'; else return 0; fi
       ;;
-    run) tar -czf - --files-from /dev/null ;;
+    run)
+      test "\${*:1:7}" = 'run --rm --no-deps --entrypoint sh api -c' || return 98
+      script="\${!#}"
+      script="$(printf '%s' "$script" | sed "s|/var/lib/indieforge/games|$DRILL_STORAGE_ROOT|g")"
+      bash -c "$script"
+      ;;
     *) return 99 ;;
   esac
 }
@@ -55,6 +66,7 @@ const invokeBackup = async (running) => {
       ...process.env,
       DRILL_RUNNING: running,
       DRILL_LIFECYCLE: lifecycle,
+      DRILL_STORAGE_ROOT: storageRoot,
     },
   });
   return { ...result, lifecycle: await readFile(lifecycle, "utf8") };
@@ -88,15 +100,52 @@ const sql = (query) =>
   ], { stdio: "pipe" }).trim();
 
 try {
+  await mkdir(join(storageRoot, "game-id", "1"), { recursive: true });
+  await mkdir(join(storageRoot, "covers", "game-id", "1"), { recursive: true });
+  await writeFile(join(storageRoot, artifactPath), "<!doctype html><title>Backup fixture</title>");
+  await writeFile(join(storageRoot, coverPath), Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aX1cAAAAASUVORK5CYII=", "base64",
+  ));
+  await writeFile(join(storageRoot, coverMetadataPath), JSON.stringify({ contentType: "image/png" }));
+  const originalChecksums = new Map();
+  for (const path of [artifactPath, coverPath, coverMetadataPath]) {
+    originalChecksums.set(path, sha256(await readFile(join(storageRoot, path))));
+    await chmod(join(storageRoot, path), 0o444);
+  }
+  await chmod(join(storageRoot, "game-id", "1"), 0o555);
+  await chmod(join(storageRoot, "covers", "game-id", "1"), 0o555);
+
   const apiOnly = await invokeBackup("api");
   assert.equal(apiOnly.status, 0, apiOnly.stderr);
   assert.equal(apiOnly.lifecycle, "stop:api\nstart:api\n");
   console.log("backup restores only initially running API: PASS");
 
+  const artifactBackup = apiOnly.stdout.match(/^Artifact backup: (.+)$/m)?.[1];
+  assert.ok(artifactBackup, "backup must identify the entire game-storage archive");
+  const manifest = artifactBackup.replace(/\.artifacts\.tar\.gz$/, ".sha256");
+  assert.ok(await stat(join(directory, manifest)).catch(() => null), "backup must publish a SHA-256 manifest for the database and game storage");
+  const manifestText = await readFile(join(directory, manifest), "utf8");
+  assert.equal(manifestText.trim().split("\n").length, 2);
+  execFileSync("sha256sum", ["--check", "--status", manifest], { cwd: directory });
+  assert.equal((await stat(join(directory, manifest))).mode & 0o077, 0);
+  const restoredRoot = join(directory, "restored");
+  await mkdir(restoredRoot);
+  execFileSync("tar", ["-C", restoredRoot, "--same-permissions", "-xzf", join(directory, artifactBackup)]);
+  for (const [path, checksum] of originalChecksums) {
+    assert.equal(sha256(await readFile(join(restoredRoot, path))), checksum, `${path} SHA-256 must survive backup/extraction`);
+    assert.equal((await stat(join(restoredRoot, path))).mode & 0o777, 0o444);
+  }
+  console.log("backup preserves sealed cover bytes/metadata beside artifacts with SHA-256 verification: PASS");
+
   const stopped = await invokeBackup("");
   assert.equal(stopped.status, 0, stopped.stderr);
   assert.equal(stopped.lifecycle, "");
   console.log("backup preserves an already stopped service: PASS");
+
+  const bothRunning = await invokeBackup("api web");
+  assert.equal(bothRunning.status, 0, bothRunning.stderr);
+  assert.equal(bothRunning.lifecycle, "stop:api web\nstart:api web\n");
+  console.log("backup restores both initially running services: PASS");
 
   docker([
     "run",
@@ -150,10 +199,11 @@ grant_moderator
   console.log("moderator grants support ordinary and apostrophe emails: PASS");
 } finally {
   try {
-    docker(["rm", "-f", "-v", container]);
+    docker(["rm", "-f", "-v", container], { stdio: "pipe" });
   } catch {
     // The backup tests run before the disposable PostgreSQL container exists.
   }
+  execFileSync("chmod", ["-R", "u+w", directory]);
   await rm(directory, { recursive: true, force: true });
   console.log("cleanup: PASS (deployment runbook drill removed)");
 }

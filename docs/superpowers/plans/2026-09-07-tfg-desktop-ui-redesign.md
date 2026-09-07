@@ -627,17 +627,17 @@ git commit -m "test: cover redesigned TFG desktop journeys"
 - Documents cover endpoints, 5 MiB/type constraints, TFG UI, theme behavior, fullscreen acceptance, and AdSense environment variables.
 - Production verification proves ads are disabled without IDs and cover bytes share the backed-up volume without being treated as executable artifacts.
 
-- [ ] **Step 1: Write failing production-contract checks**
+- [x] **Step 1: Write failing production-contract checks**
 
 Extend the compose verification to require the four `NEXT_PUBLIC_ADSENSE_*` build args, assert the enable flag is `false` for the test deployment, and reject an enabled configuration with missing/malformed IDs. Extend backup/restore fixtures with a cover file under `covers/game-id/1/cover` and assert its SHA-256 survives restore beside artifact files.
 
-- [ ] **Step 2: Run contract drills and verify RED**
+- [x] **Step 2: Run contract drills and verify RED**
 
 Run: `pnpm test:deploy-config && node scripts/test-deployment-runbook.mjs && node scripts/test-restore-runbook.mjs`
 
 Expected: FAIL because ad build contracts and cover restore assertions are not yet present/configured.
 
-- [ ] **Step 3: Update deployment/API documentation and scripts**
+- [x] **Step 3: Update deployment/API documentation and scripts**
 
 Document exact routes:
 
@@ -673,7 +673,7 @@ docker build -f apps/web/Dockerfile -t indieforge-web:tfg-ui \
 
 Expected: every command exits 0; all test summaries report zero failures; both images build; Compose exposes only Caddy ports.
 
-- [ ] **Step 5: Commit release documentation and contract checks**
+- [x] **Step 5: Commit release documentation and contract checks**
 
 ```bash
 git add README.md docs scripts compose.production.yml .env.production.example
