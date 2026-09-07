@@ -67,6 +67,15 @@ export function GameForm() {
           <option value="AUTH_REQUIRED">Account required</option>
         </select>
       </label>
+      <label>
+        Source type
+        <select name="sourceType" defaultValue="UPLOAD">
+          <option value="UPLOAD">HTML5 ZIP upload</option>
+          <option value="CODE">Code</option>
+          <option value="STORY">Story</option>
+          <option value="PLATFORMER">Platformer</option>
+        </select>
+      </label>
       {error && <p role="alert">{error}</p>}
       <button disabled={pending}>
         {pending ? "Creating…" : "Create draft"}

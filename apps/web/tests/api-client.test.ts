@@ -100,3 +100,19 @@ test("preserves status for non-JSON failures and accepts an empty success", asyn
   await expect(api.get("/discover")).rejects.toMatchObject({ status: 502 });
   await expect(api.post("/auth/logout", {})).resolves.toBeUndefined();
 });
+
+test("sends form data unchanged so fetch supplies the multipart boundary", async () => {
+  const { api } = await import("../lib/api-client");
+  const fetch = vi
+    .fn()
+    .mockResolvedValue(new Response(JSON.stringify({ artifactVersion: 1 })));
+  vi.stubGlobal("fetch", fetch);
+  const form = new FormData();
+  form.set("game", new Blob(["zip bytes"]), "game.zip");
+
+  await api.post("/games/game-1/upload", form);
+
+  const request = fetch.mock.calls[0][1] as RequestInit;
+  expect(request.body).toBe(form);
+  expect(new Headers(request.headers).get("Content-Type")).toBeNull();
+});

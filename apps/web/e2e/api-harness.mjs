@@ -38,6 +38,13 @@ const games = new Map([
       visibility: "PUBLIC",
       moderationState: "CLEAR",
       accessMode: "GUEST_ALLOWED",
+      sourceType: "UPLOAD",
+      reviewState: "APPROVED",
+      projectData: null,
+      artifactVersion: 0,
+      reviewNote: null,
+      submittedAt: null,
+      reviewedAt: null,
       ...dates,
     },
   ],
@@ -93,7 +100,18 @@ const testingModule = await Test.createTestingModule({ imports: [AppModule] })
     async create(input) {
       if ([...games.values()].some((game) => game.slug === input.slug))
         throw { code: "P2002", meta: { target: ["slug"] } };
-      const game = { ...input, id: `game-${games.size + 1}`, ...dates };
+      const game = {
+        ...input,
+        id: `game-${games.size + 1}`,
+        ...dates,
+        sourceType: input.sourceType ?? "UPLOAD",
+        reviewState: "DRAFT",
+        projectData: null,
+        artifactVersion: 0,
+        reviewNote: null,
+        submittedAt: null,
+        reviewedAt: null,
+      };
       games.set(game.id, game);
       return game;
     },
@@ -102,6 +120,91 @@ const testingModule = await Test.createTestingModule({ imports: [AppModule] })
     },
     async findUnique(id) {
       return games.get(id) ?? null;
+    },
+    async lockForArtifactReconciliation(id) {
+      return games.get(id) ?? null;
+    },
+    async findBySlug(slug) {
+      return [...games.values()].find((game) => game.slug === slug) ?? null;
+    },
+    async updateWorkspace(id, expectedUpdatedAt, input) {
+      const current = games.get(id);
+      if (!current || current.updatedAt.getTime() !== expectedUpdatedAt.getTime())
+        return null;
+      const game = { ...current, ...input, updatedAt: new Date() };
+      games.set(id, game);
+      return game;
+    },
+    async submit(id) {
+      const current = games.get(id);
+      if (
+        !current ||
+        !["DRAFT", "REJECTED"].includes(current.reviewState) ||
+        current.artifactVersion < 1
+      )
+        return null;
+      const game = {
+        ...current,
+        visibility: "DRAFT",
+        reviewState: "PENDING",
+        reviewNote: null,
+        submittedAt: new Date(),
+        reviewedAt: null,
+        updatedAt: new Date(),
+      };
+      games.set(id, game);
+      return game;
+    },
+    async approve(id) {
+      const current = games.get(id);
+      if (!current || current.reviewState !== "PENDING") return null;
+      const game = {
+        ...current,
+        visibility: "PUBLIC",
+        reviewState: "APPROVED",
+        reviewNote: null,
+        reviewedAt: new Date(),
+        updatedAt: new Date(),
+      };
+      games.set(id, game);
+      return game;
+    },
+    async reject(id, reviewNote) {
+      const current = games.get(id);
+      if (!current || current.reviewState !== "PENDING") return null;
+      const game = {
+        ...current,
+        visibility: "DRAFT",
+        reviewState: "REJECTED",
+        reviewNote,
+        reviewedAt: new Date(),
+        updatedAt: new Date(),
+      };
+      games.set(id, game);
+      return game;
+    },
+    async findPending() {
+      return [...games.values()]
+        .filter((game) => game.reviewState === "PENDING")
+        .map((game) => ({
+          ...game,
+          creator: {
+            id: game.ownerId,
+            displayName: profiles.get(game.ownerId)?.displayName ?? null,
+          },
+        }));
+    },
+    async updateOwned(id, ownerId, expectedUpdatedAt, input) {
+      const current = games.get(id);
+      if (
+        !current ||
+        current.ownerId !== ownerId ||
+        current.updatedAt.getTime() !== expectedUpdatedAt.getTime()
+      )
+        return null;
+      const game = { ...current, ...input, updatedAt: new Date() };
+      games.set(id, game);
+      return game;
     },
     async update(id, input) {
       const game = { ...games.get(id), ...input };

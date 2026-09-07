@@ -150,3 +150,43 @@ test("public discovery and metadata render without browser JavaScript", async ({
   await expect(page.getByText("By Minh")).toBeVisible();
   await context.close();
 });
+
+test("an HTML5 upload can be retried, previewed, and submitted for review", async ({
+  page,
+}) => {
+  const suffix = randomUUID();
+  const title = `HTML5 upload ${suffix}`;
+  await page.goto("/register");
+  await page.getByLabel("Email").fill(`upload-${suffix}@example.com`);
+  await page.getByLabel("Password").fill("password123");
+  await page.getByRole("button", { name: "Create account" }).click();
+  await page.getByRole("link", { name: "Create a draft" }).click();
+  await page.getByLabel("Title").fill(title);
+  await page.getByLabel("Slug").fill(`html5-upload-${suffix}`);
+  await page.getByLabel("Source type").selectOption("UPLOAD");
+  await page.getByRole("button", { name: "Create draft" }).click();
+
+  await page.getByRole("link", { name: title }).click();
+  await expect(page).toHaveURL(/\/studio\/games\//);
+  const archive = page.getByLabel("HTML5 ZIP archive");
+  await archive.setInputFiles({ name: "broken.zip", mimeType: "application/zip", buffer: Buffer.from("not a zip") });
+  await page.getByRole("button", { name: "Upload game" }).click();
+  await expect(page.getByText(/End of central directory/)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Upload game" })).toBeEnabled();
+  await archive.setInputFiles({
+    name: "game.zip",
+    mimeType: "application/zip",
+    buffer: Buffer.from(
+      "UEsDBBQAAAAAAAAAAAAcrV6BQQAAAEEAAAAKAAAAaW5kZXguaHRtbDwhZG9jdHlwZSBodG1sPjx0aXRsZT5QcmV2aWV3IHJlYWR5PC90aXRsZT48aDE+UHJldmlldyByZWFkeTwvaDE+UEsBAhQAFAAAAAAAAAAAABytXoFBAAAAQQAAAAoAAAAAAAAAAAAAAAAAAAAAAGluZGV4Lmh0bWxQSwUGAAAAAAEAAQA4AAAAaQAAAAAA",
+      "base64",
+    ),
+  });
+  await page.getByRole("button", { name: "Upload game" }).click();
+  const preview = page.getByTitle("Game preview");
+  await expect(preview).toHaveAttribute(
+    "sandbox",
+    "allow-scripts allow-pointer-lock",
+  );
+  await page.getByRole("button", { name: "Submit for review" }).click();
+  await expect(page.getByRole("status")).toHaveText("Pending review");
+});

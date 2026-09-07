@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 import { AuthForm } from "../components/auth-form";
 import { GameForm } from "../components/game-form";
+import { GameWorkspace } from "../components/game-workspace";
 import { LogoutButton } from "../components/logout-button";
 
 // Navigation needs a Next router; the form, validation and HTTP client stay real.
@@ -79,6 +80,32 @@ test("draft creation keeps input visible after a duplicate slug rejection", asyn
   expect(screen.getByRole("button", { name: "Create draft" })).toBeEnabled();
 });
 
+test("draft creation submits the selected source type", async () => {
+  const fetch = vi
+    .fn()
+    .mockResolvedValue(new Response(JSON.stringify({ id: "game-1" })));
+  vi.stubGlobal("fetch", fetch);
+  render(<GameForm />);
+
+  fireEvent.change(screen.getByLabelText("Title"), {
+    target: { value: "Upload quest" },
+  });
+  fireEvent.change(screen.getByLabelText("Slug"), {
+    target: { value: "upload-quest" },
+  });
+  fireEvent.change(screen.getByLabelText("Source type"), {
+    target: { value: "UPLOAD" },
+  });
+  fireEvent.submit(
+    screen.getByRole("button", { name: "Create draft" }).closest("form")!,
+  );
+
+  await screen.findByRole("button", { name: "Create draft" });
+  expect(JSON.parse(fetch.mock.calls[0][1].body)).toMatchObject({
+    sourceType: "UPLOAD",
+  });
+});
+
 test("logout reports a network failure and permits another attempt", async () => {
   vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("offline")));
   render(<LogoutButton />);
@@ -89,4 +116,33 @@ test("logout reports a network failure and permits another attempt", async () =>
     "Không thể đăng xuất. Vui lòng thử lại.",
   );
   expect(screen.getByRole("button", { name: "Đăng xuất" })).toBeEnabled();
+});
+
+test("workspace shows a moderator rejection note to its owner", () => {
+  render(
+    <GameWorkspace
+      initialGame={{
+        id: "game-1",
+        slug: "upload-quest",
+        title: "Upload quest",
+        description: "",
+        visibility: "DRAFT",
+        accessMode: "GUEST_ALLOWED",
+        moderationState: "CLEAR",
+        sourceType: "UPLOAD",
+        reviewState: "REJECTED",
+        projectData: null,
+        artifactVersion: 1,
+        reviewNote: "Please remove the copyrighted artwork.",
+        submittedAt: "2026-09-07T08:00:00.000Z",
+        reviewedAt: "2026-09-07T09:00:00.000Z",
+        createdAt: "2026-09-07T07:00:00.000Z",
+        updatedAt: "2026-09-07T09:00:00.000Z",
+      }}
+    />,
+  );
+
+  expect(screen.getByRole("alert")).toHaveTextContent(
+    "Please remove the copyrighted artwork.",
+  );
 });

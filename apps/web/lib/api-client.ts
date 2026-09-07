@@ -25,13 +25,16 @@ async function request<T>(
   options: Options = {},
 ): Promise<T> {
   const headers = new Headers(options.headers);
-  if (body !== undefined) headers.set("Content-Type", "application/json");
+  const isFormData =
+    typeof FormData !== "undefined" && body instanceof FormData;
+  if (body !== undefined && !isFormData)
+    headers.set("Content-Type", "application/json");
   const response = await fetch(`${resolveApiBaseUrl()}${path}`, {
     method,
     headers,
     credentials: "include",
     cache: "no-store",
-    ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+    ...(body !== undefined ? { body: isFormData ? body : JSON.stringify(body) } : {}),
   });
   if (!response.ok) {
     let message = `Request failed (${response.status})`;

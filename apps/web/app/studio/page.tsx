@@ -21,7 +21,9 @@ export default async function StudioPage() {
           <div className="grid">
             {games.map((game) => (
               <article className="card" key={game.id}>
-                <h3>{game.title}</h3>
+                <h3>
+                  <Link href={`/studio/games/${game.id}`}>{game.title}</Link>
+                </h3>
                 <p className="badge">
                   {game.visibility === "DRAFT"
                     ? "Draft"
