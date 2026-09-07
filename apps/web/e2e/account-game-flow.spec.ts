@@ -190,3 +190,40 @@ test("an HTML5 upload can be retried, previewed, and submitted for review", asyn
   await page.getByRole("button", { name: "Submit for review" }).click();
   await expect(page.getByRole("status")).toHaveText("Pending review");
 });
+
+test("a code game saves source, rebuilds its sandboxed preview, and submits the compiled revision", async ({
+  page,
+}) => {
+  const suffix = randomUUID();
+  const title = `Code game ${suffix}`;
+  await page.goto("/register");
+  await page.getByLabel("Email").fill(`code-${suffix}@example.com`);
+  await page.getByLabel("Password").fill("password123");
+  await page.getByRole("button", { name: "Create account" }).click();
+  await page.getByRole("link", { name: "Create a draft" }).click();
+  await page.getByLabel("Title").fill(title);
+  await page.getByLabel("Slug").fill(`code-game-${suffix}`);
+  await page.getByLabel("Source type").selectOption("CODE");
+  await page.getByRole("button", { name: "Create draft" }).click();
+
+  await page.getByRole("link", { name: title }).click();
+  await expect(page).toHaveURL(/\/studio\/games\//);
+  await page.getByLabel("HTML").fill(`<h1>Compiled ${suffix}</h1>`);
+  await page.getByLabel("CSS").fill("h1 { color: teal; }");
+  await page.getByLabel("JavaScript").fill("document.title = 'Compiled';");
+  await page.getByRole("button", { name: "Save source" }).click();
+  await expect(page.getByRole("button", { name: "Submit for review" })).toBeDisabled();
+  await page.getByRole("button", { name: "Build preview" }).click();
+  const preview = page.getByTitle("Game preview");
+  await expect(preview).toHaveAttribute(
+    "sandbox",
+    "allow-scripts allow-pointer-lock",
+  );
+  await expect(preview).toHaveAttribute("src", /\?v=1$/);
+  await expect(
+    preview.contentFrame().getByRole("heading", { name: `Compiled ${suffix}` }),
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Submit for review" })).toBeEnabled();
+  await page.getByRole("button", { name: "Submit for review" }).click();
+  await expect(page.getByRole("status")).toHaveText("Pending review");
+});

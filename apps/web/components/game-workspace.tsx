@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { GameSummary } from "@indieforge/contracts";
 import { api, ApiError } from "../lib/api-client";
+import { CodeGameEditor } from "./code-game-editor";
 import { GamePreview } from "./game-preview";
 import { UploadEditor } from "./upload-editor";
 
@@ -23,8 +24,10 @@ export function GameWorkspace({ initialGame }: { initialGame: GameSummary }) {
   const [game, setGame] = useState(initialGame);
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
+  const [needsBuild, setNeedsBuild] = useState(false);
   const maySubmit =
     game.artifactVersion > 0 &&
+    !needsBuild &&
     (game.reviewState === "DRAFT" || game.reviewState === "REJECTED");
 
   async function submitForReview() {
@@ -52,7 +55,23 @@ export function GameWorkspace({ initialGame }: { initialGame: GameSummary }) {
       {game.sourceType === "UPLOAD" && (
         <UploadEditor gameId={game.id} onUploaded={setGame} />
       )}
-      {game.artifactVersion > 0 && <GamePreview gameId={game.id} />}
+      {game.sourceType === "CODE" && (
+        <CodeGameEditor
+          gameId={game.id}
+          initialProject={game.projectData}
+          onBuilt={(built) => {
+            setGame(built);
+            setNeedsBuild(false);
+          }}
+          onSaved={(saved) => {
+            setGame(saved);
+            setNeedsBuild(true);
+          }}
+        />
+      )}
+      {game.artifactVersion > 0 && (
+        <GamePreview gameId={game.id} revision={game.artifactVersion} />
+      )}
       {error && <p role="alert">{error}</p>}
       <button disabled={!maySubmit || pending} onClick={submitForReview}>
         {pending ? "Submitting…" : "Submit for review"}

@@ -4,12 +4,40 @@ import { AuthForm } from "../components/auth-form";
 import { GameForm } from "../components/game-form";
 import { GameWorkspace } from "../components/game-workspace";
 import { LogoutButton } from "../components/logout-button";
+import type { GameSummary } from "@indieforge/contracts";
 
 // Navigation needs a Next router; the form, validation and HTTP client stay real.
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace: vi.fn(), refresh: vi.fn() }),
 }));
 afterEach(() => vi.unstubAllGlobals());
+
+function codeGame(overrides: Partial<GameSummary> = {}): GameSummary {
+  return {
+    id: "game-1",
+    slug: "code-quest",
+    title: "Code quest",
+    description: "",
+    visibility: "DRAFT",
+    accessMode: "GUEST_ALLOWED",
+    moderationState: "CLEAR",
+    sourceType: "CODE",
+    reviewState: "DRAFT",
+    projectData: {
+      sourceType: "CODE",
+      html: "<h1>Saved quest</h1>",
+      css: "h1 { color: rebeccapurple; }",
+      javascript: "window.saved = true;",
+    },
+    artifactVersion: 1,
+    reviewNote: null,
+    submittedAt: null,
+    reviewedAt: null,
+    createdAt: "2026-09-07T07:00:00.000Z",
+    updatedAt: "2026-09-07T09:00:00.000Z",
+    ...overrides,
+  };
+}
 
 test.each(["register", "login"] as const)(
   "%s rejects invalid credentials before sending an HTTP request",
@@ -145,4 +173,89 @@ test("workspace shows a moderator rejection note to its owner", () => {
   expect(screen.getByRole("alert")).toHaveTextContent(
     "Please remove the copyrighted artwork.",
   );
+});
+
+test("code editor loads saved HTML, CSS, and JavaScript", () => {
+  render(<GameWorkspace initialGame={codeGame()} />);
+
+  expect(screen.getByLabelText("HTML")).toHaveValue("<h1>Saved quest</h1>");
+  expect(screen.getByLabelText("CSS")).toHaveValue(
+    "h1 { color: rebeccapurple; }",
+  );
+  expect(screen.getByLabelText("JavaScript")).toHaveValue(
+    "window.saved = true;",
+  );
+});
+
+test("code editor preserves edits after a failed source save", async () => {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ message: "Source could not be saved" }), {
+        status: 503,
+      }),
+    ),
+  );
+  render(<GameWorkspace initialGame={codeGame()} />);
+
+  fireEvent.change(screen.getByLabelText("HTML"), {
+    target: { value: "<h1>Edited quest</h1>" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Save source" }));
+
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "Source could not be saved",
+  );
+  expect(screen.getByLabelText("HTML")).toHaveValue("<h1>Edited quest</h1>");
+});
+
+test("code build refreshes the sandboxed preview and enables submission of its compiled revision", async () => {
+  const saved = codeGame({
+    projectData: {
+      sourceType: "CODE",
+      html: "<h1>Edited quest</h1>",
+      css: "h1 { color: tomato; }",
+      javascript: "window.edited = true;",
+    },
+  });
+  const built = { ...saved, artifactVersion: 2 };
+  const submitted = { ...built, reviewState: "PENDING" as const };
+  const fetch = vi
+    .fn()
+    .mockResolvedValueOnce(new Response(JSON.stringify(saved)))
+    .mockResolvedValueOnce(new Response(JSON.stringify(built)))
+    .mockResolvedValueOnce(new Response(JSON.stringify(submitted)));
+  vi.stubGlobal("fetch", fetch);
+  render(<GameWorkspace initialGame={codeGame()} />);
+
+  expect(screen.getByTitle("Game preview")).toHaveAttribute(
+    "src",
+    "http://localhost:3001/games/game-1/preview/?v=1",
+  );
+  fireEvent.change(screen.getByLabelText("HTML"), {
+    target: { value: "<h1>Edited quest</h1>" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Save source" }));
+  await screen.findByRole("button", { name: "Build preview" });
+  expect(screen.getByRole("button", { name: "Submit for review" })).toBeDisabled();
+
+  fireEvent.click(screen.getByRole("button", { name: "Build preview" }));
+  const preview = await screen.findByTitle("Game preview");
+  expect(preview).toHaveAttribute(
+    "src",
+    "http://localhost:3001/games/game-1/preview/?v=2",
+  );
+  expect(preview).toHaveAttribute(
+    "sandbox",
+    "allow-scripts allow-pointer-lock",
+  );
+  expect(screen.getByRole("button", { name: "Submit for review" })).toBeEnabled();
+
+  fireEvent.click(screen.getByRole("button", { name: "Submit for review" }));
+  expect(await screen.findByRole("status")).toHaveTextContent("Pending review");
+  expect(fetch.mock.calls.map(([url]) => url)).toEqual([
+    "http://localhost:3001/games/game-1/project",
+    "http://localhost:3001/games/game-1/build",
+    "http://localhost:3001/games/game-1/submit",
+  ]);
 });
