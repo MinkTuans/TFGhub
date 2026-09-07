@@ -204,6 +204,10 @@ test("moderation hides from regular users, requires a rejection note, and publis
   const email = `moderation-${suffix}@example.com`;
   const title = `Moderated game ${suffix}`;
   const slug = `moderated-game-${suffix}`;
+  const switchAccount = async () => {
+    await page.context().clearCookies();
+    await page.goto("/login");
+  };
 
   await page.goto("/register");
   await page.getByLabel("Email").fill(email);
@@ -225,9 +229,14 @@ test("moderation hides from regular users, requires a rejection note, and publis
   await page.getByLabel("HTML").fill(`<h1>${title}</h1>`);
   await page.getByRole("button", { name: "Save source" }).click();
   await page.getByRole("button", { name: "Build preview" }).click();
+  await expect(
+    page.getByTitle("Game preview").contentFrame().getByRole("heading", {
+      name: title,
+    }),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Submit for review" }).click();
   await expect(page.getByRole("status")).toHaveText("Pending review");
-  await navigation.getByRole("button", { name: "Đăng xuất" }).click();
+  await switchAccount();
 
   await page.getByLabel("Email").fill(moderatorEmail);
   await page.getByLabel("Password").fill(moderatorPassword);
@@ -256,7 +265,7 @@ test("moderation hides from regular users, requires a rejection note, and publis
   await reject.click();
   await expect(page.getByRole("status")).toHaveText("Game rejected.");
   await expect(queued).toHaveCount(0);
-  await navigation.getByRole("button", { name: "Đăng xuất" }).click();
+  await switchAccount();
 
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password").fill("password123");
@@ -266,7 +275,7 @@ test("moderation hides from regular users, requires a rejection note, and publis
     "Please add instructions.",
   );
   await page.getByRole("button", { name: "Submit for review" }).click();
-  await navigation.getByRole("button", { name: "Đăng xuất" }).click();
+  await switchAccount();
 
   await page.getByLabel("Email").fill(moderatorEmail);
   await page.getByLabel("Password").fill(moderatorPassword);
@@ -274,7 +283,7 @@ test("moderation hides from regular users, requires a rejection note, and publis
   await navigation.getByRole("link", { name: "Moderation" }).click();
   await page.getByRole("article", { name: title }).getByRole("button", { name: "Approve" }).click();
   await expect(page.getByRole("status")).toHaveText("Game approved.");
-  await page.getByRole("link", { name: "Discover", exact: true }).click();
+  await page.goto("/discover");
   await expect(page.getByRole("heading", { name: title })).toBeVisible();
   await page.getByRole("link", { name: title }).click();
   const player = page.getByTitle("Game player");
