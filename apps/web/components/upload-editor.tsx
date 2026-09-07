@@ -18,7 +18,7 @@ export function UploadEditor({
     event.preventDefault();
     const archive = new FormData(event.currentTarget).get("game");
     if (!(archive instanceof File) || archive.size === 0) {
-      setError("Choose a .zip file to upload.");
+      setError("Chọn tệp .zip để tải lên.");
       return;
     }
     const form = new FormData();
@@ -31,7 +31,7 @@ export function UploadEditor({
       setError(
         error instanceof ApiError
           ? error.message
-          : "Unable to connect. Please try again.",
+          : "Không thể kết nối. Vui lòng thử lại.",
       );
     } finally {
       setPending(false);
@@ -39,16 +39,16 @@ export function UploadEditor({
   }
 
   return (
-    <section aria-labelledby="upload-heading">
-      <h2 id="upload-heading">HTML5 upload</h2>
+    <section className="panel editor-panel" aria-labelledby="upload-heading">
+      <h2 id="upload-heading">Tải game HTML5</h2>
       <form onSubmit={upload} className="form-stack">
         <label>
-          HTML5 ZIP archive
+          Tệp ZIP HTML5
           <input name="game" type="file" accept=".zip,application/zip" required />
         </label>
-        <p className="hint">Include index.html at the root of your ZIP file.</p>
+        <p className="hint">Đặt index.html ở thư mục gốc của tệp ZIP.</p>
         {error && <p role="alert">{error}</p>}
-        <button disabled={pending}>{pending ? "Uploading…" : "Upload game"}</button>
+        <button disabled={pending}>{pending ? "Đang tải…" : "Tải game lên"}</button>
       </form>
     </section>
   );

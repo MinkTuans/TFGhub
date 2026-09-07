@@ -5,8 +5,10 @@ export default async function NewGamePage() {
   await privateGet("/auth/me");
   return (
     <main className="narrow">
-      <h1>Create a game draft</h1>
-      <p>Drafts stay private and will not appear in Discover.</p>
+      <header className="page-heading">
+        <h1>Tạo bản nháp game</h1>
+      </header>
+      <p>Bản nháp được giữ riêng tư và chưa xuất hiện trong Khám phá.</p>
       <GameForm />
     </main>
   );

@@ -4,11 +4,13 @@ import { AuthForm } from "../../components/auth-form";
 export default function RegisterPage() {
   return (
     <main className="narrow">
-      <h1>Create your account</h1>
-      <p>Make a home for your next game.</p>
+      <header className="page-heading">
+        <h1>Tạo tài khoản</h1>
+      </header>
+      <p>Bắt đầu hành trình sáng tạo game cùng TFG.</p>
       <AuthForm mode="register" />
       <p>
-        Already have an account? <Link href="/login">Log in</Link>
+        Đã có tài khoản? <Link href="/login">Đăng nhập</Link>
       </p>
     </main>
   );

@@ -10,8 +10,10 @@ export default async function GameWorkspacePage({
   const { id } = await params;
   const game = await privateGet<GameSummary>(`/games/${id}`);
   return (
-    <main className="narrow">
-      <h1>{game.title}</h1>
+    <main className="workspace-page">
+      <header className="page-heading">
+        <h1>{game.title}</h1>
+      </header>
       <GameWorkspace initialGame={game} />
     </main>
   );

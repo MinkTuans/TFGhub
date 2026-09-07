@@ -67,7 +67,7 @@ function toProject(startSceneId: string, scenes: Scene[]): StoryProject {
 function errorMessage(error: unknown): string {
   return error instanceof ApiError
     ? error.message
-    : "Unable to connect. Please try again.";
+    : "Không thể kết nối. Vui lòng thử lại.";
 }
 
 export function StoryGameEditor({
@@ -179,7 +179,12 @@ export function StoryGameEditor({
     setError("");
     const parsed = StoryProjectInput.safeParse(project);
     if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message ?? "Check your story.");
+      const message = parsed.error.issues[0]?.message;
+      setError(message === "Scene identifiers must be unique"
+        ? "Mỗi cảnh phải có mã riêng."
+        : message === "Choice targets must reference an existing scene"
+          ? "Lựa chọn phải dẫn đến một cảnh có sẵn."
+          : "Kiểm tra mã cảnh, lời thoại và các lựa chọn.");
       return;
     }
     setOperation("save");
@@ -208,11 +213,11 @@ export function StoryGameEditor({
   }
 
   return (
-    <section aria-labelledby="story-editor-heading">
-      <h2 id="story-editor-heading">Story editor</h2>
+    <section className="panel editor-panel" aria-labelledby="story-editor-heading">
+      <h2 id="story-editor-heading">Trình tạo cốt truyện</h2>
       <div className="form-stack">
         <label>
-          Start scene ID
+          Mã cảnh mở đầu
           <input
             disabled={operation !== null}
             maxLength={64}
@@ -223,9 +228,9 @@ export function StoryGameEditor({
         </label>
         {scenes.map((scene, sceneIndex) => (
           <fieldset key={scene.key}>
-            <legend>Scene {sceneIndex + 1}</legend>
+            <legend>Cảnh {sceneIndex + 1}</legend>
             <label>
-              Scene ID
+              Mã cảnh
               <input
                 disabled={operation !== null}
                 maxLength={64}
@@ -235,7 +240,7 @@ export function StoryGameEditor({
               />
             </label>
             <label>
-              Speaker
+              Người nói
               <input
                 disabled={operation !== null}
                 maxLength={80}
@@ -246,7 +251,7 @@ export function StoryGameEditor({
               />
             </label>
             <label>
-              Dialogue
+              Lời thoại
               <textarea
                 disabled={operation !== null}
                 maxLength={5_000}
@@ -258,7 +263,7 @@ export function StoryGameEditor({
               />
             </label>
             <label>
-              Background color
+              Màu nền
               <input
                 disabled={operation !== null}
                 onChange={(event) =>
@@ -271,9 +276,9 @@ export function StoryGameEditor({
             </label>
             {scene.choices.map((choice, choiceIndex) => (
               <fieldset key={choice.key}>
-                <legend>Choice {choiceIndex + 1}</legend>
+                <legend>Lựa chọn {choiceIndex + 1}</legend>
                 <label>
-                  Choice text
+                  Nội dung lựa chọn
                   <input
                     disabled={operation !== null}
                     maxLength={200}
@@ -285,7 +290,7 @@ export function StoryGameEditor({
                   />
                 </label>
                 <label>
-                  Target scene ID
+                  Mã cảnh đích
                   <input
                     disabled={operation !== null}
                     maxLength={64}
@@ -303,7 +308,7 @@ export function StoryGameEditor({
                   onClick={() => removeChoice(scene.key, choice.key)}
                   type="button"
                 >
-                  Remove choice
+                  Xóa lựa chọn
                 </button>
               </fieldset>
             ))}
@@ -312,14 +317,14 @@ export function StoryGameEditor({
               onClick={() => addChoice(scene.key)}
               type="button"
             >
-              Add choice
+              Thêm lựa chọn
             </button>
             <button
               disabled={operation !== null || scenes.length === 1}
               onClick={() => removeScene(scene.key)}
               type="button"
             >
-              Remove scene
+              Xóa cảnh
             </button>
           </fieldset>
         ))}
@@ -328,19 +333,21 @@ export function StoryGameEditor({
           onClick={addScene}
           type="button"
         >
-          Add scene
+          Thêm cảnh
         </button>
         {error && <p role="alert">{error}</p>}
-        <button disabled={operation !== null} onClick={saveStory} type="button">
-          {operation === "save" ? "Saving…" : "Save story"}
-        </button>
-        <button
-          disabled={operation !== null || !hasSavedProject || isDirty}
-          onClick={buildPreview}
-          type="button"
-        >
-          {operation === "build" ? "Building…" : "Build preview"}
-        </button>
+        <div className="editor-actions">
+          <button disabled={operation !== null} onClick={saveStory} type="button">
+            {operation === "save" ? "Đang lưu…" : "Lưu cốt truyện"}
+          </button>
+          <button
+            disabled={operation !== null || !hasSavedProject || isDirty}
+            onClick={buildPreview}
+            type="button"
+          >
+            {operation === "build" ? "Đang tạo…" : "Tạo bản chơi thử"}
+          </button>
+        </div>
       </div>
     </section>
   );

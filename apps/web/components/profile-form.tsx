@@ -20,7 +20,7 @@ export function ProfileForm({ profile }: { profile: Profile | null }) {
     setSaved(false);
     if (!input.success) {
       setError(
-        "Use a display name with 2–50 characters and a bio up to 500 characters.",
+        "Tên hiển thị cần có 2–50 ký tự; giới thiệu tối đa 500 ký tự.",
       );
       return;
     }
@@ -38,16 +38,16 @@ export function ProfileForm({ profile }: { profile: Profile | null }) {
       setError(
         error instanceof ApiError
           ? error.message
-          : "Unable to connect. Please try again.",
+          : "Không thể kết nối. Vui lòng thử lại.",
       );
     } finally {
       setPending(false);
     }
   }
   return (
-    <form onSubmit={submit} className="form-stack">
+    <form onSubmit={submit} className="form-stack panel">
       <label>
-        Display name
+        Tên hiển thị
         <input
           name="displayName"
           minLength={2}
@@ -57,7 +57,7 @@ export function ProfileForm({ profile }: { profile: Profile | null }) {
         />
       </label>
       <label>
-        Bio
+        Giới thiệu
         <textarea
           name="bio"
           maxLength={500}
@@ -66,8 +66,8 @@ export function ProfileForm({ profile }: { profile: Profile | null }) {
         />
       </label>
       {error && <p role="alert">{error}</p>}
-      {saved && <p role="status">Profile saved.</p>}
-      <button disabled={pending}>{pending ? "Saving…" : "Save profile"}</button>
+      {saved && <p role="status">Đã lưu hồ sơ.</p>}
+      <button disabled={pending}>{pending ? "Đang lưu…" : "Lưu hồ sơ"}</button>
     </form>
   );
 }

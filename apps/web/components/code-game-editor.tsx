@@ -26,7 +26,7 @@ function savedSource(projectData: GameSummary["projectData"]): Source {
 function errorMessage(error: unknown): string {
   return error instanceof ApiError
     ? error.message
-    : "Unable to connect. Please try again.";
+    : "Không thể kết nối. Vui lòng thử lại.";
 }
 
 export function CodeGameEditor({
@@ -81,8 +81,8 @@ export function CodeGameEditor({
   }
 
   return (
-    <section aria-labelledby="code-editor-heading">
-      <h2 id="code-editor-heading">Code editor</h2>
+    <section className="panel editor-panel" aria-labelledby="code-editor-heading">
+      <h2 id="code-editor-heading">Trình soạn mã</h2>
       <div className="form-stack">
         <label>
           HTML
@@ -98,7 +98,7 @@ export function CodeGameEditor({
           />
         </label>
         <p className="hint" id="html-count">
-          {source.html.length}/{SOURCE_LIMIT} characters
+          {source.html.length}/{SOURCE_LIMIT} ký tự
         </p>
         <label>
           CSS
@@ -114,7 +114,7 @@ export function CodeGameEditor({
           />
         </label>
         <p className="hint" id="css-count">
-          {source.css.length}/{SOURCE_LIMIT} characters
+          {source.css.length}/{SOURCE_LIMIT} ký tự
         </p>
         <label>
           JavaScript
@@ -133,19 +133,21 @@ export function CodeGameEditor({
           />
         </label>
         <p className="hint" id="javascript-count">
-          {source.javascript.length}/{SOURCE_LIMIT} characters
+          {source.javascript.length}/{SOURCE_LIMIT} ký tự
         </p>
         {error && <p role="alert">{error}</p>}
-        <button disabled={operation !== null} onClick={saveSource} type="button">
-          {operation === "save" ? "Saving…" : "Save source"}
-        </button>
-        <button
-          disabled={operation !== null || !hasSavedProject || isDirty}
-          onClick={buildPreview}
-          type="button"
-        >
-          {operation === "build" ? "Building…" : "Build preview"}
-        </button>
+        <div className="editor-actions">
+          <button disabled={operation !== null} onClick={saveSource} type="button">
+            {operation === "save" ? "Đang lưu…" : "Lưu mã nguồn"}
+          </button>
+          <button
+            disabled={operation !== null || !hasSavedProject || isDirty}
+            onClick={buildPreview}
+            type="button"
+          >
+            {operation === "build" ? "Đang tạo…" : "Tạo bản chơi thử"}
+          </button>
+        </div>
       </div>
     </section>
   );

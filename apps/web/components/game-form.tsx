@@ -15,7 +15,9 @@ export function GameForm() {
       Object.fromEntries(new FormData(event.currentTarget)),
     );
     if (!input.success) {
-      setError("Check your title, slug, description, and access mode.");
+      setError(
+        "Kiểm tra tên game, đường dẫn, mô tả, quyền truy cập và kích thước hiển thị.",
+      );
       return;
     }
     setError("");
@@ -32,20 +34,20 @@ export function GameForm() {
       setError(
         error instanceof ApiError
           ? error.message
-          : "Unable to connect. Please try again.",
+          : "Không thể kết nối. Vui lòng thử lại.",
       );
     } finally {
       setPending(false);
     }
   }
   return (
-    <form onSubmit={submit} className="form-stack">
+    <form onSubmit={submit} className="form-stack panel">
       <label>
-        Title
+        Tên game
         <input name="title" maxLength={80} required />
       </label>
       <label>
-        Slug
+        Đường dẫn
         <input
           name="slug"
           pattern="[a-z0-9]+(-[a-z0-9]+)*"
@@ -54,31 +56,59 @@ export function GameForm() {
         />
       </label>
       <p className="hint" id="slug-help">
-        Use lowercase letters, numbers, and hyphens, for example tiny-quest.
+        Dùng chữ thường, số và dấu gạch nối, ví dụ tiny-quest.
       </p>
       <label>
-        Description
+        Mô tả
         <textarea name="description" maxLength={2000} rows={5} />
       </label>
       <label>
-        Access mode
+        Quyền truy cập
         <select name="accessMode" defaultValue="GUEST_ALLOWED">
-          <option value="GUEST_ALLOWED">Guests allowed</option>
-          <option value="AUTH_REQUIRED">Account required</option>
+          <option value="GUEST_ALLOWED">Cho phép khách chơi</option>
+          <option value="AUTH_REQUIRED">Yêu cầu tài khoản</option>
         </select>
       </label>
       <label>
-        Source type
+        Cách tạo game
         <select name="sourceType" defaultValue="UPLOAD">
-          <option value="UPLOAD">HTML5 ZIP upload</option>
-          <option value="CODE">Code</option>
-          <option value="STORY">Story</option>
-          <option value="PLATFORMER">Platformer</option>
+          <option value="UPLOAD">Tải tệp ZIP HTML5</option>
+          <option value="CODE">Lập trình</option>
+          <option value="STORY">Cốt truyện</option>
+          <option value="PLATFORMER">Đi cảnh</option>
         </select>
       </label>
+      <fieldset className="field-grid">
+        <legend>Kích thước hiển thị</legend>
+        <label>
+          Chiều rộng hiển thị
+          <input
+            name="viewportWidth"
+            type="number"
+            min={1}
+            max={4096}
+            step={1}
+            defaultValue={16}
+            required
+          />
+        </label>
+        <label>
+          Chiều cao hiển thị
+          <input
+            name="viewportHeight"
+            type="number"
+            min={1}
+            max={4096}
+            step={1}
+            defaultValue={9}
+            required
+          />
+        </label>
+      </fieldset>
+      <p className="hint">Tỷ lệ khung chơi, ví dụ 16 × 9 hoặc 4 × 3.</p>
       {error && <p role="alert">{error}</p>}
       <button disabled={pending}>
-        {pending ? "Creating…" : "Create draft"}
+        {pending ? "Đang tạo…" : "Tạo bản nháp"}
       </button>
     </form>
   );

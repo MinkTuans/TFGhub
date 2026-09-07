@@ -1,12 +1,22 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 import { renderToString } from "react-dom/server";
 import { AuthForm } from "../components/auth-form";
+import { ProfileForm } from "../components/profile-form";
 import { GameForm } from "../components/game-form";
 import { GameWorkspace } from "../components/game-workspace";
 import { GamePreview } from "../components/game-preview";
 import { LogoutButton } from "../components/logout-button";
-import { ModerationQueue, type ModerationGame } from "../components/moderation-queue";
+import {
+  ModerationQueue,
+  type ModerationGame,
+} from "../components/moderation-queue";
 import type { GameSummary } from "@indieforge/contracts";
 
 // Navigation needs a Next router; the form, validation and HTTP client stay real.
@@ -84,9 +94,7 @@ function platformerGame(overrides: Partial<GameSummary> = {}): GameSummary {
         backgroundColor: "#111827",
         player: { x: 24, y: 0, color: "#2563eb" },
         goal: { x: 300, y: 416, color: "#16a34a" },
-        platforms: [
-          { x: 0, y: 440, width: 640, height: 40, color: "#6b7280" },
-        ],
+        platforms: [{ x: 0, y: 440, width: 640, height: 40, color: "#6b7280" }],
       },
       artifactVersion: 1,
       artifactReady: true,
@@ -119,7 +127,7 @@ test.each(["register", "login"] as const)(
     fireEvent.change(screen.getByLabelText("Email"), {
       target: { value: "not-an-email" },
     });
-    fireEvent.change(screen.getByLabelText("Password"), {
+    fireEvent.change(screen.getByLabelText("Mật khẩu"), {
       target: { value: "short" },
     });
     fireEvent.submit(screen.getByLabelText("Email").closest("form")!);
@@ -141,16 +149,16 @@ test("registration reports the API conflict and permits another attempt", async 
   fireEvent.change(screen.getByLabelText("Email"), {
     target: { value: "me@example.com" },
   });
-  fireEvent.change(screen.getByLabelText("Password"), {
+  fireEvent.change(screen.getByLabelText("Mật khẩu"), {
     target: { value: "password123" },
   });
   fireEvent.submit(
-    screen.getByRole("button", { name: "Create account" }).closest("form")!,
+    screen.getByRole("button", { name: "Tạo tài khoản" }).closest("form")!,
   );
   expect(await screen.findByRole("alert")).toHaveTextContent(
     "Email already registered",
   );
-  expect(screen.getByRole("button", { name: "Create account" })).toBeEnabled();
+  expect(screen.getByRole("button", { name: "Tạo tài khoản" })).toBeEnabled();
 });
 
 test("draft creation keeps input visible after a duplicate slug rejection", async () => {
@@ -163,20 +171,20 @@ test("draft creation keeps input visible after a duplicate slug rejection", asyn
     ),
   );
   render(<GameForm />);
-  fireEvent.change(screen.getByLabelText("Title"), {
+  fireEvent.change(screen.getByLabelText("Tên game"), {
     target: { value: "My game" },
   });
-  fireEvent.change(screen.getByLabelText("Slug"), {
+  fireEvent.change(screen.getByLabelText("Đường dẫn"), {
     target: { value: "my-game" },
   });
   fireEvent.submit(
-    screen.getByRole("button", { name: "Create draft" }).closest("form")!,
+    screen.getByRole("button", { name: "Tạo bản nháp" }).closest("form")!,
   );
   expect(await screen.findByRole("alert")).toHaveTextContent(
     "Game slug already exists",
   );
-  expect(screen.getByLabelText("Title")).toHaveValue("My game");
-  expect(screen.getByRole("button", { name: "Create draft" })).toBeEnabled();
+  expect(screen.getByLabelText("Tên game")).toHaveValue("My game");
+  expect(screen.getByRole("button", { name: "Tạo bản nháp" })).toBeEnabled();
 });
 
 test("draft creation submits the selected source type", async () => {
@@ -186,20 +194,20 @@ test("draft creation submits the selected source type", async () => {
   vi.stubGlobal("fetch", fetch);
   render(<GameForm />);
 
-  fireEvent.change(screen.getByLabelText("Title"), {
+  fireEvent.change(screen.getByLabelText("Tên game"), {
     target: { value: "Upload quest" },
   });
-  fireEvent.change(screen.getByLabelText("Slug"), {
+  fireEvent.change(screen.getByLabelText("Đường dẫn"), {
     target: { value: "upload-quest" },
   });
-  fireEvent.change(screen.getByLabelText("Source type"), {
+  fireEvent.change(screen.getByLabelText("Cách tạo game"), {
     target: { value: "UPLOAD" },
   });
   fireEvent.submit(
-    screen.getByRole("button", { name: "Create draft" }).closest("form")!,
+    screen.getByRole("button", { name: "Tạo bản nháp" }).closest("form")!,
   );
 
-  await screen.findByRole("button", { name: "Create draft" });
+  await screen.findByRole("button", { name: "Tạo bản nháp" });
   expect(JSON.parse(fetch.mock.calls[0][1].body)).toMatchObject({
     sourceType: "UPLOAD",
   });
@@ -230,11 +238,13 @@ test("moderation keeps every active review disabled when two cards are actioned"
 
   const first = screen.getByRole("article", { name: "First review" });
   const second = screen.getByRole("article", { name: "Second review" });
-  fireEvent.click(within(first).getByRole("button", { name: "Approve" }));
-  fireEvent.click(within(second).getByRole("button", { name: "Approve" }));
+  fireEvent.click(within(first).getByRole("button", { name: "Duyệt" }));
+  fireEvent.click(within(second).getByRole("button", { name: "Duyệt" }));
 
   for (const card of [first, second]) {
-    expect(within(card).getAllByRole("button", { name: "Reviewing…" })).toHaveLength(2);
+    expect(
+      within(card).getAllByRole("button", { name: "Đang duyệt…" }),
+    ).toHaveLength(2);
     for (const button of within(card).getAllByRole("button"))
       expect(button).toBeDisabled();
   }
@@ -243,14 +253,16 @@ test("moderation keeps every active review disabled when two cards are actioned"
 test("moderation binds actions to the displayed submission and renders its context", async () => {
   const fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({})));
   vi.stubGlobal("fetch", fetch);
-  render(<ModerationQueue initialGames={[moderationGame("game-1", "Review me")]} />);
+  render(
+    <ModerationQueue initialGames={[moderationGame("game-1", "Review me")]} />,
+  );
 
   const card = screen.getByRole("article", { name: "Review me" });
-  expect(within(card).getByText("Source: Code editor")).toBeVisible();
-  expect(within(card).getByText(/Submitted:/)).toBeVisible();
-  fireEvent.click(within(card).getByRole("button", { name: "Approve" }));
+  expect(within(card).getByText("Nguồn: Trình soạn mã")).toBeVisible();
+  expect(within(card).getByText(/Ngày gửi:/)).toBeVisible();
+  fireEvent.click(within(card).getByRole("button", { name: "Duyệt" }));
 
-  await screen.findByText("Game approved.");
+  await screen.findByText("Đã duyệt game.");
   expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({
     artifactVersion: 1,
     submittedAt: "2026-09-07T09:00:00.000Z",
@@ -259,8 +271,12 @@ test("moderation binds actions to the displayed submission and renders its conte
 
 test("story and platformer editors render when crypto.randomUUID is unavailable", () => {
   vi.stubGlobal("crypto", {});
-  expect(() => render(<GameWorkspace initialGame={storyGame()} />)).not.toThrow();
-  expect(() => render(<GameWorkspace initialGame={platformerGame()} />)).not.toThrow();
+  expect(() =>
+    render(<GameWorkspace initialGame={storyGame()} />),
+  ).not.toThrow();
+  expect(() =>
+    render(<GameWorkspace initialGame={platformerGame()} />),
+  ).not.toThrow();
 });
 
 test("a server-rendered preview uses the browser-safe public API URL", () => {
@@ -322,33 +338,33 @@ test("code editor loads saved HTML, CSS, and JavaScript", () => {
 test("story editor adds and removes scenes and choices", () => {
   render(<GameWorkspace initialGame={storyGame()} />);
 
-  const opening = screen.getByRole("group", { name: "Scene 1" });
-  fireEvent.click(within(opening).getByRole("button", { name: "Add choice" }));
-  expect(within(opening).getByLabelText("Choice text")).toBeVisible();
+  const opening = screen.getByRole("group", { name: "Cảnh 1" });
   fireEvent.click(
-    within(opening).getByRole("button", { name: "Remove choice" }),
+    within(opening).getByRole("button", { name: "Thêm lựa chọn" }),
   );
-  expect(within(opening).queryByLabelText("Choice text")).toBeNull();
+  expect(within(opening).getByLabelText("Nội dung lựa chọn")).toBeVisible();
+  fireEvent.click(
+    within(opening).getByRole("button", { name: "Xóa lựa chọn" }),
+  );
+  expect(within(opening).queryByLabelText("Nội dung lựa chọn")).toBeNull();
 
-  fireEvent.click(screen.getByRole("button", { name: "Add scene" }));
-  const added = screen.getByRole("group", { name: "Scene 2" });
-  expect(within(added).getByLabelText("Scene ID")).toHaveValue("scene-2");
-  fireEvent.click(within(added).getByRole("button", { name: "Remove scene" }));
-  expect(screen.queryByRole("group", { name: "Scene 2" })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Thêm cảnh" }));
+  const added = screen.getByRole("group", { name: "Cảnh 2" });
+  expect(within(added).getByLabelText("Mã cảnh")).toHaveValue("scene-2");
+  fireEvent.click(within(added).getByRole("button", { name: "Xóa cảnh" }));
+  expect(screen.queryByRole("group", { name: "Cảnh 2" })).toBeNull();
 });
 
 test("platformer editor adds and removes repeatable platforms", () => {
   render(<GameWorkspace initialGame={platformerGame()} />);
 
-  expect(screen.getByRole("group", { name: "Platform 1" })).toBeVisible();
-  fireEvent.click(screen.getByRole("button", { name: "Add platform" }));
-  const added = screen.getByRole("group", { name: "Platform 2" });
+  expect(screen.getByRole("group", { name: "Nền tảng 1" })).toBeVisible();
+  fireEvent.click(screen.getByRole("button", { name: "Thêm nền tảng" }));
+  const added = screen.getByRole("group", { name: "Nền tảng 2" });
   expect(within(added).getByLabelText("X")).toHaveValue(0);
-  expect(within(added).getByLabelText("Width")).toHaveValue(160);
-  fireEvent.click(
-    within(added).getByRole("button", { name: "Remove platform" }),
-  );
-  expect(screen.queryByRole("group", { name: "Platform 2" })).toBeNull();
+  expect(within(added).getByLabelText("Chiều rộng")).toHaveValue(160);
+  fireEvent.click(within(added).getByRole("button", { name: "Xóa nền tảng" }));
+  expect(screen.queryByRole("group", { name: "Nền tảng 2" })).toBeNull();
 });
 
 test("platformer editor rejects geometry outside the canvas before saving", () => {
@@ -356,16 +372,16 @@ test("platformer editor rejects geometry outside the canvas before saving", () =
   vi.stubGlobal("fetch", fetch);
   render(<GameWorkspace initialGame={platformerGame()} />);
 
-  const platform = screen.getByRole("group", { name: "Platform 1" });
-  fireEvent.change(within(platform).getByLabelText("Width"), {
+  const platform = screen.getByRole("group", { name: "Nền tảng 1" });
+  fireEvent.change(within(platform).getByLabelText("Chiều rộng"), {
     target: { value: "641" },
   });
-  fireEvent.click(screen.getByRole("button", { name: "Save platformer" }));
+  fireEvent.click(screen.getByRole("button", { name: "Lưu game đi cảnh" }));
 
   expect(screen.getByRole("alert")).toHaveTextContent(
-    "Platform geometry must be inside the canvas",
+    "Nền tảng phải nằm trong khung vẽ.",
   );
-  expect(within(platform).getByLabelText("Width")).toHaveValue(641);
+  expect(within(platform).getByLabelText("Chiều rộng")).toHaveValue(641);
   expect(fetch).not.toHaveBeenCalled();
 });
 
@@ -373,22 +389,25 @@ test("platformer editor retains values after a failed save", async () => {
   vi.stubGlobal(
     "fetch",
     vi.fn().mockResolvedValue(
-      new Response(JSON.stringify({ message: "Platformer could not be saved" }), {
-        status: 503,
-      }),
+      new Response(
+        JSON.stringify({ message: "Platformer could not be saved" }),
+        {
+          status: 503,
+        },
+      ),
     ),
   );
   render(<GameWorkspace initialGame={platformerGame()} />);
 
-  fireEvent.change(screen.getByLabelText("Player X"), {
+  fireEvent.change(screen.getByLabelText("Vị trí X nhân vật"), {
     target: { value: "42" },
   });
-  fireEvent.click(screen.getByRole("button", { name: "Save platformer" }));
+  fireEvent.click(screen.getByRole("button", { name: "Lưu game đi cảnh" }));
 
   expect(await screen.findByRole("alert")).toHaveTextContent(
     "Platformer could not be saved",
   );
-  expect(screen.getByLabelText("Player X")).toHaveValue(42);
+  expect(screen.getByLabelText("Vị trí X nhân vật")).toHaveValue(42);
 });
 
 test("story editor reports duplicate scene IDs and missing choice targets before saving", () => {
@@ -396,28 +415,30 @@ test("story editor reports duplicate scene IDs and missing choice targets before
   vi.stubGlobal("fetch", fetch);
   render(<GameWorkspace initialGame={storyGame()} />);
 
-  fireEvent.click(screen.getByRole("button", { name: "Add scene" }));
-  const added = screen.getByRole("group", { name: "Scene 2" });
-  fireEvent.change(within(added).getByLabelText("Scene ID"), {
+  fireEvent.click(screen.getByRole("button", { name: "Thêm cảnh" }));
+  const added = screen.getByRole("group", { name: "Cảnh 2" });
+  fireEvent.change(within(added).getByLabelText("Mã cảnh"), {
     target: { value: "opening" },
   });
-  fireEvent.click(screen.getByRole("button", { name: "Save story" }));
+  fireEvent.click(screen.getByRole("button", { name: "Lưu cốt truyện" }));
   expect(screen.getByRole("alert")).toHaveTextContent(
-    "Scene identifiers must be unique",
+    "Mỗi cảnh phải có mã riêng.",
   );
   expect(fetch).not.toHaveBeenCalled();
 
-  fireEvent.change(within(added).getByLabelText("Scene ID"), {
+  fireEvent.change(within(added).getByLabelText("Mã cảnh"), {
     target: { value: "ending" },
   });
-  const opening = screen.getByRole("group", { name: "Scene 1" });
-  fireEvent.click(within(opening).getByRole("button", { name: "Add choice" }));
-  fireEvent.change(within(opening).getByLabelText("Target scene ID"), {
+  const opening = screen.getByRole("group", { name: "Cảnh 1" });
+  fireEvent.click(
+    within(opening).getByRole("button", { name: "Thêm lựa chọn" }),
+  );
+  fireEvent.change(within(opening).getByLabelText("Mã cảnh đích"), {
     target: { value: "missing" },
   });
-  fireEvent.click(screen.getByRole("button", { name: "Save story" }));
+  fireEvent.click(screen.getByRole("button", { name: "Lưu cốt truyện" }));
   expect(screen.getByRole("alert")).toHaveTextContent(
-    "Choice targets must reference an existing scene",
+    "Lựa chọn phải dẫn đến một cảnh có sẵn.",
   );
   expect(fetch).not.toHaveBeenCalled();
 });
@@ -433,16 +454,16 @@ test("story editor retains input after a failed save", async () => {
   );
   render(<GameWorkspace initialGame={storyGame()} />);
 
-  const opening = screen.getByRole("group", { name: "Scene 1" });
-  fireEvent.change(within(opening).getByLabelText("Dialogue"), {
-    target: { value: "The story survives the error.", },
+  const opening = screen.getByRole("group", { name: "Cảnh 1" });
+  fireEvent.change(within(opening).getByLabelText("Lời thoại"), {
+    target: { value: "The story survives the error." },
   });
-  fireEvent.click(screen.getByRole("button", { name: "Save story" }));
+  fireEvent.click(screen.getByRole("button", { name: "Lưu cốt truyện" }));
 
   expect(await screen.findByRole("alert")).toHaveTextContent(
     "Story could not be saved",
   );
-  expect(within(opening).getByLabelText("Dialogue")).toHaveValue(
+  expect(within(opening).getByLabelText("Lời thoại")).toHaveValue(
     "The story survives the error.",
   );
 });
@@ -459,12 +480,12 @@ test("story build refreshes the sandboxed preview and enables submission", async
   vi.stubGlobal("fetch", fetch);
   render(<GameWorkspace initialGame={storyGame()} />);
 
-  fireEvent.click(screen.getByRole("button", { name: "Save story" }));
-  await screen.findByRole("button", { name: "Build preview" });
-  expect(screen.getByRole("button", { name: "Submit for review" })).toBeDisabled();
+  fireEvent.click(screen.getByRole("button", { name: "Lưu cốt truyện" }));
+  await screen.findByRole("button", { name: "Tạo bản chơi thử" });
+  expect(screen.getByRole("button", { name: "Gửi duyệt" })).toBeDisabled();
 
-  fireEvent.click(screen.getByRole("button", { name: "Build preview" }));
-  const preview = await screen.findByTitle("Game preview");
+  fireEvent.click(screen.getByRole("button", { name: "Tạo bản chơi thử" }));
+  const preview = await screen.findByTitle("Chơi thử game");
   expect(preview).toHaveAttribute(
     "src",
     "http://localhost:3001/games/game-1/preview/?v=2",
@@ -473,7 +494,7 @@ test("story build refreshes the sandboxed preview and enables submission", async
     "sandbox",
     "allow-scripts allow-pointer-lock",
   );
-  expect(screen.getByRole("button", { name: "Submit for review" })).toBeEnabled();
+  expect(screen.getByRole("button", { name: "Gửi duyệt" })).toBeEnabled();
   expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({
     sourceType: "STORY",
     startSceneId: "opening",
@@ -499,12 +520,12 @@ test("platformer build refreshes the sandboxed preview and enables submission", 
   vi.stubGlobal("fetch", fetch);
   render(<GameWorkspace initialGame={platformerGame()} />);
 
-  fireEvent.click(screen.getByRole("button", { name: "Save platformer" }));
-  await screen.findByRole("button", { name: "Build preview" });
-  expect(screen.getByRole("button", { name: "Submit for review" })).toBeDisabled();
+  fireEvent.click(screen.getByRole("button", { name: "Lưu game đi cảnh" }));
+  await screen.findByRole("button", { name: "Tạo bản chơi thử" });
+  expect(screen.getByRole("button", { name: "Gửi duyệt" })).toBeDisabled();
 
-  fireEvent.click(screen.getByRole("button", { name: "Build preview" }));
-  const preview = await screen.findByTitle("Game preview");
+  fireEvent.click(screen.getByRole("button", { name: "Tạo bản chơi thử" }));
+  const preview = await screen.findByTitle("Chơi thử game");
   expect(preview).toHaveAttribute(
     "src",
     "http://localhost:3001/games/game-1/preview/?v=2",
@@ -513,16 +534,14 @@ test("platformer build refreshes the sandboxed preview and enables submission", 
     "sandbox",
     "allow-scripts allow-pointer-lock",
   );
-  expect(screen.getByRole("button", { name: "Submit for review" })).toBeEnabled();
+  expect(screen.getByRole("button", { name: "Gửi duyệt" })).toBeEnabled();
   expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({
     sourceType: "PLATFORMER",
     canvas: { width: 640, height: 480 },
     backgroundColor: "#111827",
     player: { x: 24, y: 0, color: "#2563eb" },
     goal: { x: 300, y: 416, color: "#16a34a" },
-    platforms: [
-      { x: 0, y: 440, width: 640, height: 40, color: "#6b7280" },
-    ],
+    platforms: [{ x: 0, y: 440, width: 640, height: 40, color: "#6b7280" }],
   });
 });
 
@@ -530,7 +549,7 @@ test("workspace disables submission after reloading a persisted unready artifact
   const reloaded = { ...codeGame(), artifactReady: false } as GameSummary;
   render(<GameWorkspace initialGame={reloaded} />);
 
-  expect(screen.getByRole("button", { name: "Submit for review" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Gửi duyệt" })).toBeDisabled();
 });
 
 test("code editor preserves edits after a failed source save", async () => {
@@ -547,7 +566,7 @@ test("code editor preserves edits after a failed source save", async () => {
   fireEvent.change(screen.getByLabelText("HTML"), {
     target: { value: "<h1>Edited quest</h1>" },
   });
-  fireEvent.click(screen.getByRole("button", { name: "Save source" }));
+  fireEvent.click(screen.getByRole("button", { name: "Lưu mã nguồn" }));
 
   expect(await screen.findByRole("alert")).toHaveTextContent(
     "Source could not be saved",
@@ -575,19 +594,19 @@ test("code build refreshes the sandboxed preview and enables submission of its c
   vi.stubGlobal("fetch", fetch);
   render(<GameWorkspace initialGame={codeGame()} />);
 
-  expect(screen.getByTitle("Game preview")).toHaveAttribute(
+  expect(screen.getByTitle("Chơi thử game")).toHaveAttribute(
     "src",
     "http://localhost:3001/games/game-1/preview/?v=1",
   );
   fireEvent.change(screen.getByLabelText("HTML"), {
     target: { value: "<h1>Edited quest</h1>" },
   });
-  fireEvent.click(screen.getByRole("button", { name: "Save source" }));
-  await screen.findByRole("button", { name: "Build preview" });
-  expect(screen.getByRole("button", { name: "Submit for review" })).toBeDisabled();
+  fireEvent.click(screen.getByRole("button", { name: "Lưu mã nguồn" }));
+  await screen.findByRole("button", { name: "Tạo bản chơi thử" });
+  expect(screen.getByRole("button", { name: "Gửi duyệt" })).toBeDisabled();
 
-  fireEvent.click(screen.getByRole("button", { name: "Build preview" }));
-  const preview = await screen.findByTitle("Game preview");
+  fireEvent.click(screen.getByRole("button", { name: "Tạo bản chơi thử" }));
+  const preview = await screen.findByTitle("Chơi thử game");
   expect(preview).toHaveAttribute(
     "src",
     "http://localhost:3001/games/game-1/preview/?v=2",
@@ -596,13 +615,211 @@ test("code build refreshes the sandboxed preview and enables submission of its c
     "sandbox",
     "allow-scripts allow-pointer-lock",
   );
-  expect(screen.getByRole("button", { name: "Submit for review" })).toBeEnabled();
+  expect(screen.getByRole("button", { name: "Gửi duyệt" })).toBeEnabled();
 
-  fireEvent.click(screen.getByRole("button", { name: "Submit for review" }));
-  expect(await screen.findByRole("status")).toHaveTextContent("Pending review");
+  fireEvent.click(screen.getByRole("button", { name: "Gửi duyệt" }));
+  expect(await screen.findByRole("status")).toHaveTextContent("Chờ duyệt");
   expect(fetch.mock.calls.map(([url]) => url)).toEqual([
     "http://localhost:3001/games/game-1/project",
     "http://localhost:3001/games/game-1/build",
     "http://localhost:3001/games/game-1/submit",
   ]);
+});
+
+test("profile saves Vietnamese form fields and confirms success", async () => {
+  const fetch = vi
+    .fn()
+    .mockResolvedValue(
+      new Response(JSON.stringify({ displayName: "Tác giả", bio: "Xin chào" })),
+    );
+  vi.stubGlobal("fetch", fetch);
+  render(<ProfileForm profile={null} />);
+  fireEvent.change(screen.getByLabelText("Tên hiển thị"), {
+    target: { value: "Tác giả" },
+  });
+  fireEvent.change(screen.getByLabelText("Giới thiệu"), {
+    target: { value: "Xin chào" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Lưu hồ sơ" }));
+  expect(await screen.findByRole("status")).toHaveTextContent("Đã lưu hồ sơ.");
+  expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({
+    displayName: "Tác giả",
+    bio: "Xin chào",
+  });
+});
+
+test("creation sends explicit viewport dimensions and defaults to 16 by 9", async () => {
+  const fetch = vi
+    .fn()
+    .mockResolvedValue(new Response(JSON.stringify(codeGame())));
+  vi.stubGlobal("fetch", fetch);
+  render(<GameForm />);
+  expect(screen.getByLabelText("Chiều rộng hiển thị")).toHaveValue(16);
+  expect(screen.getByLabelText("Chiều cao hiển thị")).toHaveValue(9);
+  fireEvent.change(screen.getByLabelText("Tên game"), {
+    target: { value: "Game mới" },
+  });
+  fireEvent.change(screen.getByLabelText("Đường dẫn"), {
+    target: { value: "game-moi" },
+  });
+  fireEvent.change(screen.getByLabelText("Chiều rộng hiển thị"), {
+    target: { value: "4" },
+  });
+  fireEvent.change(screen.getByLabelText("Chiều cao hiển thị"), {
+    target: { value: "3" },
+  });
+  fireEvent.submit(
+    screen.getByRole("button", { name: "Tạo bản nháp" }).closest("form")!,
+  );
+  await waitFor(() => expect(fetch).toHaveBeenCalled());
+  expect(JSON.parse(fetch.mock.calls[0][1].body)).toMatchObject({
+    viewportWidth: 4,
+    viewportHeight: 3,
+  });
+});
+
+test("workspace cover upload replaces owner preview and review state from the response", async () => {
+  const fetch = vi
+    .fn()
+    .mockResolvedValue(
+      new Response(
+        JSON.stringify(
+          codeGame({
+            coverVersion: 1,
+            coverContentType: "image/png",
+            reviewState: "PENDING",
+          }),
+        ),
+      ),
+    );
+  vi.stubGlobal("fetch", fetch);
+  render(<GameWorkspace initialGame={codeGame()} />);
+  const panel = screen.getByRole("region", { name: "Ảnh bìa và thông tin" });
+  const file = new File(["cover"], "cover.png", { type: "image/png" });
+  const input = within(panel).getByLabelText("Ảnh bìa game");
+  expect(input).toHaveAttribute("accept", ".jpg,.jpeg,.png,.webp");
+  fireEvent.change(input, { target: { files: [file] } });
+  // fireEvent sets files but cannot populate a native FileList for constraint validation.
+  fireEvent.submit(
+    within(panel)
+      .getByRole("button", { name: "Tải ảnh bìa lên" })
+      .closest("form")!,
+  );
+  expect(
+    await screen.findByRole("img", { name: "Ảnh bìa Code quest" }),
+  ).toHaveAttribute("src", "/api/games/game-1/cover/1");
+  expect(fetch).toHaveBeenCalledWith(
+    "/api/games/game-1/cover",
+    expect.objectContaining({ method: "POST", body: expect.any(FormData) }),
+  );
+  expect(fetch.mock.calls[0][1].body.get("cover")).toBe(file);
+  expect(screen.getByRole("status")).toHaveTextContent("Chờ duyệt");
+  expect(screen.getByRole("button", { name: "Gửi duyệt" })).toBeDisabled();
+});
+
+test.each(["network", "http"])(
+  "cover upload %s failure retains existing preview and enables retry",
+  async (failure) => {
+    vi.stubGlobal(
+      "fetch",
+      failure === "network"
+        ? vi.fn().mockRejectedValue(new TypeError("offline"))
+        : vi
+            .fn()
+            .mockResolvedValue(new Response("Upload failed", { status: 503 })),
+    );
+    render(
+      <GameWorkspace
+        initialGame={codeGame({
+          coverVersion: 2,
+          coverContentType: "image/png",
+        })}
+      />,
+    );
+    fireEvent.change(screen.getByLabelText("Ảnh bìa game"), {
+      target: {
+        files: [new File(["cover"], "new.png", { type: "image/png" })],
+      },
+    });
+    fireEvent.submit(
+      screen.getByRole("button", { name: "Tải ảnh bìa lên" }).closest("form")!,
+    );
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Không thể tải ảnh bìa. Vui lòng thử lại.",
+    );
+    expect(
+      screen.getByRole("button", { name: "Tải ảnh bìa lên" }),
+    ).toBeEnabled();
+    expect(
+      screen.getByRole("img", { name: "Ảnh bìa Code quest" }),
+    ).toHaveAttribute("src", "/api/games/game-1/cover/2");
+  },
+);
+
+test("display settings patch dimensions and update the shared game state", async () => {
+  const fetch = vi
+    .fn()
+    .mockResolvedValue(
+      new Response(
+        JSON.stringify(
+          codeGame({
+            viewportWidth: 4,
+            viewportHeight: 3,
+            reviewState: "PENDING",
+          }),
+        ),
+      ),
+    );
+  vi.stubGlobal("fetch", fetch);
+  render(<GameWorkspace initialGame={codeGame()} />);
+  const panel = screen.getByRole("region", { name: "Cài đặt hiển thị" });
+  fireEvent.change(within(panel).getByLabelText("Chiều rộng hiển thị"), {
+    target: { value: "4" },
+  });
+  fireEvent.change(within(panel).getByLabelText("Chiều cao hiển thị"), {
+    target: { value: "3" },
+  });
+  fireEvent.submit(
+    within(panel)
+      .getByRole("button", { name: "Lưu hiển thị" })
+      .closest("form")!,
+  );
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "Lưu hiển thị" })).toBeEnabled(),
+  );
+  expect(fetch).toHaveBeenCalledWith(
+    "http://localhost:3001/games/game-1",
+    expect.objectContaining({
+      method: "PATCH",
+      body: JSON.stringify({ viewportWidth: 4, viewportHeight: 3 }),
+    }),
+  );
+  expect(screen.getByRole("button", { name: "Gửi duyệt" })).toBeDisabled();
+});
+
+test("display settings reject invalid dimensions and retain values after an API error", async () => {
+  const fetch = vi
+    .fn()
+    .mockResolvedValue(
+      new Response(JSON.stringify({ message: "Không thể lưu" }), {
+        status: 503,
+      }),
+    );
+  vi.stubGlobal("fetch", fetch);
+  render(<GameWorkspace initialGame={codeGame()} />);
+  const width = screen.getByLabelText("Chiều rộng hiển thị");
+  const form = screen
+    .getByRole("button", { name: "Lưu hiển thị" })
+    .closest("form")!;
+  fireEvent.change(width, { target: { value: "4097" } });
+  fireEvent.submit(form);
+  expect(fetch).not.toHaveBeenCalled();
+  expect(screen.getByRole("alert")).toHaveTextContent(
+    "Kích thước phải là số nguyên từ 1 đến 4096.",
+  );
+  fireEvent.change(width, { target: { value: "4" } });
+  fireEvent.submit(form);
+  expect(await screen.findByRole("alert")).toHaveTextContent("Không thể lưu");
+  expect(width).toHaveValue(4);
+  expect(screen.getByRole("button", { name: "Lưu hiển thị" })).toBeEnabled();
 });

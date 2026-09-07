@@ -10,7 +10,9 @@ export default async function ProfilePage() {
 
   return (
     <main className="narrow" lang="vi">
-      <h1>Thông tin cá nhân</h1>
+      <header className="page-heading">
+        <h1>Thông tin cá nhân</h1>
+      </header>
       <p>Cập nhật tên hiển thị và giới thiệu về bạn.</p>
       <ProfileForm profile={profile} />
     </main>

@@ -4,10 +4,12 @@ import { AuthForm } from "../../components/auth-form";
 export default function LoginPage() {
   return (
     <main className="narrow">
-      <h1>Welcome back</h1>
+      <header className="page-heading">
+        <h1>Chào mừng trở lại</h1>
+      </header>
       <AuthForm mode="login" />
       <p>
-        New here? <Link href="/register">Create an account</Link>
+        Bạn mới đến? <Link href="/register">Tạo tài khoản</Link>
       </p>
     </main>
   );

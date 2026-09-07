@@ -33,7 +33,7 @@ function withKeys(project: PlatformerProject): Platform[] {
 function errorMessage(error: unknown): string {
   return error instanceof ApiError
     ? error.message
-    : "Unable to connect. Please try again.";
+    : "Không thể kết nối. Vui lòng thử lại.";
 }
 
 export function PlatformerGameEditor({
@@ -102,7 +102,9 @@ export function PlatformerGameEditor({
     setError("");
     const parsed = PlatformerProjectInput.safeParse(project);
     if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message ?? "Check your platformer.");
+      setError(parsed.error.issues[0]?.message === "Platform geometry must be inside the canvas"
+        ? "Nền tảng phải nằm trong khung vẽ."
+        : "Kiểm tra khung vẽ, nhân vật, đích đến và các nền tảng.");
       return;
     }
     setOperation("save");
@@ -131,13 +133,13 @@ export function PlatformerGameEditor({
   }
 
   return (
-    <section aria-labelledby="platformer-editor-heading">
-      <h2 id="platformer-editor-heading">Platformer editor</h2>
+    <section className="panel editor-panel" aria-labelledby="platformer-editor-heading">
+      <h2 id="platformer-editor-heading">Trình tạo game đi cảnh</h2>
       <div className="form-stack">
         <fieldset>
-          <legend>Canvas</legend>
+          <legend>Khung vẽ</legend>
           <label>
-            Canvas width
+            Chiều rộng khung vẽ
             <input
               disabled={operation !== null}
               max={1920}
@@ -150,7 +152,7 @@ export function PlatformerGameEditor({
             />
           </label>
           <label>
-            Canvas height
+            Chiều cao khung vẽ
             <input
               disabled={operation !== null}
               max={1080}
@@ -163,7 +165,7 @@ export function PlatformerGameEditor({
             />
           </label>
           <label>
-            Background color
+            Màu nền
             <input
               disabled={operation !== null}
               onChange={(event) => setBackgroundColor(event.target.value)}
@@ -173,9 +175,9 @@ export function PlatformerGameEditor({
           </label>
         </fieldset>
         <fieldset>
-          <legend>Player</legend>
+          <legend>Nhân vật</legend>
           <label>
-            Player X
+            Vị trí X nhân vật
             <input
               disabled={operation !== null}
               min={0}
@@ -187,7 +189,7 @@ export function PlatformerGameEditor({
             />
           </label>
           <label>
-            Player Y
+            Vị trí Y nhân vật
             <input
               disabled={operation !== null}
               min={0}
@@ -199,7 +201,7 @@ export function PlatformerGameEditor({
             />
           </label>
           <label>
-            Player color
+            Màu nhân vật
             <input
               disabled={operation !== null}
               onChange={(event) =>
@@ -211,9 +213,9 @@ export function PlatformerGameEditor({
           </label>
         </fieldset>
         <fieldset>
-          <legend>Goal</legend>
+          <legend>Đích đến</legend>
           <label>
-            Goal X
+            Vị trí X đích đến
             <input
               disabled={operation !== null}
               min={0}
@@ -225,7 +227,7 @@ export function PlatformerGameEditor({
             />
           </label>
           <label>
-            Goal Y
+            Vị trí Y đích đến
             <input
               disabled={operation !== null}
               min={0}
@@ -237,7 +239,7 @@ export function PlatformerGameEditor({
             />
           </label>
           <label>
-            Goal color
+            Màu đích đến
             <input
               disabled={operation !== null}
               onChange={(event) =>
@@ -250,7 +252,7 @@ export function PlatformerGameEditor({
         </fieldset>
         {platforms.map((platform, index) => (
           <fieldset key={platform.key}>
-            <legend>Platform {index + 1}</legend>
+            <legend>Nền tảng {index + 1}</legend>
             <label>
               X
               <input
@@ -276,7 +278,7 @@ export function PlatformerGameEditor({
               />
             </label>
             <label>
-              Width
+              Chiều rộng
               <input
                 disabled={operation !== null}
                 min={1}
@@ -288,7 +290,7 @@ export function PlatformerGameEditor({
               />
             </label>
             <label>
-              Height
+              Chiều cao
               <input
                 disabled={operation !== null}
                 min={1}
@@ -300,7 +302,7 @@ export function PlatformerGameEditor({
               />
             </label>
             <label>
-              Color
+              Màu sắc
               <input
                 disabled={operation !== null}
                 onChange={(event) =>
@@ -319,7 +321,7 @@ export function PlatformerGameEditor({
               }
               type="button"
             >
-              Remove platform
+              Xóa nền tảng
             </button>
           </fieldset>
         ))}
@@ -328,19 +330,21 @@ export function PlatformerGameEditor({
           onClick={addPlatform}
           type="button"
         >
-          Add platform
+          Thêm nền tảng
         </button>
         {error && <p role="alert">{error}</p>}
-        <button disabled={operation !== null} onClick={savePlatformer} type="button">
-          {operation === "save" ? "Saving…" : "Save platformer"}
-        </button>
-        <button
-          disabled={operation !== null || !hasSavedProject || isDirty}
-          onClick={buildPreview}
-          type="button"
-        >
-          {operation === "build" ? "Building…" : "Build preview"}
-        </button>
+        <div className="editor-actions">
+          <button disabled={operation !== null} onClick={savePlatformer} type="button">
+            {operation === "save" ? "Đang lưu…" : "Lưu game đi cảnh"}
+          </button>
+          <button
+            disabled={operation !== null || !hasSavedProject || isDirty}
+            onClick={buildPreview}
+            type="button"
+          >
+            {operation === "build" ? "Đang tạo…" : "Tạo bản chơi thử"}
+          </button>
+        </div>
       </div>
     </section>
   );

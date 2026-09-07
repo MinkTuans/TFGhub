@@ -15,7 +15,7 @@ export function AuthForm({ mode }: { mode: "register" | "login" }) {
       Object.fromEntries(new FormData(event.currentTarget)),
     );
     if (!input.success) {
-      setError("Enter a valid email and a password with 10–128 characters.");
+      setError("Nhập email hợp lệ và mật khẩu từ 10–128 ký tự.");
       return;
     }
     setError("");
@@ -28,20 +28,20 @@ export function AuthForm({ mode }: { mode: "register" | "login" }) {
       setError(
         error instanceof ApiError
           ? error.message
-          : "Unable to connect. Please try again.",
+          : "Không thể kết nối. Vui lòng thử lại.",
       );
     } finally {
       setPending(false);
     }
   }
   return (
-    <form method="post" onSubmit={submit} className="form-stack">
+    <form method="post" onSubmit={submit} className="form-stack panel">
       <label>
         Email
         <input name="email" type="email" autoComplete="email" required />
       </label>
       <label>
-        Password
+        Mật khẩu
         <input
           name="password"
           type="password"
@@ -54,15 +54,15 @@ export function AuthForm({ mode }: { mode: "register" | "login" }) {
         />
       </label>
       {mode === "register" && (
-        <p className="hint">Use at least 10 characters.</p>
+        <p className="hint">Sử dụng ít nhất 10 ký tự.</p>
       )}
       {error && <p role="alert">{error}</p>}
       <button disabled={pending}>
         {pending
-          ? "Please wait…"
+          ? "Vui lòng chờ…"
           : mode === "register"
-            ? "Create account"
-            : "Log in"}
+            ? "Tạo tài khoản"
+            : "Đăng nhập"}
       </button>
     </form>
   );

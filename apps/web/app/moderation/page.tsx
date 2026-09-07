@@ -1,5 +1,8 @@
 import { redirect } from "next/navigation";
-import { ModerationQueue, type ModerationGame } from "../../components/moderation-queue";
+import {
+  ModerationQueue,
+  type ModerationGame,
+} from "../../components/moderation-queue";
 import { optionalSession, privateGet } from "../../lib/session";
 
 export default async function ModerationPage() {
@@ -9,8 +12,10 @@ export default async function ModerationPage() {
 
   return (
     <main>
-      <h1>Moderation queue</h1>
-      <p>Review submitted games before they appear in discovery.</p>
+      <header className="page-heading">
+        <h1>Hàng đợi kiểm duyệt</h1>
+      </header>
+      <p>Kiểm tra các game được gửi trước khi xuất hiện trong Khám phá.</p>
       <ModerationQueue initialGames={games} />
     </main>
   );

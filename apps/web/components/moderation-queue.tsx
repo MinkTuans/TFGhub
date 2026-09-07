@@ -41,12 +41,12 @@ export function ModerationQueue({ initialGames }: { initialGames: ModerationGame
         },
       );
       setGames((current) => current.filter(({ id }) => id !== game.id));
-      setMessage(action === "approve" ? "Game approved." : "Game rejected.");
+      setMessage(action === "approve" ? "Đã duyệt game." : "Đã từ chối game.");
     } catch (failure) {
       setError(
         failure instanceof ApiError
           ? failure.message
-          : "Unable to review this game. Please try again.",
+          : "Không thể duyệt game này. Vui lòng thử lại.",
       );
     } finally {
       setReviewing((current) => {
@@ -58,32 +58,32 @@ export function ModerationQueue({ initialGames }: { initialGames: ModerationGame
   }
 
   return (
-    <section aria-label="Pending games" data-hydrated={hydrated} data-testid="moderation-queue">
+    <section aria-label="Game chờ duyệt" data-hydrated={hydrated} data-testid="moderation-queue">
       {message && <p role="status">{message}</p>}
       {error && <p role="alert">{error}</p>}
       {games.length === 0 ? (
-        <p>No games are waiting for review.</p>
+        <p>Không có game nào đang chờ duyệt.</p>
       ) : (
-        <div className="grid">
+        <div className="moderation-grid">
           {games.map((game) => {
             const busy = reviewing.has(game.id);
             const note = notes[game.id] ?? "";
             return (
-              <article className="card" aria-label={game.title} key={game.id}>
+              <article className="panel moderation-card" aria-label={game.title} key={game.id}>
                 <h2>{game.title}</h2>
-                <p>By {game.creator.displayName ?? "Unknown developer"}</p>
-                <p>Source: {{ UPLOAD: "HTML5 ZIP", CODE: "Code editor", STORY: "Story / quiz", PLATFORMER: "2D platformer" }[game.sourceType]}</p>
-                <p>Submitted: <time dateTime={game.submittedAt}>{game.submittedAt}</time></p>
+                <p>Tác giả: {game.creator.displayName ?? "Chưa có tên"}</p>
+                <p>Nguồn: {{ UPLOAD: "HTML5 ZIP", CODE: "Trình soạn mã", STORY: "Cốt truyện / đố vui", PLATFORMER: "Đi cảnh 2D" }[game.sourceType]}</p>
+                <p>Ngày gửi: <time dateTime={game.submittedAt}>{game.submittedAt}</time></p>
                 <p className="description">{game.description}</p>
                 {game.artifactReady && game.artifactVersion > 0 && (
                   <iframe
-                    title="Game preview"
+                    title="Chơi thử game"
                     src={`${resolvePublicApiBaseUrl()}/games/${encodeURIComponent(game.id)}/preview/?v=${game.artifactVersion}`}
                     sandbox="allow-scripts allow-pointer-lock"
                   />
                 )}
                 <label>
-                  Rejection note
+                  Lý do từ chối
                   <textarea
                     value={note}
                     maxLength={500}
@@ -94,14 +94,15 @@ export function ModerationQueue({ initialGames }: { initialGames: ModerationGame
                 </label>
                 <div className="actions">
                   <button type="button" disabled={busy} onClick={() => review(game, "approve")}>
-                    {busy ? "Reviewing…" : "Approve"}
+                    {busy ? "Đang duyệt…" : "Duyệt"}
                   </button>
                   <button
                     type="button"
+                    className="button-danger"
                     disabled={busy || !note.trim()}
                     onClick={() => review(game, "reject")}
                   >
-                    {busy ? "Reviewing…" : "Reject"}
+                    {busy ? "Đang duyệt…" : "Từ chối"}
                   </button>
                 </div>
               </article>

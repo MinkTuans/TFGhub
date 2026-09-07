@@ -10,10 +10,10 @@ export function GamePreview({
   revision: number;
 }) {
   return (
-    <section aria-labelledby="preview-heading">
-      <h2 id="preview-heading">Preview</h2>
+    <section className="panel editor-panel" aria-labelledby="preview-heading">
+      <h2 id="preview-heading">Chơi thử</h2>
       <iframe
-        title="Game preview"
+        title="Chơi thử game"
         src={`${resolvePublicApiBaseUrl()}/games/${encodeURIComponent(gameId)}/preview/?v=${revision}`}
         sandbox="allow-scripts allow-pointer-lock"
       />
