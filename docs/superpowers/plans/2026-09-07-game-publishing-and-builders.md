@@ -272,25 +272,25 @@
 - Produces: editable HTML/CSS/JavaScript source, save/build, and shared preview.
 - Consumes: `PUT /games/:id/project` and `POST /games/:id/build`.
 
-- [ ] **Step 1: Write failing code-editor tests**
+- [x] **Step 1: Write failing code-editor tests**
 
   Assert all three fields load saved content, failed saves preserve edits, a
   successful build refreshes the sandboxed preview, and submission uses the
   compiled revision.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
   Run: `pnpm --filter web test && PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/google-chrome pnpm --filter web e2e --grep "code game"`
 
   Expected: tests fail because the editor is absent.
 
-- [ ] **Step 3: Implement the editor**
+- [x] **Step 3: Implement the editor**
 
   Use controlled textareas with explicit length counters and two operations:
   `Save source` then `Build preview`. Reuse the workspace status, error, preview,
   and submit controls; add no editor dependency.
 
-- [ ] **Step 4: Verify GREEN and commit**
+- [x] **Step 4: Verify GREEN and commit**
 
   Run: `pnpm --filter web test && pnpm --filter web typecheck && pnpm --filter web lint && PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/google-chrome pnpm --filter web e2e --grep "code game" && git add apps/web && git commit -m "feat(web): add HTML game code editor"`
 
