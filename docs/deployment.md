@@ -126,28 +126,42 @@ Record the revision alongside the backup in your operations records. The dump in
 
 A restore replaces database contents and discards changes since the chosen backup. First make a fresh backup using the previous section, identify its revision and the revision compatible with the dump to restore, and verify the target project. Do not run an upgrade or a second operator session concurrently. Use a trusted custom-format dump; a dump can contain executable database commands.
 
-This function validates the archive, asks for a typed confirmation, stops the API and web to prevent writes, and uses a transaction. A failed restore returns without restarting them. Review the failure before retrying; the proxy may return 502 while services are stopped.
+`pg_restore --clean` only removes objects present in the archive; it does not remove tables or other objects introduced by later migrations. Exact recovery therefore requires a clean target database. The function below validates the archive and displays the actual target before asking for typed confirmation. It stops API, web, and the migration job, drops only the configured application database, recreates it from `template0`, and restores the archive in one transaction. It refuses the PostgreSQL maintenance/template database names.
+
+Dropping the database cannot be rolled back with the restore transaction. A failed restore leaves an empty database and the applications stopped; recover using the chosen dump or the fresh safety backup. A failed migration-status check leaves the restored database and applications stopped. Review the failure before retrying; the proxy may return 502 while services are stopped. This procedure restores database objects and data, not cluster roles or separately managed database-level grants/settings. If you manage extra database-level grants/settings, add their reapplication after `createdb` and before the function proceeds to restore and restart.
 
 ```bash
 restore_database() {
   local backup_file="$1"
   local confirmation
+  local target_database
   test -s "$backup_file" || return 1
   compose ps -a || return 1
   compose exec -T postgres pg_restore --list < "$backup_file" > /dev/null || return 1
-  printf 'Replace the indieforge database with %s? Type RESTORE: ' "$backup_file"
+  target_database="$(compose exec -T postgres sh -c 'printf "%s" "$POSTGRES_DB"' < /dev/null)" || return 1
+  case "$target_database" in
+    ''|postgres|template0|template1) printf 'Refusing maintenance/empty database target.\n' >&2; return 1 ;;
+  esac
+  printf 'DROP and recreate database %s in project indieforge from %s? Type RESTORE: ' "$target_database" "$backup_file"
   read -r confirmation
   test "$confirmation" = RESTORE || return 1
-  compose stop api web || return 1
+  compose stop api web migrate || return 1
+  compose exec -T postgres sh -ec '
+    dropdb --force --username="$POSTGRES_USER" -- "$POSTGRES_DB"
+    createdb --username="$POSTGRES_USER" --owner="$POSTGRES_USER" --template=template0 -- "$POSTGRES_DB"
+  ' || return 1
   compose exec -T postgres sh -c \
     'exec pg_restore --clean --if-exists --no-owner --single-transaction --exit-on-error --username="$POSTGRES_USER" --dbname="$POSTGRES_DB"' \
     < "$backup_file" || return 1
+  compose run --rm --no-deps migrate pnpm --filter @indieforge/database prisma migrate status || return 1
   compose up -d --wait || return 1
 }
 restore_database 'backups/<timestamp>.dump'
 ```
 
-Before calling this function, ensure the checkout and built images match the restored database's application revision. `up` may run pending migrations, so restoring an old dump while leaving incompatible newer images in place is not a rollback. After success, repeat migration logs, service health, and browser verification from the start section.
+Before calling this function, ensure the checkout and built images match the restored database's application revision. The migration-status check must confirm that this release's committed migration history matches the restored database before `up` can restart the application. Restoring an old dump while leaving incompatible newer images in place is not a rollback. After success, repeat migration logs, service health, and browser verification from the start section.
+
+To regression-test the documented function on a validation host, run `node scripts/test-restore-runbook.mjs` with Docker access and the `postgres:16-alpine` image already present. It uses an isolated, unpublished PostgreSQL container with temporary data, executes the runbook function, proves a post-backup table is removed, and checks confirmation/failure handling. Application lifecycle and migration-status outcomes are controlled by the test harness; the dump, database recreation, restore, and SQL assertions use real PostgreSQL. The drill removes its container and temporary files even on failure.
 
 ## Upgrade
 
