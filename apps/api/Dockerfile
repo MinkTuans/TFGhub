@@ -26,7 +26,10 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends openssl \
     && rm -rf /var/lib/apt/lists/*
 
-RUN corepack enable && corepack prepare pnpm@10.0.0 --activate
+ENV COREPACK_HOME=/home/node/.cache/node/corepack
+RUN corepack enable \
+    && corepack prepare pnpm@10.0.0 --activate \
+    && chown -R node:node /home/node/.cache
 
 COPY --from=build --chown=node:node /app /app
 

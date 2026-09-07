@@ -7,6 +7,10 @@ const apiRuntime = api.split(/^FROM node:22-bookworm-slim AS runtime$/m)[1];
 const webRuntime = web.split(/^FROM node:22-bookworm-slim AS runtime$/m)[1];
 
 assert.match(
+  apiRuntime,
+  /ENV COREPACK_HOME=\/home\/node\/\.cache\/node\/corepack[\s\S]*corepack prepare pnpm@10\.0\.0 --activate[\s\S]*chown -R node:node \/home\/node\/\.cache/,
+);
+assert.match(
   webRuntime,
   /ENV COREPACK_HOME=\/home\/node\/\.cache\/node\/corepack[\s\S]*corepack prepare pnpm@10\.0\.0 --activate[\s\S]*chown -R node:node \/home\/node\/\.cache/,
 );
