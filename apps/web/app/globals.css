@@ -237,6 +237,45 @@ input::placeholder, textarea::placeholder { color: var(--muted); }
 .card { overflow-wrap: anywhere; border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 1.5rem; background: var(--surface-raised); box-shadow: var(--shadow-sm); }
 .badge { display: inline-block; border-radius: var(--radius-sm); padding: 0.2rem 0.625rem; background: var(--badge); color: var(--secondary); font-size: 0.85rem; font-weight: 700; }
 
+.home-page { max-width: 68rem; }
+.home-hero { max-width: 48rem; padding: 2rem 0 1.5rem; }
+.home-hero__lede, .discover-page__lede { max-width: 42rem; color: var(--muted); font-size: 1.125rem; }
+.feature-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1rem; }
+.feature-card, .publishing-process, .discover-state {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-sm);
+}
+.feature-card { padding: 1.25rem; }
+.feature-card h3 { margin: 1rem 0 0.35rem; }
+.feature-card p { margin: 0; color: var(--muted); font-size: 0.94rem; }
+.feature-icon { width: 2.25rem; height: 2.25rem; padding: 0.5rem; border-radius: var(--radius-sm); background: var(--badge); color: var(--secondary); }
+.publishing-process { padding: 1.5rem; }
+.publishing-process ol { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin: 1.25rem 0 0; padding: 0; list-style: none; counter-reset: steps; }
+.publishing-process li { border-left: 3px solid var(--primary); padding: 0.75rem 1rem; background: color-mix(in srgb, var(--primary) 7%, var(--surface)); font-weight: 750; }
+
+.game-card { display: block; overflow: hidden; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface-raised); box-shadow: var(--shadow-sm); color: var(--text); text-decoration: none; transition: border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease; }
+.game-card:hover { border-color: var(--primary); box-shadow: var(--shadow-md); color: var(--text); text-decoration: none; transform: translateY(-2px); }
+.game-card__body { padding: 1.1rem 1.2rem 1.25rem; }
+.game-card h2 { margin-bottom: 0.4rem; font-size: 1.2rem; }
+.game-card__developer { margin: 0; color: var(--secondary); font-size: 0.9rem; font-weight: 700; }
+.game-card .description { display: -webkit-box; margin-bottom: 0; overflow: hidden; color: var(--muted); -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.game-cover { position: relative; overflow: hidden; width: 100%; background: hsl(var(--game-cover-hue) 45% 36%); }
+.game-cover__image { display: block; width: 100%; height: 100%; object-fit: cover; }
+.game-cover__fallback { display: flex; position: absolute; inset: 0; align-items: flex-end; justify-content: space-between; padding: 1rem; background: linear-gradient(135deg, hsl(var(--game-cover-hue) 74% 62%), hsl(calc(var(--game-cover-hue) + 70) 65% 34%)); color: white; }
+.game-cover__brand { align-self: flex-start; font-size: 0.75rem; font-weight: 900; letter-spacing: 0.12em; }
+.game-cover__fallback strong { font-size: clamp(1.5rem, 8vw, 3.5rem); letter-spacing: -0.08em; }
+.game-card--compact { display: flex; }
+.game-card--compact article { display: flex; width: 100%; align-items: center; }
+.game-card--compact .game-cover { width: 7rem; flex: 0 0 7rem; }
+.game-card--compact .game-card__body { padding: 0.75rem; }
+.game-card--compact h2 { font-size: 1rem; }
+
+.discover-state { margin: 1.75rem 0; padding: 1.25rem; }
+.discover-state h2, .discover-state p { margin-top: 0; }
+.discover-state p:last-of-type { margin-bottom: 0.75rem; }
+
 .skeleton {
   border-radius: var(--radius-sm);
   background: linear-gradient(90deg, var(--skeleton-base) 25%, var(--skeleton-highlight) 50%, var(--skeleton-base) 75%);
@@ -266,9 +305,12 @@ footer { padding: 1.5rem; border-top: 1px solid var(--border); text-align: cente
   main { margin: 2.25rem auto; }
   .section-heading { align-items: flex-start; flex-direction: column; }
   .hero { padding: 1.5rem 0; }
+  .feature-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .publishing-process ol { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 35rem) {
   .container, main { width: min(100% - 2rem, 65rem); }
   .theme-toggle__label { display: none; }
+  .feature-grid { grid-template-columns: 1fr; }
 }

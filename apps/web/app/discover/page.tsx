@@ -20,27 +20,41 @@ export default async function DiscoverPage({
   } catch (failure) {
     error =
       failure instanceof ApiError && failure.status === 400
-        ? "This search is invalid. Try a new search."
-        : "Unable to load games. Please try again.";
+        ? "Từ khóa tìm kiếm không hợp lệ. Hãy thử lại."
+        : "Không thể tải game lúc này. Vui lòng thử lại.";
   }
   const next = new URLSearchParams();
   if (query) next.set("query", query);
   if (data?.nextCursor) next.set("cursor", data.nextCursor);
   return (
-    <main>
-      <h1>Discover games</h1>
-      <p>Small games. Fresh ideas. Meet the people who make them.</p>
+    <main className="discover-page">
+      <p className="eyebrow">Từ cộng đồng TFG</p>
+      <h1>Khám phá game</h1>
+      <p className="discover-page__lede">
+        Những game nhỏ, ý tưởng mới và những người tạo ra chúng.
+      </p>
       <form action="/discover" className="search-form">
         <label>
-          Search games
+          Tìm kiếm game
           <input name="query" defaultValue={query} maxLength={200} />
         </label>
-        <button>Search</button>
+        <button>Tìm kiếm</button>
       </form>
-      {error && <p role="alert">{error}</p>}
+      {error && (
+        <div className="discover-state" role="alert">
+          <p>{error}</p>
+          <Link href={query ? `/discover?query=${encodeURIComponent(query)}` : "/discover"}>
+            Thử lại
+          </Link>
+        </div>
+      )}
       {data &&
         (data.games.length === 0 ? (
-          <p>No games found.</p>
+          <section className="discover-state" aria-labelledby="discover-empty-title">
+            <h2 id="discover-empty-title">Chưa có game phù hợp.</h2>
+            <p>Thử một từ khóa khác, hoặc xem tất cả game đang có trên TFG.</p>
+            <Link href="/discover">Xem tất cả game</Link>
+          </section>
         ) : (
           <div className="grid">
             {data.games.map((game) => (
@@ -48,7 +62,11 @@ export default async function DiscoverPage({
             ))}
           </div>
         ))}
-      {data?.nextCursor && <Link href={`/discover?${next}`}>Next page</Link>}
+      {data?.nextCursor && (
+        <Link className="button button-ghost" href={`/discover?${next}`}>
+          Trang tiếp theo
+        </Link>
+      )}
     </main>
   );
 }
