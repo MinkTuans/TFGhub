@@ -10,7 +10,10 @@ export default defineConfig({
     baseURL: process.env.E2E_WEB_URL ?? "http://localhost:3100",
     trace: "retain-on-failure",
     launchOptions: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH
-      ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH }
+      ? {
+          executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH,
+          chromiumSandbox: true,
+        }
       : {},
   },
   webServer: external

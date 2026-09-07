@@ -72,7 +72,23 @@ test("register, save a profile, create a private draft, and sign back in", async
   await expect(page.getByText("No games found.")).toBeVisible();
   const hidden = await page.goto(`/games/first-game-${suffix}`);
   expect(hidden?.status()).toBe(404);
-  await context.clearCookies();
+  const logoutUrl =
+    process.env.E2E_EXTERNAL_SERVICES === "1"
+      ? "/api/auth/logout"
+      : "http://localhost:3101/auth/logout";
+  const logoutStatus = await page.evaluate(async (url) => {
+    const response = await fetch(url, {
+      method: "POST",
+      credentials: "include",
+    });
+    return response.status;
+  }, logoutUrl);
+  expect(logoutStatus).toBe(204);
+  expect(
+    (await context.cookies()).some(
+      (sessionCookie) => sessionCookie.name === "indieforge_access",
+    ),
+  ).toBe(false);
   await page.goto("/studio");
   await expect(page).toHaveURL("/login");
   await page.getByLabel("Email").fill(email);
