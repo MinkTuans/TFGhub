@@ -11,6 +11,7 @@ export function GameCard({
 }) {
   return (
     <Link
+      aria-label={`Chơi ${game.title}`}
       className={`game-card${compact ? " game-card--compact" : ""}`}
       href={`/games/${encodeURIComponent(game.slug)}`}
     >

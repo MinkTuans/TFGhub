@@ -42,7 +42,7 @@ test("links the complete public game card and shows its versioned cover", () => 
       game={tinyQuest}
     />,
   );
-  expect(screen.getByRole("link", { name: /tiny quest/i })).toHaveAttribute(
+  expect(screen.getByRole("link", { name: "Chơi Tiny Quest" })).toHaveAttribute(
     "href",
     "/games/tiny-quest",
   );

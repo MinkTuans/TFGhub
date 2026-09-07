@@ -1,6 +1,10 @@
 // Test-only storage adapter. Controllers, services, password hashing, JWT guards,
 // cookies and CORS are the production Nest implementation.
 import { createRequire } from "node:module";
+import { chmod, mkdtemp, readdir, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { createServer, request as httpRequest } from "node:http";
 const requireApi = createRequire(
   new URL("../../api/package.json", import.meta.url),
 );
@@ -17,6 +21,11 @@ const { GamesRepository } =
   await import("../../api/dist/games/games.service.js");
 const { PublicGamesRepository } =
   await import("../../api/dist/games/public-games.service.js");
+const { ArtifactStorage } =
+  await import("../../api/dist/game-artifacts/artifact-storage.js");
+// Never reuse application storage or artifacts from a previous browser run.
+const storageRoot = await mkdtemp(join(tmpdir(), "tfg-browser-"));
+process.env.GAME_STORAGE_ROOT = storageRoot;
 process.env.JWT_SECRET = "browser-tests-only-explicit-long-signing-secret";
 process.env.WEB_ORIGIN = "http://localhost:3100";
 const users = new Map([
@@ -52,8 +61,8 @@ const games = new Map([
       sourceType: "UPLOAD",
       reviewState: "APPROVED",
       projectData: null,
-      artifactVersion: 0,
-      artifactReady: false,
+      artifactVersion: 1,
+      artifactReady: true,
       coverVersion: 0,
       coverContentType: null,
       viewportWidth: 16,
@@ -65,12 +74,22 @@ const games = new Map([
     },
   ],
 ]);
+games.set("seed-related", {
+  ...games.get("seed-game"),
+  id: "seed-related",
+  slug: "moon-garden",
+  title: "Moon Garden",
+  description: "A quiet garden under the moon.",
+  artifactVersion: 0,
+  artifactReady: false,
+});
 const publicRows = (where) =>
   [...games.values()]
     .filter(
       (game) =>
         game.visibility === where.visibility &&
         game.moderationState === where.moderationState &&
+        game.reviewState === where.reviewState &&
         (!where.slug || where.slug === game.slug) &&
         (!where.OR ||
           where.OR.some((clause) =>
@@ -265,11 +284,96 @@ const testingModule = await Test.createTestingModule({ imports: [AppModule] })
     },
   })
   .compile();
+await testingModule.get(ArtifactStorage).install("seed-game", 1, [{
+  path: "index.html",
+  contentType: "text/html",
+  content: '<!doctype html><html lang="vi"><meta charset="utf-8"><title>Tiny Quest</title><style>html,body{margin:0;width:100%;height:100%;overflow:hidden}body{display:grid;place-items:center;background:#101527;color:#eef2ff;font-family:sans-serif}h1{font-size:clamp(1rem,5vw,3rem)}</style><h1>Tiny Quest</h1></html>',
+}]);
 const app = testingModule.createNestApplication();
 configureApp(app);
 await app.listen(3101, "localhost");
+
+// Match Caddy's /api prefix stripping while exercising actual HTTP requests.
+// Forward the original Host/Origin/Cookie headers and stream bodies unchanged.
+function forward(request, onResponse) {
+  const api = /^\/api(?:\/|\?|$)/.test(request.url);
+  const path = api ? request.url.slice(4) : request.url;
+  return httpRequest({
+    hostname: "localhost",
+    port: api ? 3101 : 3102,
+    method: request.method,
+    path: !path || path.startsWith("?") ? `/${path}` : path,
+    headers: request.headers,
+  }, onResponse);
+}
+
+const gateway = createServer((request, response) => {
+  const upstream = forward(request, (reply) => {
+    // rawHeaders preserves repeated headers, including multiple Set-Cookie.
+    response.writeHead(reply.statusCode, reply.rawHeaders);
+    reply.on("error", () => response.destroy());
+    reply.pipe(response);
+  });
+  upstream.on("error", () => {
+    if (!response.headersSent) response.writeHead(502);
+    response.end();
+  });
+  request.on("aborted", () => upstream.destroy());
+  response.on("close", () => upstream.destroy());
+  request.pipe(upstream);
+});
+
+// Next dev uses a WebSocket; forwarding upgrades avoids reconnect/reload noise.
+gateway.on("upgrade", (request, socket, head) => {
+  const upstream = forward(request, () => socket.end());
+  upstream.on("upgrade", (reply, upstreamSocket, upstreamHead) => {
+    const headers = reply.rawHeaders.reduce((lines, value, index, all) =>
+      index % 2 === 0 ? `${lines}${value}: ${all[index + 1]}\r\n` : lines, "");
+    socket.write(`HTTP/1.1 ${reply.statusCode} ${reply.statusMessage}\r\n${headers}\r\n`);
+    if (upstreamHead.length) socket.write(upstreamHead);
+    if (head.length) upstreamSocket.write(head);
+    socket.on("error", () => upstreamSocket.destroy());
+    socket.on("close", () => upstreamSocket.destroy());
+    upstreamSocket.on("error", () => socket.destroy());
+    upstreamSocket.on("close", () => socket.destroy());
+    socket.pipe(upstreamSocket).pipe(socket);
+  });
+  upstream.on("error", () => socket.destroy());
+  upstream.end();
+});
+const sockets = new Set();
+gateway.on("connection", (socket) => {
+  sockets.add(socket);
+  socket.on("close", () => sockets.delete(socket));
+});
+await new Promise((resolve, reject) => {
+  gateway.once("error", reject);
+  gateway.listen(3100, "localhost", resolve);
+});
+
+// Production storage seals published directories; only unseal this run's root.
+async function writable(directory) {
+  await chmod(directory, 0o755);
+  for (const entry of await readdir(directory, { withFileTypes: true })) {
+    if (entry.isDirectory()) await writable(join(directory, entry.name));
+  }
+}
+
+let closing = false;
 for (const signal of ["SIGTERM", "SIGINT"])
-  process.on(signal, async () => {
-    await app.close();
-    process.exit(0);
+  process.once(signal, async () => {
+    if (closing) return;
+    closing = true;
+    try {
+      const stopped = new Promise((resolve) => gateway.close(resolve));
+      for (const socket of sockets) socket.destroy();
+      await stopped;
+      await app.close();
+      await writable(storageRoot);
+      await rm(storageRoot, { recursive: true, force: true });
+      process.exit(0);
+    } catch (error) {
+      console.error("Browser harness cleanup failed", error);
+      process.exit(1);
+    }
   });
