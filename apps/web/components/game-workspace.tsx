@@ -5,6 +5,7 @@ import type { GameSummary } from "@indieforge/contracts";
 import { api, ApiError } from "../lib/api-client";
 import { CodeGameEditor } from "./code-game-editor";
 import { GamePreview } from "./game-preview";
+import { StoryGameEditor } from "./story-game-editor";
 import { UploadEditor } from "./upload-editor";
 
 function reviewLabel(game: GameSummary): string {
@@ -56,6 +57,14 @@ export function GameWorkspace({ initialGame }: { initialGame: GameSummary }) {
       )}
       {game.sourceType === "CODE" && (
         <CodeGameEditor
+          gameId={game.id}
+          initialProject={game.projectData}
+          onBuilt={setGame}
+          onSaved={setGame}
+        />
+      )}
+      {game.sourceType === "STORY" && (
+        <StoryGameEditor
           gameId={game.id}
           initialProject={game.projectData}
           onBuilt={setGame}

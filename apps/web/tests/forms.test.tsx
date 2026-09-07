@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 import { AuthForm } from "../components/auth-form";
 import { GameForm } from "../components/game-form";
@@ -36,6 +36,30 @@ function codeGame(overrides: Partial<GameSummary> = {}): GameSummary {
     reviewedAt: null,
     createdAt: "2026-09-07T07:00:00.000Z",
     updatedAt: "2026-09-07T09:00:00.000Z",
+    ...overrides,
+  };
+}
+
+function storyGame(overrides: Partial<GameSummary> = {}): GameSummary {
+  return {
+    ...codeGame({
+      sourceType: "STORY",
+      projectData: {
+        sourceType: "STORY",
+        startSceneId: "opening",
+        scenes: [
+          {
+            id: "opening",
+            speaker: "Guide",
+            dialogue: "Choose a path.",
+            backgroundColor: "#112233",
+            choices: [],
+          },
+        ],
+      },
+      artifactVersion: 1,
+      artifactReady: true,
+    }),
     ...overrides,
   };
 }
@@ -187,6 +211,122 @@ test("code editor loads saved HTML, CSS, and JavaScript", () => {
   expect(screen.getByLabelText("JavaScript")).toHaveValue(
     "window.saved = true;",
   );
+});
+
+test("story editor adds and removes scenes and choices", () => {
+  render(<GameWorkspace initialGame={storyGame()} />);
+
+  const opening = screen.getByRole("group", { name: "Scene 1" });
+  fireEvent.click(within(opening).getByRole("button", { name: "Add choice" }));
+  expect(within(opening).getByLabelText("Choice text")).toBeVisible();
+  fireEvent.click(
+    within(opening).getByRole("button", { name: "Remove choice" }),
+  );
+  expect(within(opening).queryByLabelText("Choice text")).toBeNull();
+
+  fireEvent.click(screen.getByRole("button", { name: "Add scene" }));
+  const added = screen.getByRole("group", { name: "Scene 2" });
+  expect(within(added).getByLabelText("Scene ID")).toHaveValue("scene-2");
+  fireEvent.click(within(added).getByRole("button", { name: "Remove scene" }));
+  expect(screen.queryByRole("group", { name: "Scene 2" })).toBeNull();
+});
+
+test("story editor reports duplicate scene IDs and missing choice targets before saving", () => {
+  const fetch = vi.fn();
+  vi.stubGlobal("fetch", fetch);
+  render(<GameWorkspace initialGame={storyGame()} />);
+
+  fireEvent.click(screen.getByRole("button", { name: "Add scene" }));
+  const added = screen.getByRole("group", { name: "Scene 2" });
+  fireEvent.change(within(added).getByLabelText("Scene ID"), {
+    target: { value: "opening" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Save story" }));
+  expect(screen.getByRole("alert")).toHaveTextContent(
+    "Scene identifiers must be unique",
+  );
+  expect(fetch).not.toHaveBeenCalled();
+
+  fireEvent.change(within(added).getByLabelText("Scene ID"), {
+    target: { value: "ending" },
+  });
+  const opening = screen.getByRole("group", { name: "Scene 1" });
+  fireEvent.click(within(opening).getByRole("button", { name: "Add choice" }));
+  fireEvent.change(within(opening).getByLabelText("Target scene ID"), {
+    target: { value: "missing" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Save story" }));
+  expect(screen.getByRole("alert")).toHaveTextContent(
+    "Choice targets must reference an existing scene",
+  );
+  expect(fetch).not.toHaveBeenCalled();
+});
+
+test("story editor retains input after a failed save", async () => {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ message: "Story could not be saved" }), {
+        status: 503,
+      }),
+    ),
+  );
+  render(<GameWorkspace initialGame={storyGame()} />);
+
+  const opening = screen.getByRole("group", { name: "Scene 1" });
+  fireEvent.change(within(opening).getByLabelText("Dialogue"), {
+    target: { value: "The story survives the error.", },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Save story" }));
+
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "Story could not be saved",
+  );
+  expect(within(opening).getByLabelText("Dialogue")).toHaveValue(
+    "The story survives the error.",
+  );
+});
+
+test("story build refreshes the sandboxed preview and enables submission", async () => {
+  const saved = storyGame({ artifactReady: false });
+  const built = { ...saved, artifactVersion: 2, artifactReady: true };
+  const submitted = { ...built, reviewState: "PENDING" as const };
+  const fetch = vi
+    .fn()
+    .mockResolvedValueOnce(new Response(JSON.stringify(saved)))
+    .mockResolvedValueOnce(new Response(JSON.stringify(built)))
+    .mockResolvedValueOnce(new Response(JSON.stringify(submitted)));
+  vi.stubGlobal("fetch", fetch);
+  render(<GameWorkspace initialGame={storyGame()} />);
+
+  fireEvent.click(screen.getByRole("button", { name: "Save story" }));
+  await screen.findByRole("button", { name: "Build preview" });
+  expect(screen.getByRole("button", { name: "Submit for review" })).toBeDisabled();
+
+  fireEvent.click(screen.getByRole("button", { name: "Build preview" }));
+  const preview = await screen.findByTitle("Game preview");
+  expect(preview).toHaveAttribute(
+    "src",
+    "http://localhost:3001/games/game-1/preview/?v=2",
+  );
+  expect(preview).toHaveAttribute(
+    "sandbox",
+    "allow-scripts allow-pointer-lock",
+  );
+  expect(screen.getByRole("button", { name: "Submit for review" })).toBeEnabled();
+  expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({
+    sourceType: "STORY",
+    startSceneId: "opening",
+    scenes: [
+      {
+        id: "opening",
+        speaker: "Guide",
+        dialogue: "Choose a path.",
+        backgroundColor: "#112233",
+        choices: [],
+      },
+    ],
+  });
 });
 
 test("workspace disables submission after reloading a persisted unready artifact", () => {

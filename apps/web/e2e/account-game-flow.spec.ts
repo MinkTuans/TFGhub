@@ -227,3 +227,47 @@ test("a code game saves source, rebuilds its sandboxed preview, and submits the 
   await page.getByRole("button", { name: "Submit for review" }).click();
   await expect(page.getByRole("status")).toHaveText("Pending review");
 });
+
+test("a story game builds a sandboxed branching preview that reaches the selected scene", async ({
+  page,
+}) => {
+  const suffix = randomUUID();
+  const title = `Story game ${suffix}`;
+  const openingSpeaker = `Guide ${suffix}`;
+  const endingSpeaker = `Treasure ${suffix}`;
+  const choice = "Open the hidden door";
+  await page.goto("/register");
+  await page.getByLabel("Email").fill(`story-${suffix}@example.com`);
+  await page.getByLabel("Password").fill("password123");
+  await page.getByRole("button", { name: "Create account" }).click();
+  await page.getByRole("link", { name: "Create a draft" }).click();
+  await page.getByLabel("Title").fill(title);
+  await page.getByLabel("Slug").fill(`story-game-${suffix}`);
+  await page.getByLabel("Source type").selectOption("STORY");
+  await page.getByRole("button", { name: "Create draft" }).click();
+
+  await page.getByRole("link", { name: title }).click();
+  const opening = page.getByRole("group", { name: "Scene 1" });
+  await opening.getByLabel("Speaker").fill(openingSpeaker);
+  await opening.getByLabel("Dialogue").fill("A door waits in the dark.");
+  await page.getByRole("button", { name: "Add scene" }).click();
+  const ending = page.getByRole("group", { name: "Scene 2" });
+  await ending.getByLabel("Scene ID").fill("treasure");
+  await ending.getByLabel("Speaker").fill(endingSpeaker);
+  await ending.getByLabel("Dialogue").fill("You found the treasure.");
+  await opening.getByRole("button", { name: "Add choice" }).click();
+  await opening.getByLabel("Choice text").fill(choice);
+  await opening.getByLabel("Target scene ID").fill("treasure");
+  await page.getByRole("button", { name: "Save story" }).click();
+  await page.getByRole("button", { name: "Build preview" }).click();
+
+  const preview = page.getByTitle("Game preview");
+  await expect(preview).toHaveAttribute(
+    "sandbox",
+    "allow-scripts allow-pointer-lock",
+  );
+  const game = preview.contentFrame();
+  await expect(game.getByRole("heading", { name: openingSpeaker })).toBeVisible();
+  await game.getByRole("button", { name: choice }).click();
+  await expect(game.getByRole("heading", { name: endingSpeaker })).toBeVisible();
+});
