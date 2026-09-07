@@ -413,19 +413,19 @@
   grant/backup/restore behavior, and public release.
 - Consumes: all application behavior from Tasks 1–9.
 
-- [ ] **Step 1: Write failing deployment contract checks**
+- [x] **Step 1: Write failing deployment contract checks**
 
   Assert API mounts only `game_storage:/var/lib/indieforge/games`, the volume is
   declared, upload size/env is fixed, no extra host ports exist, and backup/
   restore instructions include game artifacts as well as PostgreSQL.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
   Run: `pnpm test:deploy-config`
 
   Expected: FAIL because the storage volume/configuration is absent.
 
-- [ ] **Step 3: Implement deployment configuration and runbook**
+- [x] **Step 3: Implement deployment configuration and runbook**
 
   Mount the named volume into API, set `GAME_STORAGE_ROOT` and upload limits,
   install only the runtime packages needed by ZIP handling, and document a
