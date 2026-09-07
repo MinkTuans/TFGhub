@@ -1,8 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import {
+  chmod,
   mkdir,
   lstat,
   readFile,
+  readdir,
   rename,
   rm,
   writeFile,
@@ -46,6 +48,40 @@ async function rejectSymbolicLinks(root: string, candidate: string): Promise<voi
     if ((await lstat(current)).isSymbolicLink()) {
       throw new Error('Artifact path must not contain symbolic links');
     }
+  }
+}
+
+/**
+ * Makes a staged version immutable to the API user before its atomic publish.
+ * The version's parent remains writable solely to create later version siblings.
+ */
+async function sealPublishedTree(directory: string): Promise<void> {
+  const entries = await readdir(directory, { withFileTypes: true });
+
+  for (const entry of entries) {
+    const entryPath = join(directory, entry.name);
+    if (entry.isDirectory()) {
+      await sealPublishedTree(entryPath);
+    } else if (entry.isFile()) {
+      await chmod(entryPath, 0o444);
+    } else {
+      throw new Error('Artifact staging directory contains an unsupported entry');
+    }
+  }
+
+  await chmod(directory, 0o555);
+}
+
+async function unsealStagingTree(directory: string): Promise<void> {
+  try {
+    await chmod(directory, 0o755);
+    for (const entry of await readdir(directory, { withFileTypes: true })) {
+      const entryPath = join(directory, entry.name);
+      if (entry.isDirectory()) await unsealStagingTree(entryPath);
+      else if (!entry.isSymbolicLink()) await chmod(entryPath, 0o644);
+    }
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
   }
 }
 
@@ -94,8 +130,10 @@ export class ArtifactStorage {
         JSON.stringify(manifest),
         { flag: 'wx' },
       );
+      await sealPublishedTree(stagingDirectory);
       await rename(stagingDirectory, artifactDirectory);
     } catch (error) {
+      await unsealStagingTree(stagingDirectory);
       await rm(stagingDirectory, { recursive: true, force: true });
       throw error;
     }

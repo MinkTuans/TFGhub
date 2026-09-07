@@ -1,15 +1,27 @@
 import {
+  chmod,
   mkdtemp,
   readFile,
   readdir,
   rm,
+  stat,
   symlink,
+  unlink,
   writeFile,
 } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { ArtifactStorage } from './artifact-storage.js';
+
+async function makeRemovable(directory: string): Promise<void> {
+  await chmod(directory, 0o755);
+  for (const entry of await readdir(directory, { withFileTypes: true })) {
+    const entryPath = join(directory, entry.name);
+    if (entry.isDirectory()) await makeRemovable(entryPath);
+    else if (!entry.isSymbolicLink()) await chmod(entryPath, 0o644);
+  }
+}
 
 describe('ArtifactStorage', () => {
   let storageRoot: string;
@@ -21,6 +33,7 @@ describe('ArtifactStorage', () => {
   });
 
   afterEach(async () => {
+    await makeRemovable(storageRoot);
     await rm(storageRoot, { recursive: true, force: true });
   });
 
@@ -65,6 +78,20 @@ describe('ArtifactStorage', () => {
     await expect(readdir(join(storageRoot, 'game-1'))).resolves.toEqual([]);
   });
 
+  it('removes sealed staging when publication cannot replace an existing version', async () => {
+    await storage.install('game-1', 1, [
+      { path: 'index.html', content: 'first', contentType: 'text/html' },
+    ]);
+
+    await expect(
+      storage.install('game-1', 1, [
+        { path: 'index.html', content: 'second', contentType: 'text/html' },
+      ]),
+    ).rejects.toThrow();
+
+    await expect(readdir(join(storageRoot, 'game-1'))).resolves.toEqual(['1']);
+  });
+
   it('rejects read paths that escape the selected artifact version', async () => {
     await storage.install('game-1', 1, [
       { path: 'index.html', content: 'safe', contentType: 'text/html' },
@@ -86,6 +113,9 @@ describe('ArtifactStorage', () => {
         { path: 'index.html', content: 'safe', contentType: 'text/html' },
       ]);
       await writeFile(externalFile, 'private');
+      // Simulate a privileged volume mutator; normal API permissions prohibit
+      // this replacement, while read still retains symlink defense in depth.
+      await makeRemovable(join(storageRoot, 'game-1', '1'));
       await rm(artifactFile);
       await symlink(externalFile, artifactFile);
 
@@ -95,5 +125,32 @@ describe('ArtifactStorage', () => {
     } finally {
       await rm(outsideRoot, { recursive: true, force: true });
     }
+  });
+
+  it('publishes immutable files and directories while allowing a later version sibling', async () => {
+    await storage.install('game-1', 1, [
+      { path: 'index.html', content: 'safe', contentType: 'text/html' },
+      { path: 'assets/runtime.js', content: 'run()', contentType: 'text/javascript' },
+    ]);
+
+    const versionDirectory = join(storageRoot, 'game-1', '1');
+    const nestedDirectory = join(versionDirectory, 'assets');
+    const leaf = join(versionDirectory, 'index.html');
+    expect((await stat(leaf)).mode & 0o222).toBe(0);
+    expect((await stat(nestedDirectory)).mode & 0o222).toBe(0);
+    expect((await stat(versionDirectory)).mode & 0o222).toBe(0);
+
+    if (process.getuid?.() !== 0) {
+      await expect(writeFile(leaf, 'changed')).rejects.toThrow();
+      await expect(unlink(leaf)).rejects.toThrow();
+      await expect(writeFile(join(nestedDirectory, 'replacement.js'), 'changed')).rejects.toThrow();
+    }
+
+    await storage.install('game-1', 2, [
+      { path: 'index.html', content: 'new version', contentType: 'text/html' },
+    ]);
+    await expect(storage.read('game-1', 2, 'index.html')).resolves.toMatchObject({
+      contentType: 'text/html',
+    });
   });
 });
