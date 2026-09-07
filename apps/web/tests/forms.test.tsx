@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 import { AuthForm } from "../components/auth-form";
 import { GameForm } from "../components/game-form";
+import { LogoutButton } from "../components/logout-button";
 
 // Navigation needs a Next router; the form, validation and HTTP client stay real.
 vi.mock("next/navigation", () => ({
@@ -76,4 +77,16 @@ test("draft creation keeps input visible after a duplicate slug rejection", asyn
   );
   expect(screen.getByLabelText("Title")).toHaveValue("My game");
   expect(screen.getByRole("button", { name: "Create draft" })).toBeEnabled();
+});
+
+test("logout reports a network failure and permits another attempt", async () => {
+  vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("offline")));
+  render(<LogoutButton />);
+
+  fireEvent.click(screen.getByRole("button", { name: "Đăng xuất" }));
+
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "Không thể đăng xuất. Vui lòng thử lại.",
+  );
+  expect(screen.getByRole("button", { name: "Đăng xuất" })).toBeEnabled();
 });

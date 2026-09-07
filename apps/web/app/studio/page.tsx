@@ -1,25 +1,13 @@
 import Link from "next/link";
 import type { GameSummary } from "@indieforge/contracts";
-import { ProfileForm, type Profile } from "../../components/profile-form";
-import { ApiError } from "../../lib/api-client";
 import { privateGet } from "../../lib/session";
 
 export default async function StudioPage() {
-  const [games, profile] = await Promise.all([
-    privateGet<GameSummary[]>("/games/mine"),
-    privateGet<Profile>("/developers/me").catch((error) => {
-      if (error instanceof ApiError && error.status === 404) return null;
-      throw error;
-    }),
-  ]);
+  const games = await privateGet<GameSummary[]>("/games/mine");
   return (
     <main>
       <h1>Your studio</h1>
       <p>A little space to start something new.</p>
-      <section aria-labelledby="profile-heading">
-        <h2 id="profile-heading">Developer profile</h2>
-        <ProfileForm profile={profile} />
-      </section>
       <section aria-labelledby="games-heading">
         <div className="section-heading">
           <h2 id="games-heading">Your games</h2>

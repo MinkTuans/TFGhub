@@ -44,6 +44,19 @@ test("register, save a profile, create a private draft, and sign back in", async
   await page.getByLabel("Password").fill("password123");
   await page.getByRole("button", { name: "Create account" }).click();
   await expect(page).toHaveURL("/studio");
+  const navigation = page.getByRole("navigation", {
+    name: "Main navigation",
+  });
+  await expect(navigation.getByRole("link", { name: "Log in" })).toHaveCount(
+    0,
+  );
+  await expect(
+    navigation.getByRole("link", { name: "Thông tin cá nhân" }),
+  ).toBeVisible();
+  await expect(
+    navigation.getByRole("button", { name: "Đăng xuất" }),
+  ).toBeVisible();
+  await expect(page.getByLabel("Display name")).toHaveCount(0);
   const cookie = (await context.cookies()).find(
     (cookie) => cookie.name === "indieforge_access",
   );
@@ -51,12 +64,18 @@ test("register, save a profile, create a private draft, and sign back in", async
   expect(await page.evaluate(() => document.cookie)).not.toContain(
     "indieforge_access",
   );
+  await navigation
+    .getByRole("link", { name: "Thông tin cá nhân" })
+    .click();
+  await expect(page).toHaveURL("/profile");
   await page.getByLabel("Display name").fill("New developer");
   await page.getByLabel("Bio").fill("I make small games.");
   await page.getByRole("button", { name: "Save profile" }).click();
   await expect(page.getByRole("status")).toHaveText("Profile saved.");
   await page.reload();
   await expect(page.getByLabel("Display name")).toHaveValue("New developer");
+  await navigation.getByRole("link", { name: "Studio" }).click();
+  await expect(page).toHaveURL("/studio");
   await page.getByRole("link", { name: "Create a draft" }).click();
   await page.getByLabel("Title").fill(title);
   await page.getByLabel("Slug").fill(`first-game-${suffix}`);
@@ -72,23 +91,30 @@ test("register, save a profile, create a private draft, and sign back in", async
   await expect(page.getByText("No games found.")).toBeVisible();
   const hidden = await page.goto(`/games/first-game-${suffix}`);
   expect(hidden?.status()).toBe(404);
-  const logoutUrl =
-    process.env.E2E_EXTERNAL_SERVICES === "1"
-      ? "/api/auth/logout"
-      : "http://localhost:3101/auth/logout";
-  const logoutStatus = await page.evaluate(async (url) => {
-    const response = await fetch(url, {
-      method: "POST",
-      credentials: "include",
-    });
-    return response.status;
-  }, logoutUrl);
-  expect(logoutStatus).toBe(204);
+  await navigation.getByRole("button", { name: "Đăng xuất" }).click();
+  await expect(page).toHaveURL("/login");
   expect(
     (await context.cookies()).some(
       (sessionCookie) => sessionCookie.name === "indieforge_access",
     ),
   ).toBe(false);
+  await expect(
+    navigation.getByRole("link", { name: "Log in" }),
+  ).toBeVisible();
+  await expect(
+    navigation.getByRole("link", { name: "Discover" }),
+  ).toBeVisible();
+  await expect(
+    navigation.getByRole("link", { name: "Studio" }),
+  ).toBeVisible();
+  await expect(
+    navigation.getByRole("link", { name: "Thông tin cá nhân" }),
+  ).toHaveCount(0);
+  await expect(
+    navigation.getByRole("button", { name: "Đăng xuất" }),
+  ).toHaveCount(0);
+  await page.goto("/profile");
+  await expect(page).toHaveURL("/login");
   await page.goto("/studio");
   await expect(page).toHaveURL("/login");
   await page.getByLabel("Email").fill(email);
