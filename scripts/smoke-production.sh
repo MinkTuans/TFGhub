@@ -5,6 +5,7 @@ set -euo pipefail
 smoke_dir="$(mktemp -d)"
 cookie_jar="$smoke_dir/cookies.txt"
 studio_file="$smoke_dir/studio.html"
+profile_file="$smoke_dir/profile.html"
 export COMPOSE_PROJECT_NAME="indieforge-smoke-$$"
 
 if ! docker info >/dev/null 2>&1; then
@@ -123,19 +124,21 @@ NODE
 echo "authenticated profile: PASS"
 
 draft_slug="smoke-draft-$$"
+draft_title="Disposable smoke draft"
 draft_response="$({
   curl --silent --show-error --fail-with-body \
     --cookie "$cookie_jar" \
     --header 'Content-Type: application/json' \
     --header 'Origin: http://localhost:8080' \
-    --data "{\"title\":\"Disposable smoke draft\",\"slug\":\"$draft_slug\",\"description\":\"Created by the production smoke journey.\",\"accessMode\":\"GUEST_ALLOWED\",\"sourceType\":\"CODE\"}" \
+    --data "{\"title\":\"$draft_title\",\"slug\":\"$draft_slug\",\"description\":\"Created by the production smoke journey.\",\"accessMode\":\"GUEST_ALLOWED\",\"sourceType\":\"CODE\"}" \
     http://localhost:8080/api/games
 })"
-RESPONSE="$draft_response" EXPECTED_SLUG="$draft_slug" node --input-type=module <<'NODE'
+RESPONSE="$draft_response" EXPECTED_SLUG="$draft_slug" EXPECTED_TITLE="$draft_title" node --input-type=module <<'NODE'
 import assert from 'node:assert/strict';
 
 const body = JSON.parse(process.env.RESPONSE);
 assert.equal(body.slug, process.env.EXPECTED_SLUG);
+assert.equal(body.title, process.env.EXPECTED_TITLE);
 assert.equal(body.visibility, 'DRAFT');
 assert.equal(body.sourceType, 'CODE');
 NODE
@@ -214,9 +217,28 @@ if [[ "$studio_status" != '200' ]]; then
   exit 1
 fi
 studio_html="$(<"$studio_file")"
-RESPONSE="$studio_html" EXPECTED_NAME="$profile_name" node --input-type=module <<'NODE'
+RESPONSE="$studio_html" EXPECTED_TITLE="$draft_title" node --input-type=module <<'NODE'
+import assert from 'node:assert/strict';
+
+assert.ok(process.env.RESPONSE.includes(process.env.EXPECTED_TITLE));
+NODE
+echo "SSR studio draft: PASS"
+
+profile_status="$(
+  curl --silent --show-error --fail-with-body \
+    --cookie "$cookie_jar" \
+    --output "$profile_file" \
+    --write-out '%{http_code}' \
+    http://localhost:8080/profile
+)"
+if [[ "$profile_status" != '200' ]]; then
+  echo "SSR profile: FAIL (expected HTTP 200, got $profile_status)" >&2
+  exit 1
+fi
+profile_html="$(<"$profile_file")"
+RESPONSE="$profile_html" EXPECTED_NAME="$profile_name" node --input-type=module <<'NODE'
 import assert from 'node:assert/strict';
 
 assert.ok(process.env.RESPONSE.includes(process.env.EXPECTED_NAME));
 NODE
-echo "SSR studio: PASS"
+echo "SSR profile persistence: PASS"

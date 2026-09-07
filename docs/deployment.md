@@ -117,9 +117,30 @@ backup_release() (
   database_backup="$backup_prefix.database.dump"
   artifact_backup="$backup_prefix.artifacts.tar.gz"
 
-  # API is the single writer of game_storage. Stopping it makes this pair
-  # consistent without exposing the volume to any other long-running service.
-  compose stop api web
+  # API is the single writer of game_storage. Stop only services that were
+  # running when this backup started, then use `start` to revive those exact
+  # existing containers. `up` could otherwise reconcile a newly built image.
+  running_services=()
+  for service in api web; do
+    if test -n "$(compose ps --status running -q "$service")"; then
+      running_services+=("$service")
+    fi
+  done
+  restore_initial_state() {
+    local status=$?
+    trap - EXIT
+    if ((${#running_services[@]})); then
+      compose start "${running_services[@]}" || {
+        printf 'Could not restart the original services: %s\n' "${running_services[*]}" >&2
+        test "$status" -ne 0 || status=1
+      }
+    fi
+    exit "$status"
+  }
+  trap restore_initial_state EXIT
+  if ((${#running_services[@]})); then
+    compose stop "${running_services[@]}"
+  fi
   compose \
     exec -T postgres sh -c 'exec pg_dump --format=custom --username="$POSTGRES_USER" --dbname="$POSTGRES_DB"' \
     > "$database_backup.partial"
@@ -132,13 +153,12 @@ backup_release() (
   mv "$artifact_backup.partial" "$artifact_backup"
   printf 'Database backup: %s\nArtifact backup: %s\n' "$database_backup" "$artifact_backup"
   git rev-parse HEAD
-  compose up -d --wait
 )
 backup_release
 ```
 
-If the function fails after stopping API/web, investigate the error before using
-`compose up -d --wait`; do not deploy from an unvalidated pair. Record the
+If the function fails, it restarts only services that were running on entry;
+investigate the error and do not deploy from an unvalidated pair. Record the
 revision alongside both files in operations records. The database dump includes
 application data and Prisma migration history, while the artifact archive is a
 tar stream of the private `game_storage` named volume. Neither includes cluster
@@ -158,7 +178,18 @@ and tar archives can contain executable restore instructions or unsafe paths.
 
 `pg_restore --clean` only removes objects present in the archive; it does not remove tables or other objects introduced by later migrations. Exact recovery therefore requires a clean target database. The function below validates the archive and displays the actual target before asking for typed confirmation. It stops API, web, and the migration job, drops only the configured application database, recreates it from `template0`, and restores the archive in one transaction. It refuses the PostgreSQL maintenance/template database names.
 
-Dropping the database cannot be rolled back with the restore transaction. A failed restore leaves an empty database and the applications stopped; recover using the chosen dump or the fresh safety backup. A failed migration-status check leaves the restored database and applications stopped. Review the failure before retrying; the proxy may return 502 while services are stopped. This procedure restores database objects and data, not cluster roles or separately managed database-level grants/settings. If you manage extra database-level grants/settings, add their reapplication after `createdb` and before the function proceeds to restore and restart.
+Dropping the database cannot be rolled back with the restore transaction. The
+artifact archive is first extracted and validated in a hidden staging directory
+inside the API-only volume; a malformed or unsafe archive therefore fails after
+services stop but before the database is dropped. A later database restore
+failure leaves an empty database and applications stopped; recover using the
+chosen dump or fresh safety backup. A failed migration-status check also leaves
+the restored database and applications stopped. Review the failure before
+retrying; the proxy may return 502 while services are stopped. This procedure
+restores database objects and data, not cluster roles or separately managed
+database-level grants/settings. If you manage extra database-level
+grants/settings, add their reapplication after `createdb` and before the
+function proceeds to restore and restart.
 
 ```bash
 restore_database() {
@@ -166,6 +197,54 @@ restore_database() {
   local artifact_file="${2:-}"
   local confirmation
   local target_database
+  local restore_token="restore-$(date -u +%Y%m%dT%H%M%S)-$$"
+  stage_artifacts() {
+    compose run --rm --no-deps --entrypoint sh api -ec '
+      root=/var/lib/indieforge/games
+      stage="$root/.$1.stage"
+      test -d "$root" && test ! -L "$root" && test ! -e "$stage" || exit 1
+      mkdir "$stage"
+      cleanup() { find -P "$stage" -xdev -depth -type f -exec chmod u+rw -- {} + 2>/dev/null || true; find -P "$stage" -xdev -depth -type d -exec chmod u+rwx -- {} + 2>/dev/null || true; rm -rf -- "$stage"; }
+      trap cleanup EXIT
+      tar -C "$stage" --no-same-owner --same-permissions -xzf -
+      if find -P "$stage" -xdev \( -type l -o ! -type d ! -type f \) -print -quit | grep -q .; then
+        printf "Artifact archive contains a disallowed entry.\n" >&2
+        exit 1
+      fi
+      trap - EXIT
+    ' sh "$restore_token" < "$artifact_file"
+  }
+  replace_artifacts() {
+    compose run --rm --no-deps --entrypoint sh api -ec '
+      root=/var/lib/indieforge/games
+      stage="$root/.$1.stage"
+      previous="$root/.$1.old"
+      test -d "$root" && test ! -L "$root" && test -d "$stage" && test ! -e "$previous" || exit 1
+      mkdir "$previous"
+      for entry in "$root"/* "$root"/.[!.]* "$root"/..?*; do
+        test -e "$entry" || continue
+        test "$entry" = "$stage" && continue
+        test "$entry" = "$previous" && continue
+        mv -- "$entry" "$previous/"
+      done
+      for entry in "$stage"/* "$stage"/.[!.]* "$stage"/..?*; do
+        test -e "$entry" || continue
+        mv -- "$entry" "$root/"
+      done
+      rmdir "$stage"
+    ' sh "$restore_token"
+  }
+  discard_previous_artifacts() {
+    compose run --rm --no-deps --entrypoint sh api -ec '
+      root=/var/lib/indieforge/games
+      previous="$root/.$1.old"
+      case "$previous" in "$root"/.restore-*.old) ;; *) exit 1 ;; esac
+      test -d "$previous" && test ! -L "$previous" || exit 1
+      find -P "$previous" -xdev -depth -type f -exec chmod u+rw -- {} +
+      find -P "$previous" -xdev -depth -type d -exec chmod u+rwx -- {} +
+      rm -rf -- "$previous"
+    ' sh "$restore_token"
+  }
   test -s "$backup_file" || return 1
   test -z "$artifact_file" || test -s "$artifact_file" || return 1
   compose ps -a || return 1
@@ -179,21 +258,27 @@ restore_database() {
   read -r confirmation
   test "$confirmation" = RESTORE || return 1
   compose stop api web migrate || return 1
+  if test -n "$artifact_file"; then
+    # Extract and validate first. A bad artifact archive must fail before the
+    # database is dropped or the live artifact tree is replaced.
+    stage_artifacts || return 1
+  fi
   compose exec -T postgres sh -ec '
     dropdb --force --username="$POSTGRES_USER" -- "$POSTGRES_DB"
     createdb --username="$POSTGRES_USER" --owner="$POSTGRES_USER" --template=template0 -- "$POSTGRES_DB"
   ' || return 1
   if test -n "$artifact_file"; then
-    compose run --rm --no-deps --entrypoint sh api -c '
-      set -e
-      find /var/lib/indieforge/games -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
-      exec tar -C /var/lib/indieforge/games --no-same-owner --no-same-permissions -xzf -
-    ' < "$artifact_file" || return 1
+    # This runs as API's node user. It only moves children of the exact mounted
+    # root, so sealed 0555 artifact versions never need in-place deletion.
+    replace_artifacts || return 1
   fi
   compose exec -T postgres sh -c \
     'exec pg_restore --clean --if-exists --no-owner --single-transaction --exit-on-error --username="$POSTGRES_USER" --dbname="$POSTGRES_DB"' \
     < "$backup_file" || return 1
   compose run --rm --no-deps migrate pnpm --filter @indieforge/database prisma migrate status || return 1
+  if test -n "$artifact_file"; then
+    discard_previous_artifacts || printf 'Preserved prior artifact tree in game_storage for manual cleanup.\n' >&2
+  fi
   compose up -d --wait || return 1
 }
 restore_database 'backups/<timestamp>.database.dump' 'backups/<timestamp>.artifacts.tar.gz'
@@ -201,9 +286,12 @@ restore_database 'backups/<timestamp>.database.dump' 'backups/<timestamp>.artifa
 
 The second argument is required for a complete application recovery; omitting it
 is only appropriate for a deliberate database-only operator repair. The
-artifact replacement occurs only after the typed confirmation, with API/web
-stopped, and clears the contents of `game_storage` without deleting its Docker
-volume. Before calling this function, ensure the checkout and built images
+artifact replacement occurs only after typed confirmation, with API/web
+stopped. It moves only direct children of the exact `game_storage` mount, so
+version directories restored with their sealed `0555` permissions never require
+in-place deletion; the prior tree is removed only after database migration
+verification. The Docker volume itself is never deleted. Before calling this
+function, ensure the checkout and built images
 match the restored database's application revision. The migration-status check
 must confirm that this release's committed migration history matches the
 restored database before `up` can restart the application. Restoring an old
@@ -228,9 +316,19 @@ grant_moderator() {
   printf 'Grant MODERATOR to %s in project indieforge? Type GRANT: ' "$email"
   read -r confirmation
   test "$confirmation" = GRANT || return 1
-  compose exec -T postgres psql --set ON_ERROR_STOP=1 --set "email=$email" \
-    --username="$POSTGRES_USER" --dbname="$POSTGRES_DB" \
-    --command 'UPDATE "User" SET "role" = '\''MODERATOR'\'' WHERE "email" = :'\''email'\'' RETURNING "email", "role";'
+  # The email travels on stdin. PostgreSQL variables and the SQL file are
+  # resolved inside the container, so host environment variables cannot alter
+  # the target database and apostrophes remain safely quoted by psql.
+  printf '%s\n' "$email" | compose exec -T postgres sh -ec '
+    IFS= read -r email
+    psql --set=ON_ERROR_STOP=1 --set="email=$email" \
+      --username="$POSTGRES_USER" --dbname="$POSTGRES_DB" --file=/dev/stdin <<'"'"'SQL'"'"'
+UPDATE "User"
+SET "role" = '"'"'MODERATOR'"'"'
+WHERE "email" = :'"'"'email'"'"'
+RETURNING "email", "role";
+SQL
+  '
 }
 grant_moderator
 ```

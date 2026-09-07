@@ -106,3 +106,46 @@ owner.
 - No deployment was performed. The release owner must take the documented
   paired backup, run the full release gates, remove only the stopped `migrate`
   container, and then start the existing Compose project.
+
+## Review fix round
+
+- Restore now extracts a paired artifact archive into a hidden staging tree on
+  the API-mounted volume before dropping PostgreSQL. It rejects symlinks and
+  non-file/non-directory entries, then moves only direct children of the exact
+  artifact root. The prior tree is unsealed only in its hidden restore location
+  after migration verification, so real `0555` versions can be recovered and
+  removed without weakening live artifact immutability.
+- Added an unsafe-artifact regression to the restore drill. It proves an
+  archive that passes a superficial tar listing but contains a symlink stops
+  before the database is dropped.
+- Backup now records whether API/web were initially running, stops only those
+  services, and revives the same existing containers with `compose start` from
+  an exit trap. It never invokes `compose up`, preventing a backup from
+  reconciling a newly built replacement image.
+- Moderator elevation now pipes the prompted email on stdin to a shell inside
+  PostgreSQL's container. That shell resolves `POSTGRES_USER`/`POSTGRES_DB` and
+  supplies a psql variable to a stdin SQL file. The drill verified both a
+  normal email and `o'hara@example.com`.
+- Smoke now verifies the created game title appears in server-rendered Studio
+  and the saved display name persists on server-rendered `/profile`.
+- Kept the platformer-specific sandbox assertion in the component test and
+  removed the duplicate browser assertion.
+
+### Review-fix verification
+
+```text
+node scripts/test-restore-runbook.mjs
+7 restore checks passed, including sealed artifact replacement and unsafe tar preflight
+
+node scripts/test-deployment-runbook.mjs
+backup state preservation and two moderator-email grants passed
+
+bash -n scripts/smoke-production.sh
+exit 0
+
+pnpm --filter web test -- forms.test.tsx
+31 passed
+
+pnpm test:deploy-config && pnpm test:containers
+exit 0
+```

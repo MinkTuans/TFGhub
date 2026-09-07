@@ -378,10 +378,6 @@ test("a platformer game builds a collision-safe preview that reaches its goal by
   await page.getByRole("button", { name: "Build preview" }).click();
 
   const preview = page.getByTitle("Game preview");
-  await expect(preview).toHaveAttribute(
-    "sandbox",
-    "allow-scripts allow-pointer-lock",
-  );
   const game = preview.contentFrame();
   const canvas = game.locator("#game");
   await expect.poll(async () =>

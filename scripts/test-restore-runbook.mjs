@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdtemp, mkdir, readFile, rm, stat, symlink, unlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -53,9 +53,16 @@ compose() {
       ;;
     up) printf 'start\\n' >> "$DRILL_LIFECYCLE" ;;
     run)
-      printf 'verify\\n' >> "$DRILL_LIFECYCLE"
-      test "$*" = 'run --rm --no-deps migrate pnpm --filter @indieforge/database prisma migrate status' || return 98
-      return "$DRILL_VERIFY_EXIT"
+      if [[ "$*" == *' api -ec '* ]]; then
+        script="\${@: -3:1}"
+        token="\${!#}"
+        script="$(printf '%s' "$script" | sed "s|/var/lib/indieforge/games|$DRILL_ARTIFACT_ROOT|g")"
+        bash -ec "$script" sh "$token"
+      else
+        printf 'verify\\n' >> "$DRILL_LIFECYCLE"
+        test "$*" = 'run --rm --no-deps migrate pnpm --filter @indieforge/database prisma migrate status' || return 98
+        return "$DRILL_VERIFY_EXIT"
+      fi
       ;;
     exec)
       shift 3
@@ -66,9 +73,11 @@ compose() {
   esac
 }
 ${restoreFunction}
-restore_database "$DRILL_BACKUP"
+restore_database "$DRILL_BACKUP" "$DRILL_ARTIFACT_BACKUP"
 `;
 const backup = join(directory, "before.dump");
+const artifactRoot = join(directory, "games");
+const artifactBackup = join(directory, "before.artifacts.tar.gz");
 const invoke = async (confirmation, overrides = {}) => {
   await writeFile(lifecycleFile, "");
   const result = spawnSync("bash", ["-c", harness], {
@@ -78,6 +87,8 @@ const invoke = async (confirmation, overrides = {}) => {
       ...process.env,
       DRILL_CONTAINER: container,
       DRILL_BACKUP: backup,
+      DRILL_ARTIFACT_BACKUP: artifactBackup,
+      DRILL_ARTIFACT_ROOT: artifactRoot,
       DRILL_DATABASE: "drill",
       DRILL_LIFECYCLE: lifecycleFile,
       DRILL_VERIFY_EXIT: "0",
@@ -127,6 +138,15 @@ try {
   sql(
     "CREATE TABLE before_backup (id integer PRIMARY KEY); INSERT INTO before_backup VALUES (1)",
   );
+  await mkdir(join(artifactRoot, "before-game", "1"), { recursive: true });
+  await writeFile(join(artifactRoot, "before-game", "1", "index.html"), "before");
+  await chmod(join(artifactRoot, "before-game", "1", "index.html"), 0o444);
+  await chmod(join(artifactRoot, "before-game", "1"), 0o555);
+  execFileSync("tar", ["-C", artifactRoot, "-czf", artifactBackup, "."]);
+  await mkdir(join(artifactRoot, "after-game", "1"), { recursive: true });
+  await writeFile(join(artifactRoot, "after-game", "1", "index.html"), "after");
+  await chmod(join(artifactRoot, "after-game", "1", "index.html"), 0o444);
+  await chmod(join(artifactRoot, "after-game", "1"), 0o555);
   await writeFile(
     backup,
     docker(
@@ -168,8 +188,18 @@ try {
     "restore must remove objects introduced after the backup",
   );
   assert.equal(restored.lifecycle, "stop\nverify\nstart");
+  assert.equal(
+    await readFile(join(artifactRoot, "before-game", "1", "index.html"), "utf8"),
+    "before",
+  );
+  await assert.rejects(stat(join(artifactRoot, "after-game")));
+  assert.equal(
+    (await stat(join(artifactRoot, "before-game", "1"))).mode & 0o777,
+    0o555,
+    "restored artifact directories must retain their sealed mode",
+  );
   console.log(
-    "clean restore removes later objects and verifies before restart: PASS",
+    "clean restore replaces sealed artifacts and later database objects: PASS",
   );
 
   const invalidBackup = join(directory, "invalid.dump");
@@ -179,6 +209,23 @@ try {
   assert.equal(invalid.lifecycle, "");
   assert.equal(sql("SELECT count(*) FROM before_backup"), "1");
   console.log("invalid archive cannot modify database: PASS");
+
+  const invalidArtifact = join(directory, "unsafe.artifacts.tar.gz");
+  const unsafeLink = join(directory, "unsafe-link");
+  await symlink("before-game/1/index.html", unsafeLink);
+  execFileSync("tar", ["-C", directory, "-czf", invalidArtifact, "unsafe-link"]);
+  await unlink(unsafeLink);
+  const artifactFailure = await invoke("RESTORE", {
+    DRILL_ARTIFACT_BACKUP: invalidArtifact,
+  });
+  assert.notEqual(artifactFailure.status, 0);
+  assert.equal(artifactFailure.lifecycle, "stop");
+  assert.equal(
+    sql("SELECT count(*) FROM before_backup"),
+    "1",
+    "a rejected artifact archive must fail before the database is dropped",
+  );
+  console.log("unsafe artifact archive preserves database before drop: PASS");
 
   const failedRestore = await invoke("RESTORE", { DRILL_RESTORE_FAIL: "1" });
   assert.notEqual(failedRestore.status, 0);
@@ -197,6 +244,11 @@ try {
   try {
     docker(["rm", "-f", "-v", container]);
   } finally {
+    try {
+      execFileSync("chmod", ["-R", "u+w", artifactRoot]);
+    } catch {
+      // The root may not exist if setup failed before artifact creation.
+    }
     await rm(directory, { recursive: true, force: true });
   }
   console.log(`cleanup: PASS (${container} removed)`);
