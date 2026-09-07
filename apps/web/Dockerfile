@@ -20,7 +20,10 @@ FROM node:22-bookworm-slim AS runtime
 
 WORKDIR /app
 
-RUN corepack enable && corepack prepare pnpm@10.0.0 --activate
+ENV COREPACK_HOME=/home/node/.cache/node/corepack
+RUN corepack enable \
+    && corepack prepare pnpm@10.0.0 --activate \
+    && chown -R node:node /home/node/.cache
 
 COPY --from=build --chown=node:node /app /app
 
