@@ -952,6 +952,39 @@ describe('Developer profile and game draft HTTP boundary', () => {
     });
   });
 
+  it('rejects a stale moderation action after metadata-only resubmission of the same artifact', async () => {
+    const { developer, game } = await createGame();
+    await developer
+      .post(`/games/${game.id}/upload`)
+      .attach('game', zipFixture([{ name: 'index.html', content: '<h1>Ready</h1>' }]), 'game.zip')
+      .expect(201);
+    const first = await developer.post(`/games/${game.id}/submit`).expect(201);
+    const staleSubmission = {
+      artifactVersion: first.body.artifactVersion,
+      submittedAt: first.body.submittedAt,
+    };
+
+    await developer.patch(`/games/${game.id}`).send({ title: 'Updated metadata' }).expect(200);
+    await new Promise((resolve) => setTimeout(resolve, 2));
+    const second = await developer.post(`/games/${game.id}/submit`).expect(201);
+    expect(second.body.artifactVersion).toBe(staleSubmission.artifactVersion);
+    expect(second.body.submittedAt).not.toBe(staleSubmission.submittedAt);
+
+    const moderator = await agent('moderator@example.com');
+    users.get('user-2')!.role = 'MODERATOR';
+    await moderator
+      .post(`/moderation/games/${game.id}/approve`)
+      .send(staleSubmission)
+      .expect(409);
+    await moderator
+      .post(`/moderation/games/${game.id}/approve`)
+      .send({
+        artifactVersion: second.body.artifactVersion,
+        submittedAt: second.body.submittedAt,
+      })
+      .expect(201);
+  });
+
   it('requires a rejection note and returns the game to draft', async () => {
     const { developer, game } = await createGame();
     await developer

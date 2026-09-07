@@ -408,7 +408,9 @@ test("a platformer game builds a collision-safe preview that reaches its goal by
 
   await canvas.click();
   await page.keyboard.down("ArrowRight");
-  await page.waitForTimeout(200);
+  await expect.poll(async () =>
+    Number(await canvas.getAttribute("data-player-x")),
+  ).toBeGreaterThanOrEqual(70);
   await page.keyboard.down("ArrowUp");
   await expect.poll(async () => Number(await canvas.getAttribute("data-player-y"))).toBeLessThan(390);
   await expect(game.getByRole("status")).toHaveText("Goal reached!");

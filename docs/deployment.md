@@ -81,10 +81,12 @@ Expect `{"status":"ok"}`. In a browser at that origin, register a disposable acc
 From a checkout with dependencies and Playwright Chromium installed, the same account journey can target this stack:
 
 ```bash
-E2E_EXTERNAL_SERVICES=1 E2E_WEB_URL="$PUBLIC_ORIGIN" \
-  E2E_MODERATOR_EMAIL='<disposable-moderator@example.com>' \
-  E2E_MODERATOR_PASSWORD='<unique-disposable-password>' \
-  pnpm --filter web e2e
+read -r -p 'Disposable moderator email: ' E2E_MODERATOR_EMAIL
+read -r -s -p 'Disposable moderator password: ' E2E_MODERATOR_PASSWORD; printf '\n'
+export E2E_EXTERNAL_SERVICES=1 E2E_WEB_URL="$PUBLIC_ORIGIN"
+export E2E_MODERATOR_EMAIL E2E_MODERATOR_PASSWORD
+pnpm --filter web e2e
+unset E2E_MODERATOR_EMAIL E2E_MODERATOR_PASSWORD
 ```
 
 Register the disposable account first, grant it `MODERATOR` with the operator-only function below, and use credentials created solely for this run. If either moderator variable is omitted, the external moderation journey is skipped; the local harness alone supplies its documented deterministic defaults. After verification, revoke the role (or delete the disposable account and its test data through an audited operator procedure) and unset both variables. Never reuse or commit production credentials. This creates real test records; the fixture-dependent public discovery test is skipped. See [browser setup](../apps/web/README.md#verify). The separate `pnpm test:deploy-smoke` creates and deletes a disposable Compose project and its volumes; run it on a validation host with free ports 8080 and 443, not alongside this production proxy.
