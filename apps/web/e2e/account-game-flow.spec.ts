@@ -213,6 +213,7 @@ test("moderation hides from regular users, requires a rejection note, and publis
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password").fill("password123");
   await page.getByRole("button", { name: "Create account" }).click();
+  await expect(page).toHaveURL("/studio");
   const navigation = page.getByRole("navigation", {
     name: "Main navigation",
   });
