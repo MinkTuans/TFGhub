@@ -232,31 +232,31 @@
   review-state/rejection display.
 - Consumes: Task 3/4 API routes and expanded contracts.
 
-- [ ] **Step 1: Write failing component/browser tests**
+- [x] **Step 1: Write failing component/browser tests**
 
   Assert source selection is submitted, Studio cards link to workspace, invalid
   ZIP errors remain visible and retryable, valid upload enables sandboxed
   preview, submit displays `Pending review`, and rejection note is visible.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
   Run: `pnpm --filter web test && PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/google-chrome pnpm --filter web e2e`
 
   Expected: new assertions fail because workspace UI is absent.
 
-- [ ] **Step 3: Implement minimal accessible UI**
+- [x] **Step 3: Implement minimal accessible UI**
 
   Use one source-specific editor under a shared status/actions shell. Upload the
   `File` with `FormData`; do not set `Content-Type` manually. Render preview as
   `<iframe sandbox="allow-scripts allow-pointer-lock">` and use API error text.
 
-- [ ] **Step 4: Verify GREEN**
+- [x] **Step 4: Verify GREEN**
 
   Run: `pnpm --filter web test && pnpm --filter web typecheck && pnpm --filter web lint && PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/google-chrome pnpm --filter web e2e`
 
   Expected: all commands exit 0.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
   Run: `git add apps/web && git commit -m "feat(web): add game upload workspace"`
 
