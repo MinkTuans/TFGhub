@@ -220,7 +220,11 @@ export class GameContentService {
     return this.serialized(gameId, async () => {
       const game = await this.owned(gameId, userId);
       const project = this.project(game, input);
-      return this.update(game, { ...resetReview, projectData: project });
+      return this.update(game, {
+        ...resetReview,
+        projectData: project,
+        artifactReady: false,
+      });
     });
   }
 
@@ -286,7 +290,11 @@ export class GameContentService {
       }
     }
     try {
-      return await this.update(game, { ...resetReview, artifactVersion });
+      return await this.update(game, {
+        ...resetReview,
+        artifactVersion,
+        artifactReady: true,
+      });
     } catch (error) {
       // A lost commit response can leave the original transaction in flight.
       // Wait on its row lock before deciding which bytes are unreferenced.
@@ -357,7 +365,8 @@ export class GameContentService {
       game.visibility === 'PUBLIC' &&
       game.reviewState === 'APPROVED' &&
       game.moderationState === 'CLEAR' &&
-      game.artifactVersion > 0
+      game.artifactVersion > 0 &&
+      game.artifactReady
     );
   }
 

@@ -30,6 +30,7 @@ function codeGame(overrides: Partial<GameSummary> = {}): GameSummary {
       javascript: "window.saved = true;",
     },
     artifactVersion: 1,
+    artifactReady: true,
     reviewNote: null,
     submittedAt: null,
     reviewedAt: null,
@@ -161,6 +162,7 @@ test("workspace shows a moderator rejection note to its owner", () => {
         reviewState: "REJECTED",
         projectData: null,
         artifactVersion: 1,
+        artifactReady: true,
         reviewNote: "Please remove the copyrighted artwork.",
         submittedAt: "2026-09-07T08:00:00.000Z",
         reviewedAt: "2026-09-07T09:00:00.000Z",
@@ -187,6 +189,13 @@ test("code editor loads saved HTML, CSS, and JavaScript", () => {
   );
 });
 
+test("workspace disables submission after reloading a persisted unready artifact", () => {
+  const reloaded = { ...codeGame(), artifactReady: false } as GameSummary;
+  render(<GameWorkspace initialGame={reloaded} />);
+
+  expect(screen.getByRole("button", { name: "Submit for review" })).toBeDisabled();
+});
+
 test("code editor preserves edits after a failed source save", async () => {
   vi.stubGlobal(
     "fetch",
@@ -211,6 +220,7 @@ test("code editor preserves edits after a failed source save", async () => {
 
 test("code build refreshes the sandboxed preview and enables submission of its compiled revision", async () => {
   const saved = codeGame({
+    artifactReady: false,
     projectData: {
       sourceType: "CODE",
       html: "<h1>Edited quest</h1>",
@@ -218,7 +228,7 @@ test("code build refreshes the sandboxed preview and enables submission of its c
       javascript: "window.edited = true;",
     },
   });
-  const built = { ...saved, artifactVersion: 2 };
+  const built = { ...saved, artifactVersion: 2, artifactReady: true };
   const submitted = { ...built, reviewState: "PENDING" as const };
   const fetch = vi
     .fn()

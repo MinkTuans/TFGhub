@@ -19,6 +19,7 @@ const pendingGame = {
   reviewState: 'PENDING' as const,
   projectData: { unpublishedSource: 'MODERATION_SOURCE_SENTINEL' },
   artifactVersion: 1,
+  artifactReady: true,
   reviewNote: null,
   submittedAt: new Date('2026-09-05T12:01:00.000Z'),
   reviewedAt: null,
@@ -52,7 +53,12 @@ describe('ModerationService', () => {
 
     const result = await service.pending();
     expect(result).toMatchObject([
-      { id: 'game-1', reviewState: 'PENDING', artifactVersion: 1 },
+      {
+        id: 'game-1',
+        reviewState: 'PENDING',
+        artifactVersion: 1,
+        artifactReady: true,
+      },
     ]);
     expect(result[0]).not.toHaveProperty('projectData');
     expect(result[0]).toMatchObject({
@@ -68,6 +74,7 @@ describe('ModerationService', () => {
       reviewState: 'APPROVED',
       visibility: 'PUBLIC',
       artifactVersion: 1,
+      artifactReady: true,
     });
     expect(result).not.toHaveProperty('projectData');
     expect(games.approve).toHaveBeenCalledWith('game-1');
@@ -87,6 +94,7 @@ describe('ModerationService', () => {
     expect(result).toMatchObject({
       reviewState: 'REJECTED',
       visibility: 'DRAFT',
+      artifactReady: true,
     });
     expect(result).not.toHaveProperty('projectData');
     expect(games.reject).toHaveBeenCalledWith('game-1', 'Needs a title screen');

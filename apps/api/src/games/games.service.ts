@@ -35,6 +35,7 @@ export type StoredGame = {
   reviewState: GameReviewState;
   projectData: GameSummary['projectData'];
   artifactVersion: number;
+  artifactReady: boolean;
   reviewNote: string | null;
   submittedAt: Date | null;
   reviewedAt: Date | null;
@@ -43,6 +44,7 @@ export type StoredGame = {
 export type WorkspaceUpdate = {
   projectData?: GameProjectInput;
   artifactVersion?: number;
+  artifactReady?: boolean;
   visibility: 'DRAFT';
   reviewState: 'DRAFT';
   reviewNote: null;
@@ -126,6 +128,7 @@ export function gameSummary(game: StoredGame): GameSummary {
     reviewState: game.reviewState,
     projectData: game.projectData,
     artifactVersion: game.artifactVersion,
+    artifactReady: game.artifactReady,
     reviewNote: game.reviewNote,
     submittedAt: game.submittedAt?.toISOString() ?? null,
     reviewedAt: game.reviewedAt?.toISOString() ?? null,
@@ -148,6 +151,7 @@ export function moderationActionSummary(
     sourceType: game.sourceType,
     reviewState: game.reviewState,
     artifactVersion: game.artifactVersion,
+    artifactReady: game.artifactReady,
     reviewNote: game.reviewNote,
     submittedAt: game.submittedAt?.toISOString() ?? null,
     reviewedAt: game.reviewedAt?.toISOString() ?? null,
@@ -237,7 +241,7 @@ export class GamesService {
     if (!game || game.ownerId !== userId) {
       throw new ForbiddenException('You do not own this game');
     }
-    if (game.artifactVersion < 1) {
+    if (game.artifactVersion < 1 || !game.artifactReady) {
       throw new ConflictException(
         'Build or upload a game artifact before review',
       );

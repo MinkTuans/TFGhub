@@ -102,6 +102,7 @@ describe('contracts', () => {
         reviewState: 'PENDING',
         projectData: { sourceType: 'CODE', html: '', css: '', javascript: '' },
         artifactVersion: 2,
+        artifactReady: true,
         reviewNote: null,
         submittedAt: '2026-09-07T01:00:00.000Z',
         reviewedAt: null,

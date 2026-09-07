@@ -65,6 +65,7 @@ describe('GameContentService with real artifacts and ZIP streams', () => {
       sourceType: 'UPLOAD',
       projectData: null,
       artifactVersion: 1,
+      artifactReady: true,
       reviewState: 'APPROVED',
       reviewNote: 'Previously reviewed',
       submittedAt: new Date(),
@@ -180,6 +181,7 @@ describe('GameContentService with real artifacts and ZIP streams', () => {
     );
     expect(result).toMatchObject({
       artifactVersion: 2,
+      artifactReady: true,
       visibility: 'DRAFT',
       reviewState: 'DRAFT',
       reviewNote: null,
@@ -275,6 +277,7 @@ describe('GameContentService with real artifacts and ZIP streams', () => {
       service.saveProject(game.id, 'owner-1', project),
     ).rejects.toMatchObject({ status: 400 });
     game.sourceType = 'CODE';
+    (game as StoredGame & { artifactReady: boolean }).artifactReady = true;
     await expect(
       service.upload(game.id, 'owner-1', zipFixture([{ name: 'index.html' }])),
     ).rejects.toMatchObject({ status: 400 });
@@ -291,11 +294,13 @@ describe('GameContentService with real artifacts and ZIP streams', () => {
       visibility: 'DRAFT',
       reviewState: 'DRAFT',
       artifactVersion: 1,
+      artifactReady: false,
     });
     game.visibility = 'PUBLIC';
     game.reviewState = 'APPROVED';
     expect(await service.build(game.id, 'owner-1')).toMatchObject({
       artifactVersion: 2,
+      artifactReady: true,
       visibility: 'DRAFT',
       reviewState: 'DRAFT',
     });

@@ -159,6 +159,7 @@ export const GameSummary = z.object({
   reviewState: GameReviewState,
   projectData: z.unknown().refine((value) => value !== undefined).nullable(),
   artifactVersion: z.number().int().nonnegative(),
+  artifactReady: z.boolean(),
   reviewNote: z.string().max(500).nullable(),
   submittedAt: z.string().datetime().nullable(),
   reviewedAt: z.string().datetime().nullable(),

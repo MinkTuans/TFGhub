@@ -33,6 +33,7 @@ export const gameSummarySelect = {
   reviewState: true,
   projectData: true,
   artifactVersion: true,
+  artifactReady: true,
   reviewNote: true,
   submittedAt: true,
   reviewedAt: true,
@@ -51,6 +52,7 @@ const moderationGameSelect = {
   sourceType: true,
   reviewState: true,
   artifactVersion: true,
+  artifactReady: true,
   reviewNote: true,
   submittedAt: true,
   reviewedAt: true,
@@ -148,6 +150,7 @@ const publicGameSelect = {
                 id,
                 reviewState: { in: ['DRAFT', 'REJECTED'] },
                 artifactVersion: { gt: 0 },
+                artifactReady: true,
               },
               data: {
                 reviewState: 'PENDING',

@@ -24,10 +24,9 @@ export function GameWorkspace({ initialGame }: { initialGame: GameSummary }) {
   const [game, setGame] = useState(initialGame);
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
-  const [needsBuild, setNeedsBuild] = useState(false);
   const maySubmit =
     game.artifactVersion > 0 &&
-    !needsBuild &&
+    game.artifactReady &&
     (game.reviewState === "DRAFT" || game.reviewState === "REJECTED");
 
   async function submitForReview() {
@@ -59,14 +58,8 @@ export function GameWorkspace({ initialGame }: { initialGame: GameSummary }) {
         <CodeGameEditor
           gameId={game.id}
           initialProject={game.projectData}
-          onBuilt={(built) => {
-            setGame(built);
-            setNeedsBuild(false);
-          }}
-          onSaved={(saved) => {
-            setGame(saved);
-            setNeedsBuild(true);
-          }}
+          onBuilt={setGame}
+          onSaved={setGame}
         />
       )}
       {game.artifactVersion > 0 && (

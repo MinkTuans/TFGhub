@@ -17,6 +17,7 @@ const storedGame = {
   reviewState: 'DRAFT' as const,
   projectData: null,
   artifactVersion: 0,
+  artifactReady: false,
   reviewNote: null,
   submittedAt: null,
   reviewedAt: null,
@@ -76,6 +77,7 @@ describe('GamesService', () => {
       reviewState: 'DRAFT',
       projectData: null,
       artifactVersion: 0,
+      artifactReady: false,
       reviewNote: null,
       submittedAt: null,
       reviewedAt: null,
@@ -187,10 +189,12 @@ describe('GamesService', () => {
     vi.mocked(games.findUnique).mockResolvedValue({
       ...storedGame,
       artifactVersion: 1,
+      artifactReady: true,
     });
     vi.mocked(games.submit).mockResolvedValue({
       ...storedGame,
       artifactVersion: 1,
+      artifactReady: true,
       reviewState: 'PENDING',
       submittedAt: new Date('2026-09-05T12:01:00.000Z'),
     });
@@ -207,6 +211,20 @@ describe('GamesService', () => {
   it('does not submit an artifact-free game', async () => {
     const { service, games } = fixture();
     vi.mocked(games.findUnique).mockResolvedValue({ ...storedGame });
+
+    await expect(service.submitOwned('game-1', 'owner-1')).rejects.toThrow(
+      ConflictException,
+    );
+    expect(games.submit).not.toHaveBeenCalled();
+  });
+
+  it('does not submit a stale artifact after source has been saved', async () => {
+    const { service, games } = fixture();
+    vi.mocked(games.findUnique).mockResolvedValue({
+      ...storedGame,
+      artifactVersion: 1,
+      artifactReady: false,
+    });
 
     await expect(service.submitOwned('game-1', 'owner-1')).rejects.toThrow(
       ConflictException,

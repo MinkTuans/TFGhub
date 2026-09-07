@@ -75,6 +75,7 @@ model Game {
   reviewState     GameReviewState @default(DRAFT)
   projectData     Json?
   artifactVersion Int             @default(0)
+  artifactReady   Boolean         @default(false)
   reviewNote      String?
   submittedAt     DateTime?
   reviewedAt      DateTime?

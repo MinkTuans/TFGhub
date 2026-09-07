@@ -80,6 +80,7 @@ describe('Developer profile and game draft HTTP boundary', () => {
             reviewState: 'DRAFT',
             projectData: null,
             artifactVersion: 0,
+            artifactReady: false,
             reviewNote: null,
             submittedAt: null,
             reviewedAt: null,
@@ -129,6 +130,7 @@ describe('Developer profile and game draft HTTP boundary', () => {
           if (
             !game ||
             game.artifactVersion < 1 ||
+            !game.artifactReady ||
             !['DRAFT', 'REJECTED'].includes(game.reviewState)
           ) {
             return null;
@@ -264,6 +266,7 @@ describe('Developer profile and game draft HTTP boundary', () => {
         expect(response.body).toMatchObject({
           sourceType: 'UPLOAD',
           artifactVersion: 0,
+          artifactReady: false,
           projectData: null,
           reviewState: 'DRAFT',
         });
@@ -426,6 +429,7 @@ describe('Developer profile and game draft HTTP boundary', () => {
       .post(`/games/${game.id}/upload`)
       .attach('game', archive, 'game.zip');
     expect(uploaded.status, JSON.stringify(uploaded.body)).toBe(201);
+    expect(uploaded.body).toMatchObject({ artifactReady: true });
     const preview = await developer
       .get(`/games/${game.id}/preview/`)
       .expect(302);
@@ -600,7 +604,13 @@ describe('Developer profile and game draft HTTP boundary', () => {
         css: '',
         javascript: '',
       })
-      .expect(200);
+      .expect(200)
+      .expect((result) => {
+        expect(result.body).toMatchObject({
+          artifactVersion: 0,
+          artifactReady: false,
+        });
+      });
     await developer
       .post(`/games/${id}/build`)
       .send({})
@@ -608,10 +618,47 @@ describe('Developer profile and game draft HTTP boundary', () => {
       .expect((result) => {
         expect(result.body).toMatchObject({
           artifactVersion: 1,
+          artifactReady: true,
           reviewState: 'DRAFT',
           visibility: 'DRAFT',
         });
       });
+    await developer
+      .put(`/games/${id}/project`)
+      .send({
+        sourceType: 'CODE',
+        html: '<h1>Changed code</h1>',
+        css: '',
+        javascript: '',
+      })
+      .expect(200)
+      .expect((result) => {
+        expect(result.body).toMatchObject({
+          artifactVersion: 1,
+          artifactReady: false,
+        });
+      });
+    await developer
+      .get(`/games/${id}`)
+      .expect(200)
+      .expect((result) => {
+        expect(result.body).toMatchObject({
+          artifactVersion: 1,
+          artifactReady: false,
+        });
+      });
+    await developer.post(`/games/${id}/submit`).send({}).expect(409);
+    await developer
+      .post(`/games/${id}/build`)
+      .send({})
+      .expect(201)
+      .expect((result) => {
+        expect(result.body).toMatchObject({
+          artifactVersion: 2,
+          artifactReady: true,
+        });
+      });
+    await developer.post(`/games/${id}/submit`).send({}).expect(201);
     await developer.get(`/games/${id}/preview/index.html`).expect(302);
     await developer
       .put(`/games/${id}/project`)
@@ -694,6 +741,7 @@ describe('Developer profile and game draft HTTP boundary', () => {
       reviewState: 'DRAFT',
       projectData: null,
       artifactVersion: 0,
+      artifactReady: false,
       reviewNote: null,
       submittedAt: null,
       reviewedAt: null,
@@ -726,6 +774,7 @@ describe('Developer profile and game draft HTTP boundary', () => {
           reviewState: 'DRAFT',
           projectData: null,
           artifactVersion: 0,
+          artifactReady: false,
           reviewNote: null,
           submittedAt: null,
           reviewedAt: null,
@@ -769,6 +818,7 @@ describe('Developer profile and game draft HTTP boundary', () => {
           reviewState: 'PENDING',
           visibility: 'DRAFT',
           artifactVersion: 1,
+          artifactReady: true,
         });
         expect(response.body.submittedAt).not.toBeNull();
       });
@@ -843,6 +893,7 @@ describe('Developer profile and game draft HTTP boundary', () => {
           reviewState: 'APPROVED',
           visibility: 'PUBLIC',
           artifactVersion: 1,
+          artifactReady: true,
         });
         expect(response.body.reviewedAt).not.toBeNull();
         expect(response.body).not.toHaveProperty('projectData');

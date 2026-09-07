@@ -42,6 +42,7 @@ const games = new Map([
       reviewState: "APPROVED",
       projectData: null,
       artifactVersion: 0,
+      artifactReady: false,
       reviewNote: null,
       submittedAt: null,
       reviewedAt: null,
@@ -108,6 +109,7 @@ const testingModule = await Test.createTestingModule({ imports: [AppModule] })
         reviewState: "DRAFT",
         projectData: null,
         artifactVersion: 0,
+        artifactReady: false,
         reviewNote: null,
         submittedAt: null,
         reviewedAt: null,
@@ -140,7 +142,8 @@ const testingModule = await Test.createTestingModule({ imports: [AppModule] })
       if (
         !current ||
         !["DRAFT", "REJECTED"].includes(current.reviewState) ||
-        current.artifactVersion < 1
+        current.artifactVersion < 1 ||
+        !current.artifactReady
       )
         return null;
       const game = {
