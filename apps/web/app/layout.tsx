@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { AdsenseScript } from "../components/adsense-script";
 import { SiteNavigation } from "../components/site-navigation";
 import { TfgLogo } from "../components/tfg-logo";
 import { ThemeToggle } from "../components/theme-toggle";
@@ -37,6 +38,7 @@ export default async function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: themeBootstrap }} />
       </head>
       <body>
+        <AdsenseScript />
         <header className="site-header">
           <div className="site-header__inner container">
             <Link aria-label="TFG — Trang chủ" className="brand" href="/">

@@ -64,6 +64,10 @@ services:
       dockerfile: apps/web/Dockerfile
       args:
         NEXT_PUBLIC_API_URL: /api
+        NEXT_PUBLIC_ADSENSE_ENABLED: ${NEXT_PUBLIC_ADSENSE_ENABLED:-false}
+        NEXT_PUBLIC_ADSENSE_CLIENT: ${NEXT_PUBLIC_ADSENSE_CLIENT:-}
+        NEXT_PUBLIC_ADSENSE_GAME_LEFT_TOP_SLOT: ${NEXT_PUBLIC_ADSENSE_GAME_LEFT_TOP_SLOT:-}
+        NEXT_PUBLIC_ADSENSE_GAME_LEFT_BOTTOM_SLOT: ${NEXT_PUBLIC_ADSENSE_GAME_LEFT_BOTTOM_SLOT:-}
     restart: unless-stopped
     environment:
       NODE_ENV: production
