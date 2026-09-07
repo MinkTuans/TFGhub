@@ -432,19 +432,19 @@
   tar-based artifact backup paired with the database dump plus explicit role
   grant SQL using a safely prompted email.
 
-- [ ] **Step 4: Run release gates**
+- [x] **Step 4: Run release gates**
 
   Run: `pnpm test && pnpm typecheck && pnpm lint && pnpm test:deploy-config && pnpm test:containers && PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/google-chrome pnpm --filter web e2e && docker compose --project-name deploy-ip-preview --env-file .env.production -f compose.production.yml build`
 
   Expected: every command exits 0.
 
-- [ ] **Step 5: Back up and deploy**
+- [x] **Step 5: Back up and deploy**
 
   Create and validate a new PostgreSQL custom-format dump and an artifact-volume
   archive, remove only the stopped one-shot migrate container, then run the
   existing project with `up -d --build --wait`. Never remove volumes.
 
-- [ ] **Step 6: Verify the public release and commit**
+- [x] **Step 6: Verify the public release and commit**
 
   Run the full external Playwright journey at `http://161.248.81.59`, verify
   health/service/port state, then commit deployment/docs changes as
