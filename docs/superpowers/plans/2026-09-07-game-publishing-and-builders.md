@@ -84,33 +84,33 @@
   `ArtifactFile { path, content, contentType }`.
 - Consumes: project input types from Task 1.
 
-- [ ] **Step 1: Write failing storage and compiler tests**
+- [x] **Step 1: Write failing storage and compiler tests**
 
   Use a temporary root. Prove traversal/absolute paths are rejected, staging is
   atomically published, reads cannot escape the root, `</script>` user input
   cannot break generated markup, story choices render, and platform output
   contains bounded serialized coordinates and its keyboard/collision runtime.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
   Run: `pnpm --filter api test -- game-artifacts`
 
   Expected: FAIL because the module does not exist.
 
-- [ ] **Step 3: Implement pure compilers and filesystem storage**
+- [x] **Step 3: Implement pure compilers and filesystem storage**
 
   Serialize projects with `JSON.stringify(...).replaceAll("<", "\\u003c")`.
   Install through a sibling `.staging-<uuid>` directory, `writeFile` with
   `flag:"wx"`, and atomic `rename`; validate every resolved path begins with
   the resolved artifact root plus `path.sep`.
 
-- [ ] **Step 4: Verify GREEN**
+- [x] **Step 4: Verify GREEN**
 
   Run: `pnpm --filter api test -- game-artifacts && pnpm --filter api typecheck`
 
   Expected: all commands exit 0.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
   Run: `git add apps/api/src/game-artifacts && git commit -m "feat(api): add safe game artifact compilation"`
 
