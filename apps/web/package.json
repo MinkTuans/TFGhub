@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "build:contracts": "pnpm --filter @indieforge/contracts build",
-    "test": "pnpm run build:contracts && vitest run",
+    "test": "pnpm run build:contracts && sh -c 'if [ \"$1\" = \"--\" ]; then shift; fi; exec pnpm exec vitest run \"$@\"' --",
     "e2e": "playwright test",
     "dev": "pnpm run build:contracts && next dev",
     "build": "pnpm run build:contracts && next build",
