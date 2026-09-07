@@ -38,6 +38,30 @@ export const gameSummarySelect = {
   reviewedAt: true,
 } as const;
 
+const moderationGameSelect = {
+  id: true,
+  slug: true,
+  title: true,
+  description: true,
+  visibility: true,
+  accessMode: true,
+  moderationState: true,
+  createdAt: true,
+  updatedAt: true,
+  sourceType: true,
+  reviewState: true,
+  artifactVersion: true,
+  reviewNote: true,
+  submittedAt: true,
+  reviewedAt: true,
+  owner: {
+    select: {
+      id: true,
+      profile: { select: { displayName: true } },
+    },
+  },
+} as const;
+
 const publicGameSelect = {
   id: true,
   slug: true,
@@ -73,12 +97,20 @@ const publicGameSelect = {
             orderBy: { createdAt: 'desc' },
             select: gameSummarySelect,
           }),
-        findPending: () =>
-          database.game.findMany({
-            where: { reviewState: 'PENDING' },
-            orderBy: { submittedAt: 'asc' },
-            select: gameSummarySelect,
-          }),
+        findPending: async () =>
+          (
+            await database.game.findMany({
+              where: { reviewState: 'PENDING' },
+              orderBy: { submittedAt: 'asc' },
+              select: moderationGameSelect,
+            })
+          ).map(({ owner, ...game }) => ({
+            ...game,
+            creator: {
+              id: owner.id,
+              displayName: owner.profile?.displayName ?? null,
+            },
+          })),
         findUnique: (id) =>
           database.game.findUnique({
             where: { id },
@@ -159,11 +191,15 @@ const publicGameSelect = {
               ? tx.game.findUnique({ where: { id }, select: gameSummarySelect })
               : null;
           }),
-        update: (id, input) =>
-          database.game.update({
-            where: { id },
-            data: input,
-            select: gameSummarySelect,
+        updateOwned: (id, ownerId, expectedUpdatedAt, input) =>
+          database.$transaction(async (tx) => {
+            const result = await tx.game.updateMany({
+              where: { id, ownerId, updatedAt: expectedUpdatedAt },
+              data: input,
+            });
+            return result.count === 1
+              ? tx.game.findUnique({ where: { id }, select: gameSummarySelect })
+              : null;
           }),
       }),
     },

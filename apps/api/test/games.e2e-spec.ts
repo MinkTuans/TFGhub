@@ -93,9 +93,15 @@ describe('Developer profile and game draft HTTP boundary', () => {
           return [...games.values()].filter((game) => game.ownerId === ownerId);
         },
         async findPending() {
-          return [...games.values()].filter(
-            (game) => game.reviewState === 'PENDING',
-          );
+          return [...games.values()]
+            .filter((game) => game.reviewState === 'PENDING')
+            .map((game) => ({
+              ...game,
+              creator: {
+                id: game.ownerId,
+                displayName: profiles.get(game.ownerId)?.displayName ?? null,
+              },
+            }));
         },
         async findUnique(id: string) {
           const game = games.get(id);
@@ -167,8 +173,10 @@ describe('Developer profile and game draft HTTP boundary', () => {
           games.set(id, updated);
           return updated;
         },
-        async update(
+        async updateOwned(
           id: string,
+          ownerId: string,
+          expectedUpdatedAt: Date,
           input: {
             title?: string;
             description?: string;
@@ -176,6 +184,12 @@ describe('Developer profile and game draft HTTP boundary', () => {
           },
         ) {
           const game = games.get(id)!;
+          if (
+            game.ownerId !== ownerId ||
+            game.updatedAt.getTime() !== expectedUpdatedAt.getTime()
+          ) {
+            return null;
+          }
           const updated: StoredGame = {
             ...game,
             ...input,
@@ -738,7 +752,11 @@ describe('Developer profile and game draft HTTP boundary', () => {
     const { developer, game } = await createGame();
     await developer
       .post(`/games/${game.id}/upload`)
-      .attach('game', zipFixture([{ name: 'index.html', content: '<h1>Ready</h1>' }]), 'game.zip')
+      .attach(
+        'game',
+        zipFixture([{ name: 'index.html', content: '<h1>Ready</h1>' }]),
+        'game.zip',
+      )
       .expect(201);
     const other = await agent('other@example.com');
 
@@ -765,11 +783,50 @@ describe('Developer profile and game draft HTTP boundary', () => {
     await moderator.get('/moderation/games').expect(200, []);
   });
 
+  it('keeps unpublished project source out of the moderation queue', async () => {
+    const { developer, game } = await createGame();
+    await developer
+      .put('/developers/me')
+      .send({ displayName: 'Queue creator', bio: '' })
+      .expect(200);
+    await developer
+      .post(`/games/${game.id}/upload`)
+      .attach(
+        'game',
+        zipFixture([{ name: 'index.html', content: '<h1>Ready</h1>' }]),
+        'game.zip',
+      )
+      .expect(201);
+    games.get(game.id)!.projectData = {
+      unpublishedSource: 'MODERATION_SOURCE_SENTINEL',
+    };
+    await developer.post(`/games/${game.id}/submit`).expect(201);
+    const moderator = await agent('moderator@example.com');
+    users.get('user-2')!.role = 'MODERATOR';
+
+    await moderator
+      .get('/moderation/games')
+      .expect(200)
+      .expect((response) => {
+        expect(response.body).toMatchObject([
+          {
+            id: game.id,
+            creator: { id: 'user-1', displayName: 'Queue creator' },
+          },
+        ]);
+        expect(response.body[0]).not.toHaveProperty('projectData');
+      });
+  });
+
   it('approves a pending artifact once and publishes it', async () => {
     const { developer, game } = await createGame();
     await developer
       .post(`/games/${game.id}/upload`)
-      .attach('game', zipFixture([{ name: 'index.html', content: '<h1>Ready</h1>' }]), 'game.zip')
+      .attach(
+        'game',
+        zipFixture([{ name: 'index.html', content: '<h1>Ready</h1>' }]),
+        'game.zip',
+      )
       .expect(201);
     await developer.post(`/games/${game.id}/submit`).expect(201);
     const moderator = await agent('moderator@example.com');
@@ -793,13 +850,20 @@ describe('Developer profile and game draft HTTP boundary', () => {
     const { developer, game } = await createGame();
     await developer
       .post(`/games/${game.id}/upload`)
-      .attach('game', zipFixture([{ name: 'index.html', content: '<h1>Ready</h1>' }]), 'game.zip')
+      .attach(
+        'game',
+        zipFixture([{ name: 'index.html', content: '<h1>Ready</h1>' }]),
+        'game.zip',
+      )
       .expect(201);
     await developer.post(`/games/${game.id}/submit`).expect(201);
     const moderator = await agent('moderator@example.com');
     users.get('user-2')!.role = 'MODERATOR';
 
-    await moderator.post(`/moderation/games/${game.id}/reject`).send({}).expect(400);
+    await moderator
+      .post(`/moderation/games/${game.id}/reject`)
+      .send({})
+      .expect(400);
     await moderator
       .post(`/moderation/games/${game.id}/reject`)
       .send({ reviewNote: '  Add instructions  ' })

@@ -29,7 +29,7 @@ function fixture() {
     findPending: vi.fn().mockResolvedValue([]),
     findUnique: vi.fn().mockResolvedValue(storedGame),
     lockForArtifactReconciliation: vi.fn().mockResolvedValue(storedGame),
-    update: vi.fn().mockResolvedValue(storedGame),
+    updateOwned: vi.fn().mockResolvedValue(storedGame),
     submit: vi.fn().mockResolvedValue(storedGame),
     approve: vi.fn().mockResolvedValue(storedGame),
     reject: vi.fn().mockResolvedValue(storedGame),
@@ -91,12 +91,12 @@ describe('GamesService', () => {
     await expect(
       service.updateOwned('game-1', 'owner-2', { title: 'Changed' }),
     ).rejects.toThrow(ForbiddenException);
-    expect(games.update).not.toHaveBeenCalled();
+    expect(games.updateOwned).not.toHaveBeenCalled();
   });
 
   it('updates only the owning developer game and returns the dashboard fields', async () => {
     const { service, games } = fixture();
-    vi.mocked(games.update).mockResolvedValue({
+    games.updateOwned.mockResolvedValue({
       ...storedGame,
       title: 'Changed',
       updatedAt: new Date('2026-09-05T12:05:00.000Z'),
@@ -106,7 +106,12 @@ describe('GamesService', () => {
       title: 'Changed',
     });
 
-    expect(games.update).toHaveBeenCalledWith('game-1', { title: 'Changed' });
+    expect(games.updateOwned).toHaveBeenCalledWith(
+      'game-1',
+      'owner-1',
+      storedGame.updatedAt,
+      { title: 'Changed' },
+    );
     expect(result).toMatchObject({
       id: 'game-1',
       title: 'Changed',
@@ -127,13 +132,53 @@ describe('GamesService', () => {
 
     await service.updateOwned('game-1', 'owner-1', { title: 'Changed' });
 
-    expect(games.update).toHaveBeenCalledWith('game-1', {
-      title: 'Changed',
-      visibility: 'DRAFT',
-      reviewState: 'DRAFT',
-      reviewNote: null,
-      submittedAt: null,
-      reviewedAt: null,
+    expect(games.updateOwned).toHaveBeenCalledWith(
+      'game-1',
+      'owner-1',
+      expect.any(Date),
+      {
+        title: 'Changed',
+        visibility: 'DRAFT',
+        reviewState: 'DRAFT',
+        reviewNote: null,
+        submittedAt: null,
+        reviewedAt: null,
+      },
+    );
+  });
+
+  it('does not overwrite a moderator approval that happens after the owner read', async () => {
+    const { service, games } = fixture();
+    const observedAt = new Date('2026-09-05T12:00:00.000Z');
+    let persisted = {
+      ...storedGame,
+      title: 'Original title',
+      reviewState: 'PENDING' as const,
+      artifactVersion: 1,
+      updatedAt: observedAt,
+    };
+    vi.mocked(games.findUnique).mockResolvedValue({ ...persisted });
+    games.updateOwned.mockImplementation(
+      async (_id: string, _ownerId: string, expectedUpdatedAt: Date) => {
+        persisted = {
+          ...persisted,
+          reviewState: 'APPROVED',
+          visibility: 'PUBLIC',
+          updatedAt: new Date('2026-09-05T12:02:00.000Z'),
+        } as typeof persisted;
+        return persisted.updatedAt.getTime() === expectedUpdatedAt.getTime()
+          ? persisted
+          : null;
+      },
+    );
+
+    await expect(
+      service.updateOwned('game-1', 'owner-1', { title: 'Edited title' }),
+    ).rejects.toThrow(ConflictException);
+    expect(persisted).toMatchObject({
+      title: 'Original title',
+      reviewState: 'APPROVED',
+      visibility: 'PUBLIC',
     });
   });
 
@@ -150,7 +195,9 @@ describe('GamesService', () => {
       submittedAt: new Date('2026-09-05T12:01:00.000Z'),
     });
 
-    await expect(service.submitOwned('game-1', 'owner-1')).resolves.toMatchObject({
+    await expect(
+      service.submitOwned('game-1', 'owner-1'),
+    ).resolves.toMatchObject({
       reviewState: 'PENDING',
       artifactVersion: 1,
     });

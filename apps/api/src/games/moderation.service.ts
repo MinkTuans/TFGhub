@@ -2,6 +2,7 @@ import { ConflictException, Inject, Injectable } from '@nestjs/common';
 import {
   GamesRepository,
   gameSummary,
+  moderationGameSummary,
 } from './games.service.js';
 
 @Injectable()
@@ -11,7 +12,7 @@ export class ModerationService {
   ) {}
 
   async pending() {
-    return (await this.games.findPending()).map(gameSummary);
+    return (await this.games.findPending()).map(moderationGameSummary);
   }
 
   async approve(gameId: string) {

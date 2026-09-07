@@ -58,6 +58,22 @@ export type MetadataUpdate = UpdateGameInput &
     >
   >;
 
+export type ModerationCreator = {
+  id: string;
+  displayName: string | null;
+};
+
+export type ModerationStoredGame = Omit<
+  StoredGame,
+  'ownerId' | 'projectData'
+> & {
+  creator: ModerationCreator;
+};
+
+export type ModerationGameSummary = Omit<GameSummary, 'projectData'> & {
+  creator: ModerationCreator;
+};
+
 export abstract class GamesRepository {
   abstract create(input: {
     ownerId: string;
@@ -70,7 +86,7 @@ export abstract class GamesRepository {
     sourceType?: GameSourceType;
   }): Promise<StoredGame>;
   abstract findManyByOwner(ownerId: string): Promise<StoredGame[]>;
-  abstract findPending(): Promise<StoredGame[]>;
+  abstract findPending(): Promise<ModerationStoredGame[]>;
   abstract findUnique(id: string): Promise<StoredGame | null>;
   /** Wait for in-flight row writers before returning artifact reconciliation state. */
   abstract lockForArtifactReconciliation(
@@ -85,7 +101,12 @@ export abstract class GamesRepository {
   abstract submit(id: string): Promise<StoredGame | null>;
   abstract approve(id: string): Promise<StoredGame | null>;
   abstract reject(id: string, reviewNote: string): Promise<StoredGame | null>;
-  abstract update(id: string, input: MetadataUpdate): Promise<StoredGame>;
+  abstract updateOwned(
+    id: string,
+    ownerId: string,
+    expectedUpdatedAt: Date,
+    input: MetadataUpdate,
+  ): Promise<StoredGame | null>;
 }
 
 export function gameSummary(game: StoredGame): GameSummary {
@@ -106,6 +127,29 @@ export function gameSummary(game: StoredGame): GameSummary {
     reviewNote: game.reviewNote,
     submittedAt: game.submittedAt?.toISOString() ?? null,
     reviewedAt: game.reviewedAt?.toISOString() ?? null,
+  };
+}
+
+export function moderationGameSummary(
+  game: ModerationStoredGame,
+): ModerationGameSummary {
+  return {
+    id: game.id,
+    slug: game.slug,
+    title: game.title,
+    description: game.description,
+    visibility: game.visibility,
+    accessMode: game.accessMode,
+    moderationState: game.moderationState,
+    createdAt: game.createdAt.toISOString(),
+    updatedAt: game.updatedAt.toISOString(),
+    sourceType: game.sourceType,
+    reviewState: game.reviewState,
+    artifactVersion: game.artifactVersion,
+    reviewNote: game.reviewNote,
+    submittedAt: game.submittedAt?.toISOString() ?? null,
+    reviewedAt: game.reviewedAt?.toISOString() ?? null,
+    creator: game.creator,
   };
 }
 
@@ -167,7 +211,15 @@ export class GamesService {
             reviewedAt: null,
           }
         : {};
-    return gameSummary(await this.games.update(gameId, { ...input, ...resetReview }));
+    const updated = await this.games.updateOwned(
+      gameId,
+      userId,
+      game.updatedAt,
+      { ...input, ...resetReview },
+    );
+    if (!updated)
+      throw new ConflictException('Game changed; reload the workspace');
+    return gameSummary(updated);
   }
 
   async submitOwned(gameId: string, userId: string): Promise<GameSummary> {
@@ -176,7 +228,9 @@ export class GamesService {
       throw new ForbiddenException('You do not own this game');
     }
     if (game.artifactVersion < 1) {
-      throw new ConflictException('Build or upload a game artifact before review');
+      throw new ConflictException(
+        'Build or upload a game artifact before review',
+      );
     }
     const submitted = await this.games.submit(gameId);
     if (!submitted) throw new ConflictException('Game cannot be submitted');

@@ -6,6 +6,7 @@ import { ModerationService } from './moderation.service.js';
 const pendingGame = {
   id: 'game-1',
   ownerId: 'owner-1',
+  creator: { id: 'owner-1', displayName: null },
   slug: 'demo-game',
   title: 'Demo game',
   description: 'A pending game',
@@ -16,7 +17,7 @@ const pendingGame = {
   updatedAt: new Date('2026-09-05T12:00:00.000Z'),
   sourceType: 'UPLOAD' as const,
   reviewState: 'PENDING' as const,
-  projectData: null,
+  projectData: { unpublishedSource: 'MODERATION_SOURCE_SENTINEL' },
   artifactVersion: 1,
   reviewNote: null,
   submittedAt: new Date('2026-09-05T12:01:00.000Z'),
@@ -49,9 +50,14 @@ describe('ModerationService', () => {
   it('returns the pending review queue', async () => {
     const { service } = fixture();
 
-    await expect(service.pending()).resolves.toMatchObject([
+    const result = await service.pending();
+    expect(result).toMatchObject([
       { id: 'game-1', reviewState: 'PENDING', artifactVersion: 1 },
     ]);
+    expect(result[0]).not.toHaveProperty('projectData');
+    expect(result[0]).toMatchObject({
+      creator: { id: 'owner-1', displayName: null },
+    });
   });
 
   it('publishes an artifact only when its review is still pending', async () => {
@@ -75,8 +81,9 @@ describe('ModerationService', () => {
   it('rejects a pending game with a trimmed moderator note', async () => {
     const { service, games } = fixture();
 
-    await expect(service.reject('game-1', '  Needs a title screen  ')).resolves
-      .toMatchObject({ reviewState: 'REJECTED', visibility: 'DRAFT' });
+    await expect(
+      service.reject('game-1', '  Needs a title screen  '),
+    ).resolves.toMatchObject({ reviewState: 'REJECTED', visibility: 'DRAFT' });
     expect(games.reject).toHaveBeenCalledWith('game-1', 'Needs a title screen');
   });
 });
