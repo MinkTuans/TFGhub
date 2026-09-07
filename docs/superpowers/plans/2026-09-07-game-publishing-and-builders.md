@@ -35,19 +35,19 @@
 - Produces: `GameSourceType`, `GameReviewState`, `CodeProjectInput`, `StoryProjectInput`, `PlatformerProjectInput`, `GameProjectInput`, `ReviewGameInput`, expanded `GameSummary`.
 - Consumes: existing `CreateGameInput`, `UpdateGameInput`, and Prisma `Game`.
 
-- [ ] **Step 1: Add failing literal contract tests**
+- [x] **Step 1: Add failing literal contract tests**
 
   Assert that `CreateGameInput` accepts each source type, story choices reject
   unknown scene targets, platform coordinates reject values outside the canvas,
   code fields are bounded, and `GameSummary` requires review/build fields.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
   Run: `pnpm --filter @indieforge/contracts test`
 
   Expected: FAIL because the new schemas/fields are absent.
 
-- [ ] **Step 3: Add schemas and database fields**
+- [x] **Step 3: Add schemas and database fields**
 
   Add Prisma enums `GameSourceType { UPLOAD CODE STORY PLATFORMER }` and
   `GameReviewState { DRAFT PENDING APPROVED REJECTED }`; add `sourceType`,
@@ -56,13 +56,13 @@
   SQL with explicit defaults. Implement discriminated Zod project schemas with
   literal maximums and cross-field `superRefine` checks.
 
-- [ ] **Step 4: Verify GREEN and migration**
+- [x] **Step 4: Verify GREEN and migration**
 
   Run: `pnpm db:generate && pnpm --filter @indieforge/contracts test && pnpm --filter @indieforge/database test`
 
   Expected: all commands exit 0.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
   Run: `git add packages && git commit -m "feat(domain): model game sources and review state"`
 
