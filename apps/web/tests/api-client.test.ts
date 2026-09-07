@@ -1,11 +1,51 @@
 import { afterEach, expect, test, vi } from "vitest";
-import { api } from "../lib/api-client";
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllEnvs();
+  vi.unstubAllGlobals();
+  vi.resetModules();
+});
+
+test("uses the internal API URL during server rendering", async () => {
+  vi.stubEnv("API_INTERNAL_URL", "http://api:3001/");
+  vi.stubEnv("NEXT_PUBLIC_API_URL", "/api");
+  vi.stubGlobal("window", undefined);
+  const fetch = vi
+    .fn()
+    .mockResolvedValue(new Response(JSON.stringify({ status: "ok" })));
+  vi.stubGlobal("fetch", fetch);
+  const { api } = await import("../lib/api-client");
+
+  await api.get("/health");
+
+  expect(fetch).toHaveBeenCalledWith(
+    "http://api:3001/health",
+    expect.objectContaining({ method: "GET" }),
+  );
+});
+
+test("uses the public API prefix in a browser", async () => {
+  vi.stubEnv("API_INTERNAL_URL", "http://api:3001");
+  vi.stubEnv("NEXT_PUBLIC_API_URL", "/api/");
+  vi.stubGlobal("window", {});
+  const fetch = vi
+    .fn()
+    .mockResolvedValue(new Response(JSON.stringify({ status: "ok" })));
+  vi.stubGlobal("fetch", fetch);
+  const { api } = await import("../lib/api-client");
+
+  await api.get("/health");
+
+  expect(fetch).toHaveBeenCalledWith(
+    "/api/health",
+    expect.objectContaining({ method: "GET" }),
+  );
+});
 
 test.each(["get", "post", "put", "patch"] as const)(
   "%s includes cookie credentials and returns the JSON body",
   async (method) => {
+    const { api } = await import("../lib/api-client");
     const fetch = vi
       .fn()
       .mockResolvedValue(new Response(JSON.stringify({ title: "Tiny Quest" })));
@@ -29,6 +69,7 @@ test.each(["get", "post", "put", "patch"] as const)(
 );
 
 test("preserves a JSON HTTP failure instead of returning it as success", async () => {
+  const { api } = await import("../lib/api-client");
   vi.stubGlobal(
     "fetch",
     vi
@@ -46,6 +87,7 @@ test("preserves a JSON HTTP failure instead of returning it as success", async (
 });
 
 test("preserves status for non-JSON failures and accepts an empty success", async () => {
+  const { api } = await import("../lib/api-client");
   vi.stubGlobal(
     "fetch",
     vi

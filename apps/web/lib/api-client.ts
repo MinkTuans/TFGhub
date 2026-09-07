@@ -8,8 +8,15 @@ export class ApiError extends Error {
   }
 }
 
-const baseUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 type Options = { headers?: HeadersInit };
+
+export function resolveApiBaseUrl(): string {
+  const configured =
+    typeof window === "undefined"
+      ? process.env.API_INTERNAL_URL ?? process.env.NEXT_PUBLIC_API_URL
+      : process.env.NEXT_PUBLIC_API_URL;
+  return (configured ?? "http://localhost:3001").replace(/\/$/, "");
+}
 
 async function request<T>(
   method: string,
@@ -19,7 +26,7 @@ async function request<T>(
 ): Promise<T> {
   const headers = new Headers(options.headers);
   if (body !== undefined) headers.set("Content-Type", "application/json");
-  const response = await fetch(`${baseUrl.replace(/\/$/, "")}${path}`, {
+  const response = await fetch(`${resolveApiBaseUrl()}${path}`, {
     method,
     headers,
     credentials: "include",
