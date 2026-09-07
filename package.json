@@ -8,6 +8,7 @@
     "test": "pnpm db:generate && turbo test",
     "test:containers": "node scripts/test-container-contract.mjs",
     "test:deploy-config": "node scripts/test-deployment-config.mjs",
+    "test:deploy-smoke": "bash scripts/smoke-production.sh",
     "lint": "turbo lint",
     "typecheck": "pnpm db:generate && turbo typecheck"
   },

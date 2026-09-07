@@ -1,8 +1,5 @@
 x-api-image: &api-image
   image: indieforge-api
-  build:
-    context: .
-    dockerfile: apps/api/Dockerfile
 
 services:
   postgres:
@@ -32,6 +29,9 @@ services:
 
   api:
     <<: *api-image
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
     restart: unless-stopped
     environment:
       NODE_ENV: production

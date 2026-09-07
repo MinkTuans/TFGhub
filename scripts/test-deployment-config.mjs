@@ -111,6 +111,14 @@ try {
   }
 
   assert.equal(services.api.environment.JWT_SECRET, jwtSecret);
+  assert.deepEqual(
+    Object.entries(services)
+      .filter(([, service]) => service.build?.dockerfile === 'apps/api/Dockerfile')
+      .map(([name]) => name),
+    ['api'],
+    'the API image must be built once and shared with the migration job',
+  );
+  assert.equal(services.migrate.image, services.api.image);
   console.log('deployment configuration valid');
 } finally {
   await rm(temporaryDirectory, { recursive: true, force: true });
