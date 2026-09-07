@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { database } from '@indieforge/database';
 import { AuthModule } from '../auth/auth.module.js';
 import { GameArtifactsModule } from '../game-artifacts/game-artifacts.module.js';
+import { GameCoversModule } from '../game-covers/game-covers.module.js';
 import { GameContentService } from './game-content.service.js';
 import {
   GameContentController,
@@ -88,7 +89,7 @@ const publicGameSelect = {
 } as const;
 
 @Module({
-  imports: [AuthModule, GameArtifactsModule],
+  imports: [AuthModule, GameArtifactsModule, GameCoversModule],
   controllers: [
     GamesController,
     PublicGamesController,
