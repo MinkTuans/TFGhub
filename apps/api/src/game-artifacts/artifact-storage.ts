@@ -20,8 +20,11 @@ type ArtifactManifest = {
   files: Array<Pick<ArtifactFile, 'path' | 'contentType'>>;
 };
 
+export class ArtifactVersionExistsError extends Error {}
+
 function defaultStorageRoot(): string {
-  if (process.env.GAME_STORAGE_ROOT !== undefined) return process.env.GAME_STORAGE_ROOT;
+  if (process.env.GAME_STORAGE_ROOT !== undefined)
+    return process.env.GAME_STORAGE_ROOT;
   if (process.env.NODE_ENV === 'production') return '/var/lib/indieforge/games';
   return join(tmpdir(), 'indieforge-games');
 }
@@ -37,7 +40,10 @@ function within(root: string, candidate: string): string {
   return resolvedCandidate;
 }
 
-async function rejectSymbolicLinks(root: string, candidate: string): Promise<void> {
+async function rejectSymbolicLinks(
+  root: string,
+  candidate: string,
+): Promise<void> {
   const resolvedRoot = resolve(root);
   const resolvedCandidate = within(resolvedRoot, candidate);
   const components = relative(resolvedRoot, resolvedCandidate).split(sep);
@@ -65,7 +71,9 @@ async function sealPublishedTree(directory: string): Promise<void> {
     } else if (entry.isFile()) {
       await chmod(entryPath, 0o444);
     } else {
-      throw new Error('Artifact staging directory contains an unsupported entry');
+      throw new Error(
+        'Artifact staging directory contains an unsupported entry',
+      );
     }
   }
 
@@ -93,12 +101,19 @@ export class ArtifactStorage {
     this.root = resolve(storageRoot);
   }
 
-  async install(gameId: string, version: number, files: ArtifactFile[]): Promise<void> {
+  async install(
+    gameId: string,
+    version: number,
+    files: ArtifactFile[],
+  ): Promise<void> {
     if (!Number.isSafeInteger(version) || version < 0) {
       throw new Error('Artifact version must be a non-negative integer');
     }
 
-    const artifactDirectory = within(this.root, resolve(this.root, gameId, String(version)));
+    const artifactDirectory = within(
+      this.root,
+      resolve(this.root, gameId, String(version)),
+    );
     const artifactParent = dirname(artifactDirectory);
     const stagingDirectory = within(
       artifactParent,
@@ -117,7 +132,10 @@ export class ArtifactStorage {
     try {
       await mkdir(stagingDirectory);
       for (const file of files) {
-        const filePath = within(stagingDirectory, resolve(stagingDirectory, file.path));
+        const filePath = within(
+          stagingDirectory,
+          resolve(stagingDirectory, file.path),
+        );
         await mkdir(dirname(filePath), { recursive: true });
         await writeFile(filePath, file.content, { flag: 'wx' });
       }
@@ -131,7 +149,20 @@ export class ArtifactStorage {
         { flag: 'wx' },
       );
       await sealPublishedTree(stagingDirectory);
-      await rename(stagingDirectory, artifactDirectory);
+      try {
+        await rename(stagingDirectory, artifactDirectory);
+      } catch (error) {
+        if (
+          ['EEXIST', 'ENOTEMPTY'].includes(
+            (error as NodeJS.ErrnoException).code ?? '',
+          )
+        ) {
+          throw new ArtifactVersionExistsError(
+            'Artifact version already exists',
+          );
+        }
+        throw error;
+      }
     } catch (error) {
       await unsealStagingTree(stagingDirectory);
       await rm(stagingDirectory, { recursive: true, force: true });
@@ -139,13 +170,54 @@ export class ArtifactStorage {
     }
   }
 
-  async read(gameId: string, version: number, path: string): Promise<StoredArtifactFile> {
+  /** Caller must hold its per-game mutation lock and supply a fresh DB version. */
+  async discardUnreferenced(
+    gameId: string,
+    version: number,
+    referencedVersion: number,
+  ): Promise<void> {
+    if (
+      !/^[a-zA-Z0-9_-]+$/.test(gameId) ||
+      !Number.isSafeInteger(referencedVersion) ||
+      referencedVersion < 0 ||
+      !Number.isSafeInteger(version) ||
+      version !== referencedVersion + 1
+    ) {
+      throw new Error(
+        'Only the unreferenced next artifact version may be discarded',
+      );
+    }
+    const directory = within(
+      this.root,
+      resolve(this.root, gameId, String(version)),
+    );
+    try {
+      await rejectSymbolicLinks(this.root, directory);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return;
+      throw error;
+    }
+    await unsealStagingTree(directory);
+    await rm(directory, { recursive: true });
+  }
+
+  async read(
+    gameId: string,
+    version: number,
+    path: string,
+  ): Promise<StoredArtifactFile> {
     if (!Number.isSafeInteger(version) || version < 0) {
       throw new Error('Artifact version must be a non-negative integer');
     }
 
-    const artifactDirectory = within(this.root, resolve(this.root, gameId, String(version)));
-    const filePath = within(artifactDirectory, resolve(artifactDirectory, path));
+    const artifactDirectory = within(
+      this.root,
+      resolve(this.root, gameId, String(version)),
+    );
+    const filePath = within(
+      artifactDirectory,
+      resolve(artifactDirectory, path),
+    );
     const manifestPath = join(artifactDirectory, manifestName);
 
     await rejectSymbolicLinks(this.root, artifactDirectory);

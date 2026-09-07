@@ -37,32 +37,50 @@ describe('ArtifactStorage', () => {
     await rm(storageRoot, { recursive: true, force: true });
   });
 
-  it.each(['../outside.html', '/tmp/outside.html', 'nested/../../outside.html'])(
+  it.each([
+    '../outside.html',
+    '/tmp/outside.html',
+    'nested/../../outside.html',
+  ])(
     'rejects an install path that escapes its artifact directory: %s',
     async (unsafePath) => {
       await expect(
         storage.install('game-1', 1, [
           { path: unsafePath, content: 'outside', contentType: 'text/html' },
         ]),
-      ).rejects.toThrow('Artifact path must stay within its artifact directory');
+      ).rejects.toThrow(
+        'Artifact path must stay within its artifact directory',
+      );
 
-      await expect(readFile(join(storageRoot, 'outside.html'))).rejects.toThrow();
+      await expect(
+        readFile(join(storageRoot, 'outside.html')),
+      ).rejects.toThrow();
     },
   );
 
   it('publishes a complete staged version and retains each file content type', async () => {
     await storage.install('game-1', 2, [
-      { path: 'index.html', content: '<h1>Play</h1>', contentType: 'text/html' },
+      {
+        path: 'index.html',
+        content: '<h1>Play</h1>',
+        contentType: 'text/html',
+      },
       { path: 'assets/theme.css', content: 'body{}', contentType: 'text/css' },
     ]);
 
-    await expect(readFile(join(storageRoot, 'game-1', '2', 'index.html'), 'utf8')).resolves.toBe('<h1>Play</h1>');
-    await expect(storage.read('game-1', 2, 'assets/theme.css')).resolves.toEqual({
+    await expect(
+      readFile(join(storageRoot, 'game-1', '2', 'index.html'), 'utf8'),
+    ).resolves.toBe('<h1>Play</h1>');
+    await expect(
+      storage.read('game-1', 2, 'assets/theme.css'),
+    ).resolves.toEqual({
       path: 'assets/theme.css',
       content: expect.any(Buffer),
       contentType: 'text/css',
     });
-    expect((await storage.read('game-1', 2, 'assets/theme.css')).content.toString()).toBe('body{}');
+    expect(
+      (await storage.read('game-1', 2, 'assets/theme.css')).content.toString(),
+    ).toBe('body{}');
 
     expect(await readdir(join(storageRoot, 'game-1'))).toEqual(['2']);
   });
@@ -103,6 +121,27 @@ describe('ArtifactStorage', () => {
     );
   });
 
+  it('discards only the unreferenced next version and preserves published bytes', async () => {
+    for (const version of [1, 2])
+      await storage.install('game-1', version, [
+        {
+          path: 'index.html',
+          content: `version ${version}`,
+          contentType: 'text/html',
+        },
+      ]);
+    await expect(storage.discardUnreferenced('game-1', 1, 1)).rejects.toThrow();
+    await expect(
+      storage.discardUnreferenced('../game-1', 2, 1),
+    ).rejects.toThrow();
+    await storage.discardUnreferenced('game-1', 2, 1);
+    expect(await readdir(join(storageRoot, 'game-1'))).toEqual(['1']);
+    expect(
+      (await storage.read('game-1', 1, 'index.html')).content.toString(),
+    ).toBe('version 1');
+    expect((await stat(join(storageRoot, 'game-1', '1'))).mode & 0o222).toBe(0);
+  });
+
   it('rejects an installed artifact file replaced with an external symlink', async () => {
     const outsideRoot = await mkdtemp(join(tmpdir(), 'indieforge-outside-'));
     const externalFile = join(outsideRoot, 'secret.txt');
@@ -130,7 +169,11 @@ describe('ArtifactStorage', () => {
   it('publishes immutable files and directories while allowing a later version sibling', async () => {
     await storage.install('game-1', 1, [
       { path: 'index.html', content: 'safe', contentType: 'text/html' },
-      { path: 'assets/runtime.js', content: 'run()', contentType: 'text/javascript' },
+      {
+        path: 'assets/runtime.js',
+        content: 'run()',
+        contentType: 'text/javascript',
+      },
     ]);
 
     const versionDirectory = join(storageRoot, 'game-1', '1');
@@ -143,13 +186,17 @@ describe('ArtifactStorage', () => {
     if (process.getuid?.() !== 0) {
       await expect(writeFile(leaf, 'changed')).rejects.toThrow();
       await expect(unlink(leaf)).rejects.toThrow();
-      await expect(writeFile(join(nestedDirectory, 'replacement.js'), 'changed')).rejects.toThrow();
+      await expect(
+        writeFile(join(nestedDirectory, 'replacement.js'), 'changed'),
+      ).rejects.toThrow();
     }
 
     await storage.install('game-1', 2, [
       { path: 'index.html', content: 'new version', contentType: 'text/html' },
     ]);
-    await expect(storage.read('game-1', 2, 'index.html')).resolves.toMatchObject({
+    await expect(
+      storage.read('game-1', 2, 'index.html'),
+    ).resolves.toMatchObject({
       contentType: 'text/html',
     });
   });

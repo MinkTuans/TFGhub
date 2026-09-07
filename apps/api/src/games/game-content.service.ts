@@ -9,9 +9,13 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { GameProjectInput } from '@indieforge/contracts';
+import { JwtService } from '@nestjs/jwt';
 import { extname } from 'node:path';
 import { fromBuffer, type Entry, type ZipFile } from 'yauzl';
-import { ArtifactStorage } from '../game-artifacts/artifact-storage.js';
+import {
+  ArtifactStorage,
+  ArtifactVersionExistsError,
+} from '../game-artifacts/artifact-storage.js';
 import type { ArtifactFile } from '../game-artifacts/artifact-types.js';
 import { compileCode } from '../game-artifacts/code-compiler.js';
 import { compileStory } from '../game-artifacts/story-compiler.js';
@@ -174,10 +178,32 @@ async function readZip(buffer: Buffer): Promise<ArtifactFile[]> {
 
 @Injectable()
 export class GameContentService {
+  private readonly mutations = new Map<string, Promise<void>>();
+
   constructor(
     @Inject(GamesRepository) private readonly games: GamesRepository,
     @Inject(ArtifactStorage) private readonly storage: ArtifactStorage,
+    @Inject(JwtService) private readonly tokens: JwtService,
   ) {}
+
+  private async serialized<T>(
+    gameId: string,
+    operation: () => Promise<T>,
+  ): Promise<T> {
+    const previous = this.mutations.get(gameId) ?? Promise.resolve();
+    let release!: () => void;
+    const current = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    this.mutations.set(gameId, current);
+    await previous;
+    try {
+      return await operation();
+    } finally {
+      release();
+      if (this.mutations.get(gameId) === current) this.mutations.delete(gameId);
+    }
+  }
 
   async owned(gameId: string, userId: string): Promise<StoredGame> {
     const game = await this.games.findUnique(gameId);
@@ -191,9 +217,11 @@ export class GameContentService {
   }
 
   async saveProject(gameId: string, userId: string, input: unknown) {
-    const game = await this.owned(gameId, userId);
-    const project = this.project(game, input);
-    return this.update(game, { ...resetReview, projectData: project });
+    return this.serialized(gameId, async () => {
+      const game = await this.owned(gameId, userId);
+      const project = this.project(game, input);
+      return this.update(game, { ...resetReview, projectData: project });
+    });
   }
 
   private project(game: StoredGame, input: unknown): GameProjectInput {
@@ -207,32 +235,97 @@ export class GameContentService {
   }
 
   async build(gameId: string, userId: string) {
-    const game = await this.owned(gameId, userId);
-    const project = this.project(game, game.projectData);
-    const files =
-      project.sourceType === 'CODE'
-        ? compileCode(project)
-        : project.sourceType === 'STORY'
-          ? compileStory(project)
-          : compilePlatformer(project);
-    return this.install(game, files);
+    return this.serialized(gameId, async () => {
+      const game = await this.owned(gameId, userId);
+      const project = this.project(game, game.projectData);
+      const files =
+        project.sourceType === 'CODE'
+          ? compileCode(project)
+          : project.sourceType === 'STORY'
+            ? compileStory(project)
+            : compilePlatformer(project);
+      return this.install(game, files);
+    });
   }
 
   async upload(gameId: string, userId: string, archive: Buffer) {
-    const game = await this.owned(gameId, userId);
-    if (game.sourceType !== 'UPLOAD')
-      throw new BadRequestException('This game does not accept ZIP uploads');
-    return this.install(game, await readZip(archive));
+    return this.serialized(gameId, async () => {
+      const game = await this.owned(gameId, userId);
+      if (game.sourceType !== 'UPLOAD')
+        throw new BadRequestException('This game does not accept ZIP uploads');
+      return this.install(game, await readZip(archive));
+    });
   }
 
   private async install(game: StoredGame, files: ArtifactFile[]) {
     const artifactVersion = game.artifactVersion + 1;
     try {
       await this.storage.install(game.id, artifactVersion, files);
+    } catch (error) {
+      if (!(error instanceof ArtifactVersionExistsError)) {
+        throw new ServiceUnavailableException(
+          'Artifact storage is unavailable',
+        );
+      }
+      // A previous request may have lost its DB connection after installation.
+      // Never delete the current version or any historical referenced version.
+      const fresh = await this.current(game.id);
+      if (!fresh || fresh.artifactVersion >= artifactVersion) {
+        throw new ConflictException('Game changed; reload the workspace');
+      }
+      await this.discard(game.id, artifactVersion, fresh.artifactVersion);
+      if (fresh.updatedAt.getTime() !== game.updatedAt.getTime()) {
+        throw new ConflictException('Game changed; reload the workspace');
+      }
+      try {
+        await this.storage.install(game.id, artifactVersion, files);
+      } catch {
+        throw new ServiceUnavailableException(
+          'Artifact storage is unavailable',
+        );
+      }
+    }
+    try {
+      return await this.update(game, { ...resetReview, artifactVersion });
+    } catch (error) {
+      // A lost commit response is ambiguous: first establish which bytes the
+      // database references. If that read fails, preserve bytes for a retry.
+      const fresh = await this.current(game.id);
+      if (fresh?.artifactVersion === artifactVersion) return gameSummary(fresh);
+      if (fresh && fresh.artifactVersion < artifactVersion) {
+        await this.discard(game.id, artifactVersion, fresh.artifactVersion);
+      }
+      if (error instanceof ConflictException) throw error;
+      throw new ServiceUnavailableException(
+        'Artifact finalization is unavailable',
+      );
+    }
+  }
+
+  private async current(gameId: string) {
+    try {
+      return await this.games.findUnique(gameId);
+    } catch {
+      throw new ServiceUnavailableException(
+        'Artifact finalization is unavailable',
+      );
+    }
+  }
+
+  private async discard(
+    gameId: string,
+    version: number,
+    referencedVersion: number,
+  ) {
+    try {
+      await this.storage.discardUnreferenced(
+        gameId,
+        version,
+        referencedVersion,
+      );
     } catch {
       throw new ServiceUnavailableException('Artifact storage is unavailable');
     }
-    return this.update(game, { ...resetReview, artifactVersion });
   }
 
   private async update(game: StoredGame, input: WorkspaceUpdate) {
@@ -246,7 +339,7 @@ export class GameContentService {
     return gameSummary(updated);
   }
 
-  async preview(gameId: string, path: string, user: Viewer) {
+  private async previewGame(gameId: string, user: Viewer) {
     const game = await this.games.findUnique(gameId);
     if (
       !game ||
@@ -256,22 +349,105 @@ export class GameContentService {
     ) {
       throw new ForbiddenException('You cannot preview this game');
     }
-    return this.file(game, path);
+    return game;
   }
 
-  async play(slug: string, path: string, user?: Viewer) {
+  private isPublic(game: StoredGame): boolean {
+    return (
+      game.visibility === 'PUBLIC' &&
+      game.reviewState === 'APPROVED' &&
+      game.moderationState === 'CLEAR' &&
+      game.artifactVersion > 0
+    );
+  }
+
+  private async playGame(slug: string, user?: Viewer) {
     const game = await this.games.findBySlug(slug);
-    if (
-      !game ||
-      game.visibility !== 'PUBLIC' ||
-      game.reviewState !== 'APPROVED' ||
-      game.moderationState !== 'CLEAR' ||
-      game.artifactVersion < 1
-    ) {
+    if (!game || !this.isPublic(game)) {
       throw new NotFoundException('Game not found');
     }
     if (game.accessMode === 'AUTH_REQUIRED' && !user)
       throw new UnauthorizedException();
+    return game;
+  }
+
+  async previewCapability(gameId: string, user: Viewer) {
+    return this.mint(await this.previewGame(gameId, user), 'preview', true);
+  }
+
+  async playCapability(slug: string, user?: Viewer) {
+    return this.mint(
+      await this.playGame(slug, user),
+      'play',
+      user !== undefined,
+    );
+  }
+
+  private async mint(
+    game: StoredGame,
+    purpose: 'preview' | 'play',
+    authenticated: boolean,
+  ) {
+    if (game.artifactVersion < 1)
+      throw new NotFoundException('Game file not found');
+    const iat = Math.floor(Date.now() / 1000);
+    const token = await this.tokens.signAsync(
+      {
+        gameId: game.id,
+        artifactVersion: game.artifactVersion,
+        purpose,
+        authenticated,
+        iat,
+      },
+      {
+        algorithm: 'HS256',
+        audience: 'game-content',
+        issuer: 'indieforge-game-content',
+        expiresIn: 300,
+      },
+    );
+    return { token, expiresAt: new Date((iat + 300) * 1000).toISOString() };
+  }
+
+  async capabilityFile(token: string, path: string) {
+    let payload: {
+      gameId?: unknown;
+      artifactVersion?: unknown;
+      purpose?: unknown;
+      authenticated?: unknown;
+      exp?: unknown;
+    };
+    try {
+      payload = await this.tokens.verifyAsync(token, {
+        algorithms: ['HS256'],
+        audience: 'game-content',
+        issuer: 'indieforge-game-content',
+      });
+      if (
+        typeof payload.gameId !== 'string' ||
+        !/^[a-zA-Z0-9_-]+$/.test(payload.gameId) ||
+        !Number.isSafeInteger(payload.artifactVersion) ||
+        !['preview', 'play'].includes(String(payload.purpose)) ||
+        typeof payload.authenticated !== 'boolean' ||
+        typeof payload.exp !== 'number'
+      ) {
+        throw new Error('Invalid capability');
+      }
+    } catch {
+      throw new NotFoundException(
+        'Game content capability is invalid or expired',
+      );
+    }
+    const game = await this.games.findUnique(payload.gameId as string);
+    if (
+      !game ||
+      game.artifactVersion !== payload.artifactVersion ||
+      (payload.purpose === 'play' &&
+        (!this.isPublic(game) ||
+          (game.accessMode === 'AUTH_REQUIRED' && !payload.authenticated)))
+    ) {
+      throw new NotFoundException('Game file not found');
+    }
     return this.file(game, path);
   }
 

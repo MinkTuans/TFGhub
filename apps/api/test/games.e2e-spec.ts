@@ -1,12 +1,14 @@
 import { type INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
+import { chromium, type Request as BrowserRequest } from '@playwright/test';
+import { createRequire } from 'node:module';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppModule } from '../src/app.module.js';
 import { configureApp } from '../src/configure-app.js';
 import { zipFixture } from './zip-fixture.js';
-import { mkdtemp, chmod, readdir, rm } from 'node:fs/promises';
-import { join } from 'node:path';
+import { mkdtemp, chmod, readdir, rm, readFile } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { ArtifactStorage } from '../src/game-artifacts/artifact-storage.js';
 import type {
@@ -200,6 +202,149 @@ describe('Developer profile and game draft HTTP boundary', () => {
     await other.get(`/games/${game.id}`).expect(403);
   });
 
+  it('runs authenticated nested classic JS inside the exact opaque sandbox in Chromium', async () => {
+    const { developer, game } = await createGame();
+    await developer
+      .post(`/games/${game.id}/upload`)
+      .attach(
+        'game',
+        zipFixture([
+          {
+            name: 'index.html',
+            content:
+              '<div id="status">Waiting</div><script src="assets/game.js"></script>',
+          },
+          {
+            name: 'assets/game.js',
+            content:
+              'document.getElementById("status").textContent="Nested classic ready"',
+          },
+        ]),
+        'game.zip',
+      )
+      .expect(201);
+    await app.listen(0, '127.0.0.1');
+    const origin = await app.getUrl();
+    const browser = await chromium.launch({
+      executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH,
+    });
+    try {
+      const context = await browser.newContext();
+      await context.request.post(`${origin}/auth/login`, {
+        data: { email: 'owner@example.com', password: 'password123' },
+      });
+      const page = await context.newPage();
+      const requests: BrowserRequest[] = [];
+      page.on('request', (request) => requests.push(request));
+      await page.goto(origin);
+      await page.setContent(
+        `<iframe sandbox="allow-scripts allow-pointer-lock" src="${origin}/games/${game.id}/preview/index.html"></iframe>`,
+      );
+      await page
+        .frameLocator('iframe')
+        .locator('#status')
+        .filter({ hasText: 'Nested classic ready' })
+        .waitFor({ timeout: 5000 });
+      const nested = requests.find((request) =>
+        request.url().endsWith('/assets/game.js'),
+      )!;
+      expect(nested.url()).toContain('/game-content/');
+      expect((await nested.allHeaders()).cookie).toBeUndefined();
+    } finally {
+      await browser.close();
+    }
+  }, 20000);
+
+  it('runs guest nested modules and a local font with Origin:null in Chromium without widening API CORS', async () => {
+    const { developer, game } = await createGame();
+    const require = createRequire(import.meta.url);
+    const databaseRequire = createRequire(
+      require.resolve('@indieforge/database'),
+    );
+    const fontDirectory = join(
+      dirname(databaseRequire.resolve('prisma/package.json')),
+      'build/public/assets',
+    );
+    const fontName = (await readdir(fontDirectory)).find((file) =>
+      /^inter-latin-400-normal\..*\.woff2$/.test(file),
+    )!;
+    const font = await readFile(join(fontDirectory, fontName));
+    await developer
+      .post(`/games/${game.id}/upload`)
+      .attach(
+        'game',
+        zipFixture([
+          {
+            name: 'index.html',
+            content:
+              '<style>@font-face{font-family:Fixture;src:url("fonts/fixture.woff2")}</style><div id="module">Waiting</div><div id="font">Waiting</div><script type="module" src="assets/main.js"></script>',
+          },
+          {
+            name: 'assets/main.js',
+            content:
+              'import {value} from "./nested/value.js";document.getElementById("module").textContent=value;document.fonts.load("16px Fixture").then(()=>document.getElementById("font").textContent="Font ready")',
+          },
+          {
+            name: 'assets/nested/value.js',
+            content: 'export const value="Nested module ready"',
+          },
+          { name: 'fonts/fixture.woff2', content: font },
+        ]),
+        'game.zip',
+      )
+      .expect(201);
+    Object.assign(games.get(game.id)!, {
+      reviewState: 'APPROVED',
+      visibility: 'PUBLIC',
+    });
+    await app.listen(0, '127.0.0.1');
+    const origin = await app.getUrl();
+    const browser = await chromium.launch({
+      executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH,
+    });
+    try {
+      const page = await browser.newPage();
+      const requests: BrowserRequest[] = [];
+      page.on('request', (request) => requests.push(request));
+      await page.goto(origin);
+      await page.setContent(
+        `<iframe sandbox="allow-scripts allow-pointer-lock" src="${origin}/play/demo-game/index.html"></iframe>`,
+      );
+      await page
+        .frameLocator('iframe')
+        .locator('#module')
+        .filter({ hasText: 'Nested module ready' })
+        .waitFor({ timeout: 5000 });
+      await page
+        .frameLocator('iframe')
+        .locator('#font')
+        .filter({ hasText: 'Font ready' })
+        .waitFor({ timeout: 5000 });
+      for (const suffix of [
+        '/assets/nested/value.js',
+        '/fonts/fixture.woff2',
+      ]) {
+        const nested = requests.find((request) =>
+          request.url().endsWith(suffix),
+        )!;
+        const headers = await nested.allHeaders();
+        expect(headers.origin).toBe('null');
+        expect(headers.cookie).toBeUndefined();
+      }
+      await request(app.getHttpServer())
+        .get('/games/mine')
+        .set('Origin', 'null')
+        .expect(401)
+        .expect((response) => {
+          expect(response.headers['access-control-allow-origin']).toBe(
+            'http://localhost:3000',
+          );
+        });
+    } finally {
+      await browser.close();
+    }
+  }, 20000);
+
   it('uploads through the multipart boundary, previews nested files with isolation headers, and gates public play', async () => {
     const { developer, game } = await createGame();
     const archive = zipFixture([
@@ -210,8 +355,23 @@ describe('Developer profile and game draft HTTP boundary', () => {
       .post(`/games/${game.id}/upload`)
       .attach('game', archive, 'game.zip');
     expect(uploaded.status, JSON.stringify(uploaded.body)).toBe(201);
-    await developer
+    const preview = await developer
       .get(`/games/${game.id}/preview/`)
+      .expect(302);
+    const previewUrl = new URL(
+      preview.headers.location,
+      `http://api/games/${game.id}/preview/`,
+    ).pathname;
+    expect(previewUrl).toMatch(/^\/game-content\/[^/]+\/index\.html$/);
+    expect(
+      new URL(
+        preview.headers.location,
+        `https://site/api/games/${game.id}/preview/`,
+      ).pathname,
+    ).toBe(`/api${previewUrl}`);
+    await request(app.getHttpServer())
+      .get(previewUrl)
+      .set('Origin', 'null')
       .expect(200)
       .expect((response) => {
         expect(response.headers['content-type']).toBe(
@@ -219,6 +379,11 @@ describe('Developer profile and game draft HTTP boundary', () => {
         );
         expect(response.headers['x-content-type-options']).toBe('nosniff');
         expect(response.headers['cache-control']).toBe('no-store');
+        expect(response.headers['access-control-allow-origin']).toBe('*');
+        expect(
+          response.headers['access-control-allow-credentials'],
+        ).toBeUndefined();
+        expect(response.headers['referrer-policy']).toBe('no-referrer');
         expect(response.headers['content-security-policy']).toContain(
           'sandbox allow-scripts allow-pointer-lock',
         );
@@ -232,11 +397,11 @@ describe('Developer profile and game draft HTTP boundary', () => {
           "'self'",
         );
         expect(response.headers['content-security-policy']).toContain(
-          `/games/${game.id}/preview/`,
+          previewUrl.slice(0, -'index.html'.length),
         );
       });
-    await developer
-      .get(`/games/${game.id}/preview/assets/game.js`)
+    await request(app.getHttpServer())
+      .get(previewUrl.replace('index.html', 'assets/game.js'))
       .expect(200)
       .expect((response) => {
         expect(response.text).toBe('window.ready=true');
@@ -256,12 +421,32 @@ describe('Developer profile and game draft HTTP boundary', () => {
       reviewState: 'APPROVED',
       visibility: 'PUBLIC',
     });
-    await request(app.getHttpServer()).get('/play/demo-game/').expect(200);
+    const play = await request(app.getHttpServer())
+      .get('/play/demo-game/')
+      .expect(302);
+    const playUrl = new URL(play.headers.location, 'http://api/play/demo-game/')
+      .pathname;
+    await request(app.getHttpServer()).get(playUrl).expect(200);
     Object.assign(games.get(game.id)!, { accessMode: 'AUTH_REQUIRED' });
     await request(app.getHttpServer())
       .get('/play/demo-game/index.html')
       .expect(401);
-    await other.get('/play/demo-game/index.html').expect(200);
+    await request(app.getHttpServer()).get(playUrl).expect(404);
+    const authorized = await other
+      .get('/play/demo-game/index.html')
+      .expect(302);
+    const authorizedUrl = new URL(
+      authorized.headers.location,
+      'http://api/play/demo-game/index.html',
+    ).pathname;
+    await request(app.getHttpServer()).get(authorizedUrl).expect(200);
+    Object.assign(games.get(game.id)!, { moderationState: 'QUARANTINED' });
+    await request(app.getHttpServer()).get(authorizedUrl).expect(404);
+    const capabilityToken = previewUrl.split('/')[2]!;
+    await request(app.getHttpServer())
+      .get('/games/mine')
+      .set('Cookie', `indieforge_access=${capabilityToken}`)
+      .expect(401);
     await request(app.getHttpServer())
       .get('/play/demo-game/index.html')
       .set('Cookie', 'indieforge_access=invalid')
@@ -356,7 +541,7 @@ describe('Developer profile and game draft HTTP boundary', () => {
           visibility: 'DRAFT',
         });
       });
-    await developer.get(`/games/${id}/preview/index.html`).expect(200);
+    await developer.get(`/games/${id}/preview/index.html`).expect(302);
     await developer
       .put(`/games/${id}/project`)
       .send({ sourceType: 'STORY', scenes: [] })

@@ -71,6 +71,8 @@ function sendArtifact(
     .flatMap((origin) => [`${origin}${route}`, `${origin}/api${route}`])
     .join(' ');
   response.set({
+    'Access-Control-Allow-Origin': '*',
+    'Referrer-Policy': 'no-referrer',
     'Content-Type': file.contentType,
     'X-Content-Type-Options': 'nosniff',
     'Cache-Control': 'no-store',
@@ -89,7 +91,24 @@ function sendArtifact(
       "form-action 'none'",
     ].join('; '),
   });
+  response.removeHeader('Access-Control-Allow-Credentials');
   response.send(file.content);
+}
+
+function redirectCapability(response: Response, token: string, path: string) {
+  // Relative Location preserves an outer /api proxy prefix without trusting a
+  // forwarded-prefix header. The token remains in the path for relative assets.
+  const requestedPath = response.req.originalUrl.split('?')[0]!;
+  const levels = requestedPath.split('/').length - 2;
+  const encodedPath = path.split('/').map(encodeURIComponent).join('/');
+  response.set({
+    'Cache-Control': 'no-store',
+    'Referrer-Policy': 'no-referrer',
+  });
+  response.redirect(
+    302,
+    `${'../'.repeat(levels)}game-content/${token}/${encodedPath}`,
+  );
 }
 
 @Controller()
@@ -146,11 +165,8 @@ export class GameContentController {
     @Param('path') path: string[] | undefined,
     @Res() response: Response,
   ) {
-    sendArtifact(
-      response,
-      await this.content.preview(id, artifactPath(path), user),
-      `/games/${encodeURIComponent(id)}/preview/`,
-    );
+    const capability = await this.content.previewCapability(id, user);
+    redirectCapability(response, capability.token, artifactPath(path));
   }
 
   @Get('play/:slug/{*path}')
@@ -161,10 +177,20 @@ export class GameContentController {
     @Param('path') path: string[] | undefined,
     @Res() response: Response,
   ) {
+    const capability = await this.content.playCapability(slug, user);
+    redirectCapability(response, capability.token, artifactPath(path));
+  }
+
+  @Get('game-content/:token/{*path}')
+  async capability(
+    @Param('token') token: string,
+    @Param('path') path: string[] | undefined,
+    @Res() response: Response,
+  ) {
     sendArtifact(
       response,
-      await this.content.play(slug, artifactPath(path), user),
-      `/play/${encodeURIComponent(slug)}/`,
+      await this.content.capabilityFile(token, artifactPath(path)),
+      `/game-content/${encodeURIComponent(token)}/`,
     );
   }
 }
