@@ -26,6 +26,10 @@ The final command keeps the API and web development servers running. Open the we
 
 See [the development guide](docs/development.md) for the complete workflow and [the foundation API guide](docs/api/foundation.md) for endpoint examples.
 
+## Production deployment
+
+Use [the production operations runbook](docs/deployment.md) for the single-host Docker Compose stack, HTTPS or bare-IP HTTP preview setup, backups, restores, upgrades, and rollback.
+
 ## Scope of this slice
 
 Build upload, malware scanning, game runtime hosting, analytics, donations, and game publishing are planned, but are not delivered here. In particular, new games are always drafts: the public catalog endpoints only return already-public, clear games and this slice has no endpoint to publish a draft.

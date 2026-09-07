@@ -1,5 +1,7 @@
 # Development guide
 
+Production operators should follow [the deployment runbook](deployment.md). Local `docker-compose.yml` starts the development database; `compose.production.yml` runs the production database, migration job, API, web, and proxy with a separate environment file and persistent volumes.
+
 ## Prerequisites
 
 - Node.js 22 and pnpm 10 (`corepack enable` can provide the repository-pinned pnpm version).
@@ -48,7 +50,7 @@ Prisma Client generation is explicit because pnpm 10 can skip dependency build s
 
 ## Sessions and browser requests
 
-Registration and login set an `indieforge_access` cookie. It is HTTP-only, `SameSite=Lax`, scoped to `/`, and lasts 15 minutes. It is marked `Secure` when `NODE_ENV=production`. Protected endpoints accept this cookie only; bearer `Authorization` headers are not an alternative. The API permits credentialed browser requests only from `WEB_ORIGIN`, and the web app uses `credentials: "include"`.
+Registration and login set an `indieforge_access` cookie. It is HTTP-only, `SameSite=Lax`, scoped to `/`, and lasts 15 minutes. It is marked `Secure` by default when `NODE_ENV=production`; only the explicit `COOKIE_SECURE=false` HTTP preview setting disables that protection. See the deployment runbook before using this override. Protected endpoints accept this cookie only; bearer `Authorization` headers are not an alternative. The API permits credentialed browser requests only from `WEB_ORIGIN`, and the web app uses `credentials: "include"`.
 
 Every browser mutation, including registration, login, and logout, must send an `Origin` exactly matching `WEB_ORIGIN`. An untrusted or opaque (`null`) origin returns `403`; browser requests identified by fetch metadata also require an origin. Mutation bodies accept only `application/json` (`415` for HTML form content types). Bodyless logout remains supported. Non-browser JSON clients such as curl may omit `Origin`; these checks complement the API's authentication and ownership rules.
 
