@@ -74,6 +74,8 @@ export type ModerationGameSummary = Omit<GameSummary, 'projectData'> & {
   creator: ModerationCreator;
 };
 
+export type ModerationActionSummary = Omit<GameSummary, 'projectData'>;
+
 export abstract class GamesRepository {
   abstract create(input: {
     ownerId: string;
@@ -130,9 +132,9 @@ export function gameSummary(game: StoredGame): GameSummary {
   };
 }
 
-export function moderationGameSummary(
-  game: ModerationStoredGame,
-): ModerationGameSummary {
+export function moderationActionSummary(
+  game: Omit<StoredGame, 'ownerId' | 'projectData'>,
+): ModerationActionSummary {
   return {
     id: game.id,
     slug: game.slug,
@@ -149,6 +151,14 @@ export function moderationGameSummary(
     reviewNote: game.reviewNote,
     submittedAt: game.submittedAt?.toISOString() ?? null,
     reviewedAt: game.reviewedAt?.toISOString() ?? null,
+  };
+}
+
+export function moderationGameSummary(
+  game: ModerationStoredGame,
+): ModerationGameSummary {
+  return {
+    ...moderationActionSummary(game),
     creator: game.creator,
   };
 }

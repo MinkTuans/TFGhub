@@ -828,6 +828,9 @@ describe('Developer profile and game draft HTTP boundary', () => {
         'game.zip',
       )
       .expect(201);
+    games.get(game.id)!.projectData = {
+      unpublishedSource: 'APPROVE_RESPONSE_SOURCE_SENTINEL',
+    };
     await developer.post(`/games/${game.id}/submit`).expect(201);
     const moderator = await agent('moderator@example.com');
     users.get('user-2')!.role = 'MODERATOR';
@@ -842,6 +845,7 @@ describe('Developer profile and game draft HTTP boundary', () => {
           artifactVersion: 1,
         });
         expect(response.body.reviewedAt).not.toBeNull();
+        expect(response.body).not.toHaveProperty('projectData');
       });
     await moderator.post(`/moderation/games/${game.id}/approve`).expect(409);
   });
@@ -856,6 +860,9 @@ describe('Developer profile and game draft HTTP boundary', () => {
         'game.zip',
       )
       .expect(201);
+    games.get(game.id)!.projectData = {
+      unpublishedSource: 'REJECT_RESPONSE_SOURCE_SENTINEL',
+    };
     await developer.post(`/games/${game.id}/submit`).expect(201);
     const moderator = await agent('moderator@example.com');
     users.get('user-2')!.role = 'MODERATOR';
@@ -874,6 +881,7 @@ describe('Developer profile and game draft HTTP boundary', () => {
           visibility: 'DRAFT',
           reviewNote: 'Add instructions',
         });
+        expect(response.body).not.toHaveProperty('projectData');
       });
   });
 

@@ -63,11 +63,13 @@ describe('ModerationService', () => {
   it('publishes an artifact only when its review is still pending', async () => {
     const { service, games } = fixture();
 
-    await expect(service.approve('game-1')).resolves.toMatchObject({
+    const result = await service.approve('game-1');
+    expect(result).toMatchObject({
       reviewState: 'APPROVED',
       visibility: 'PUBLIC',
       artifactVersion: 1,
     });
+    expect(result).not.toHaveProperty('projectData');
     expect(games.approve).toHaveBeenCalledWith('game-1');
   });
 
@@ -81,9 +83,12 @@ describe('ModerationService', () => {
   it('rejects a pending game with a trimmed moderator note', async () => {
     const { service, games } = fixture();
 
-    await expect(
-      service.reject('game-1', '  Needs a title screen  '),
-    ).resolves.toMatchObject({ reviewState: 'REJECTED', visibility: 'DRAFT' });
+    const result = await service.reject('game-1', '  Needs a title screen  ');
+    expect(result).toMatchObject({
+      reviewState: 'REJECTED',
+      visibility: 'DRAFT',
+    });
+    expect(result).not.toHaveProperty('projectData');
     expect(games.reject).toHaveBeenCalledWith('game-1', 'Needs a title screen');
   });
 });
