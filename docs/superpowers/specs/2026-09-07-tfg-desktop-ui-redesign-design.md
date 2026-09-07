@@ -106,6 +106,8 @@ Cột phải tái sử dụng public discover data. Phiên bản đầu lấy c�
 
 Game có `coverVersion` nullable/khởi tạo bằng 0 và metadata content type cần thiết để phục vụ file. Byte ảnh nằm trong volume game storage bền vững, trong namespace riêng và không trộn với artifact version có thể chạy.
 
+Mỗi game cũng có `viewportWidth` và `viewportHeight`, là hai số nguyên dương từ 1 đến 4096, mặc định 16 và 9. Chủ game chọn/chỉnh tỷ lệ trong Studio; player dùng `viewportWidth / viewportHeight` để fit khung. Hai trường chỉ mô tả viewport hiển thị, không thay đổi byte artifact hoặc quyền chạy game.
+
 Chủ sở hữu tải lên một file JPEG, PNG hoặc WebP tại workspace. API giới hạn 5 MiB, kiểm tra MIME khai báo và magic bytes, từ chối file rỗng/sai định dạng, và ghi file theo quy trình atomic. Mỗi lần thay ảnh tăng version để URL/cache thay đổi. Thao tác không được sửa owner, artifact hoặc review state của game.
 
 Ảnh bìa public chỉ được phục vụ khi game đáp ứng cùng điều kiện visibility/moderation/review như trang public. Chủ sở hữu được xem bìa game của mình trong workspace. Response có content type cố định, `nosniff` và cache policy theo URL có version.
@@ -131,7 +133,7 @@ Các unit chính và trách nhiệm:
 - **Design tokens/global styles:** theme, typography, spacing và primitive state.
 - **Brand/AppShell/ThemeToggle:** nhận diện, navigation theo session và theme; không chứa logic game.
 - **GameCover/GameCard:** quyết định URL/fallback và trình bày summary; không truy vấn data.
-- **GamePlayer:** iframe, toolbar, fit, fullscreen và thông báo lỗi fullscreen; không quyết định quyền play.
+- **GamePlayer:** iframe, toolbar, fit theo `viewportWidth / viewportHeight`, fullscreen và thông báo lỗi fullscreen; không quyết định quyền play.
 - **AdSlot:** placeholder hoặc AdSense adapter theo config; không tạo config runtime.
 - **Cover service/storage:** validate, ghi/đọc và phân quyền ảnh; không can thiệp artifact executable.
 - **Page server components:** tải data qua API hiện có, ghép layout và cung cấp props cho component.
