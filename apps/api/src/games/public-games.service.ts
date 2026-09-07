@@ -12,6 +12,7 @@ export type PublicGame = {
 type PublicGameWhere = {
   visibility: 'PUBLIC';
   moderationState: 'CLEAR';
+  reviewState: 'APPROVED';
   OR?: [
     { title: { contains: string; mode: 'insensitive' } },
     { description: { contains: string; mode: 'insensitive' } },
@@ -86,6 +87,7 @@ export class PublicGamesService {
     const where: PublicGameWhere = {
       visibility: 'PUBLIC',
       moderationState: 'CLEAR',
+      reviewState: 'APPROVED',
       ...(search
         ? {
             OR: [
@@ -104,19 +106,28 @@ export class PublicGamesService {
       where,
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take: pageSize + 1,
-      ...(cursor ? { cursor: { id: decodeCursor(cursor) }, skip: 1 as const } : {}),
+      ...(cursor
+        ? { cursor: { id: decodeCursor(cursor) }, skip: 1 as const }
+        : {}),
     });
     const page = games.slice(0, pageSize);
     return {
       games: page.map(summary),
       nextCursor:
-        games.length > pageSize ? encodeCursor(page[page.length - 1]!.id) : null,
+        games.length > pageSize
+          ? encodeCursor(page[page.length - 1]!.id)
+          : null,
     };
   }
 
   async findBySlug(slug: string) {
     const game = await this.games.findBySlug({
-      where: { slug, visibility: 'PUBLIC', moderationState: 'CLEAR' },
+      where: {
+        slug,
+        visibility: 'PUBLIC',
+        moderationState: 'CLEAR',
+        reviewState: 'APPROVED',
+      },
     });
     return game ? summary(game) : null;
   }

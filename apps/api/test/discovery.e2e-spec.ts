@@ -13,6 +13,7 @@ import {
 type CatalogGame = PublicGame & {
   visibility: 'DRAFT' | 'PUBLIC' | 'UNLISTED';
   moderationState: 'CLEAR' | 'FLAGGED' | 'QUARANTINED';
+  reviewState: 'DRAFT' | 'PENDING' | 'APPROVED' | 'REJECTED';
   owner: PublicGame['owner'] & { email: string };
 };
 
@@ -32,6 +33,8 @@ describe('Public game discovery HTTP boundary', () => {
               (game) =>
                 game.visibility === query.where.visibility &&
                 game.moderationState === query.where.moderationState &&
+                (!query.where.reviewState ||
+                  game.reviewState === query.where.reviewState) &&
                 (!search ||
                   game.title.toLowerCase().includes(search) ||
                   game.description.toLowerCase().includes(search)),
@@ -47,13 +50,23 @@ describe('Public game discovery HTTP boundary', () => {
             : 0;
           return ordered.slice(start, start + query.take);
         },
-        async findBySlug({ where }: { where: { slug: string; visibility: 'PUBLIC'; moderationState: 'CLEAR' } }) {
+        async findBySlug({
+          where,
+        }: {
+          where: {
+            slug: string;
+            visibility: 'PUBLIC';
+            moderationState: 'CLEAR';
+            reviewState?: 'APPROVED';
+          };
+        }) {
           return (
             catalog.find(
               (game) =>
                 game.slug === where.slug &&
                 game.visibility === where.visibility &&
-                game.moderationState === where.moderationState,
+                game.moderationState === where.moderationState &&
+                (!where.reviewState || game.reviewState === where.reviewState),
             ) ?? null
           );
         },
@@ -78,6 +91,7 @@ describe('Public game discovery HTTP boundary', () => {
       description: 'A public game',
       visibility: 'PUBLIC',
       moderationState: 'CLEAR',
+      reviewState: 'APPROVED',
       createdAt: new Date('2026-09-05T12:00:00.000Z'),
       owner: {
         email: 'owner@example.com',
@@ -215,7 +229,19 @@ describe('Public game discovery HTTP boundary', () => {
   it('does not expose drafts by slug', async () => {
     addGame({ id: 'game-1', slug: 'draft-game', visibility: 'DRAFT' });
 
-    await request(app.getHttpServer()).get('/games/by-slug/draft-game').expect(404);
+    await request(app.getHttpServer())
+      .get('/games/by-slug/draft-game')
+      .expect(404);
+  });
+
+  it('excludes unapproved public rows from discovery and slug reads', async () => {
+    addGame({ id: 'game-1', slug: 'unapproved', reviewState: 'DRAFT' });
+    await request(app.getHttpServer())
+      .get('/discover')
+      .expect(200, { games: [], nextCursor: null });
+    await request(app.getHttpServer())
+      .get('/games/by-slug/unapproved')
+      .expect(404);
   });
 
   it('returns exactly the public response fields without the owner email', async () => {

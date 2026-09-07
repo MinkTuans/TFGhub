@@ -4,17 +4,25 @@ import {
   Inject,
   Injectable,
 } from '@nestjs/common';
-import type { GameSummary, UpdateGameInput } from '@indieforge/contracts';
+import type {
+  GameSummary,
+  GameSourceType,
+  GameReviewState,
+  GameProjectInput,
+  UpdateGameInput,
+} from '@indieforge/contracts';
 
 type CreateGameInput = {
   title: string;
   slug: string;
   description: string;
   accessMode: 'GUEST_ALLOWED' | 'AUTH_REQUIRED';
+  sourceType?: GameSourceType;
 };
 
-type StoredGame = {
+export type StoredGame = {
   id: string;
+  ownerId: string;
   slug: string;
   title: string;
   description: string;
@@ -23,6 +31,23 @@ type StoredGame = {
   moderationState: 'CLEAR' | 'FLAGGED' | 'QUARANTINED';
   createdAt: Date;
   updatedAt: Date;
+  sourceType: GameSourceType;
+  reviewState: GameReviewState;
+  projectData: GameSummary['projectData'];
+  artifactVersion: number;
+  reviewNote: string | null;
+  submittedAt: Date | null;
+  reviewedAt: Date | null;
+};
+
+export type WorkspaceUpdate = {
+  projectData?: GameProjectInput;
+  artifactVersion?: number;
+  visibility: 'DRAFT';
+  reviewState: 'DRAFT';
+  reviewNote: null;
+  submittedAt: null;
+  reviewedAt: null;
 };
 
 export abstract class GamesRepository {
@@ -34,15 +59,20 @@ export abstract class GamesRepository {
     accessMode: 'GUEST_ALLOWED' | 'AUTH_REQUIRED';
     visibility: 'DRAFT';
     moderationState: 'CLEAR';
+    sourceType?: GameSourceType;
   }): Promise<StoredGame>;
   abstract findManyByOwner(ownerId: string): Promise<StoredGame[]>;
-  abstract findUnique(
+  abstract findUnique(id: string): Promise<StoredGame | null>;
+  abstract findBySlug(slug: string): Promise<StoredGame | null>;
+  abstract updateWorkspace(
     id: string,
-  ): Promise<(Pick<StoredGame, 'id'> & { ownerId: string }) | null>;
+    expectedUpdatedAt: Date,
+    input: WorkspaceUpdate,
+  ): Promise<StoredGame | null>;
   abstract update(id: string, input: UpdateGameInput): Promise<StoredGame>;
 }
 
-function summary(game: StoredGame): GameSummary {
+export function gameSummary(game: StoredGame): GameSummary {
   return {
     id: game.id,
     slug: game.slug,
@@ -53,12 +83,21 @@ function summary(game: StoredGame): GameSummary {
     moderationState: game.moderationState,
     createdAt: game.createdAt.toISOString(),
     updatedAt: game.updatedAt.toISOString(),
+    sourceType: game.sourceType,
+    reviewState: game.reviewState,
+    projectData: game.projectData,
+    artifactVersion: game.artifactVersion,
+    reviewNote: game.reviewNote,
+    submittedAt: game.submittedAt?.toISOString() ?? null,
+    reviewedAt: game.reviewedAt?.toISOString() ?? null,
   };
 }
 
 @Injectable()
 export class GamesService {
-  constructor(@Inject(GamesRepository) private readonly games: GamesRepository) {}
+  constructor(
+    @Inject(GamesRepository) private readonly games: GamesRepository,
+  ) {}
 
   async create(userId: string, input: CreateGameInput): Promise<GameSummary> {
     try {
@@ -70,8 +109,9 @@ export class GamesService {
         accessMode: input.accessMode,
         visibility: 'DRAFT',
         moderationState: 'CLEAR',
+        ...(input.sourceType ? { sourceType: input.sourceType } : {}),
       });
-      return summary(game);
+      return gameSummary(game);
     } catch (error) {
       const failure = error as {
         code?: unknown;
@@ -89,7 +129,7 @@ export class GamesService {
   }
 
   async listOwned(userId: string): Promise<GameSummary[]> {
-    return (await this.games.findManyByOwner(userId)).map(summary);
+    return (await this.games.findManyByOwner(userId)).map(gameSummary);
   }
 
   async updateOwned(
@@ -101,6 +141,6 @@ export class GamesService {
     if (!game || game.ownerId !== userId) {
       throw new ForbiddenException('You do not own this game');
     }
-    return summary(await this.games.update(gameId, input));
+    return gameSummary(await this.games.update(gameId, input));
   }
 }

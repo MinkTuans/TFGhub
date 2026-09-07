@@ -1,4 +1,5 @@
 import type { INestApplication } from '@nestjs/common';
+import type { ExpressAdapter } from '@nestjs/platform-express';
 import cookieParser from 'cookie-parser';
 import type { NextFunction, Request, Response } from 'express';
 
@@ -30,7 +31,14 @@ export function configureApp(app: INestApplication): void {
       ?.split(';')[0]
       .trim()
       .toLowerCase();
-    if (contentType !== undefined && contentType !== 'application/json') {
+    const isUpload =
+      request.method === 'POST' &&
+      /^\/games\/[^/]+\/upload\/?$/.test(request.path);
+    if (
+      contentType !== undefined &&
+      contentType !== 'application/json' &&
+      !(isUpload && contentType === 'multipart/form-data')
+    ) {
       response
         .status(415)
         .json({ statusCode: 415, message: 'Expected application/json' });
@@ -38,4 +46,7 @@ export function configureApp(app: INestApplication): void {
     }
     next();
   });
+  // Bounded story/code schemas can exceed Express's default 100 KiB JSON limit.
+  const adapter = app.getHttpAdapter() as ExpressAdapter;
+  adapter.useBodyParser('json', false, { limit: '4mb' });
 }

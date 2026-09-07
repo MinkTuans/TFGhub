@@ -1,6 +1,13 @@
 import { Module } from '@nestjs/common';
 import { database } from '@indieforge/database';
 import { AuthModule } from '../auth/auth.module.js';
+import { GameArtifactsModule } from '../game-artifacts/game-artifacts.module.js';
+import { GameContentService } from './game-content.service.js';
+import {
+  GameContentController,
+  GameOwnerGuard,
+  OptionalGameAuthGuard,
+} from './game-content.controller.js';
 import { GamesController } from './games.controller.js';
 import { GamesRepository, GamesService } from './games.service.js';
 import { PublicGamesController } from './public-games.controller.js';
@@ -11,6 +18,7 @@ import {
 
 export const gameSummarySelect = {
   id: true,
+  ownerId: true,
   slug: true,
   title: true,
   description: true,
@@ -19,6 +27,13 @@ export const gameSummarySelect = {
   moderationState: true,
   createdAt: true,
   updatedAt: true,
+  sourceType: true,
+  reviewState: true,
+  projectData: true,
+  artifactVersion: true,
+  reviewNote: true,
+  submittedAt: true,
+  reviewedAt: true,
 } as const;
 
 const publicGameSelect = {
@@ -31,11 +46,14 @@ const publicGameSelect = {
 } as const;
 
 @Module({
-  imports: [AuthModule],
-  controllers: [GamesController, PublicGamesController],
+  imports: [AuthModule, GameArtifactsModule],
+  controllers: [GamesController, PublicGamesController, GameContentController],
   providers: [
     GamesService,
     PublicGamesService,
+    GameContentService,
+    GameOwnerGuard,
+    OptionalGameAuthGuard,
     {
       provide: GamesRepository,
       useFactory: (): GamesRepository => ({
@@ -50,7 +68,22 @@ const publicGameSelect = {
         findUnique: (id) =>
           database.game.findUnique({
             where: { id },
-            select: { id: true, ownerId: true },
+            select: gameSummarySelect,
+          }),
+        findBySlug: (slug) =>
+          database.game.findUnique({
+            where: { slug },
+            select: gameSummarySelect,
+          }),
+        updateWorkspace: (id, expectedUpdatedAt, input) =>
+          database.$transaction(async (tx) => {
+            const result = await tx.game.updateMany({
+              where: { id, updatedAt: expectedUpdatedAt },
+              data: input,
+            });
+            return result.count === 1
+              ? tx.game.findUnique({ where: { id }, select: gameSummarySelect })
+              : null;
           }),
         update: (id, input) =>
           database.game.update({
@@ -68,9 +101,7 @@ const publicGameSelect = {
             where: query.where,
             orderBy: query.orderBy,
             take: query.take,
-            ...(query.cursor
-              ? { cursor: query.cursor, skip: query.skip }
-              : {}),
+            ...(query.cursor ? { cursor: query.cursor, skip: query.skip } : {}),
             select: publicGameSelect,
           }),
         findBySlug: ({ where }) =>
@@ -83,6 +114,7 @@ const publicGameSelect = {
     GamesRepository,
     PublicGamesService,
     PublicGamesRepository,
+    GameContentService,
   ],
 })
 export class GamesModule {}

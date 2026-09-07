@@ -13,6 +13,13 @@ const storedGame = {
   moderationState: 'CLEAR' as const,
   createdAt: new Date('2026-09-05T12:00:00.000Z'),
   updatedAt: new Date('2026-09-05T12:00:00.000Z'),
+  sourceType: 'UPLOAD' as const,
+  reviewState: 'DRAFT' as const,
+  projectData: null,
+  artifactVersion: 0,
+  reviewNote: null,
+  submittedAt: null,
+  reviewedAt: null,
 };
 
 function fixture() {
@@ -21,6 +28,8 @@ function fixture() {
     findManyByOwner: vi.fn().mockResolvedValue([storedGame]),
     findUnique: vi.fn().mockResolvedValue(storedGame),
     update: vi.fn().mockResolvedValue(storedGame),
+    findBySlug: vi.fn().mockResolvedValue(storedGame),
+    updateWorkspace: vi.fn().mockResolvedValue(storedGame),
   };
   return { service: new GamesService(games), games };
 }
@@ -58,14 +67,20 @@ describe('GamesService', () => {
       moderationState: 'CLEAR',
       createdAt: '2026-09-05T12:00:00.000Z',
       updatedAt: '2026-09-05T12:00:00.000Z',
+      sourceType: 'UPLOAD',
+      reviewState: 'DRAFT',
+      projectData: null,
+      artifactVersion: 0,
+      reviewNote: null,
+      submittedAt: null,
+      reviewedAt: null,
     });
   });
 
   it('does not update another developer game', async () => {
     const { service, games } = fixture();
     vi.mocked(games.findUnique).mockResolvedValue({
-      id: 'game-1',
-      ownerId: 'owner-1',
+      ...storedGame,
     });
 
     await expect(

@@ -2,7 +2,9 @@ import { Module } from '@nestjs/common';
 import { ArtifactStorage } from './artifact-storage.js';
 
 @Module({
-  providers: [ArtifactStorage],
+  providers: [
+    { provide: ArtifactStorage, useFactory: () => new ArtifactStorage() },
+  ],
   exports: [ArtifactStorage],
 })
 export class GameArtifactsModule {}

@@ -27,7 +27,11 @@ describe('PublicGamesService', () => {
 
     expect(games.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { visibility: 'PUBLIC', moderationState: 'CLEAR' },
+        where: {
+          visibility: 'PUBLIC',
+          moderationState: 'CLEAR',
+          reviewState: 'APPROVED',
+        },
         take: 51,
       }),
     );
@@ -84,6 +88,7 @@ describe('PublicGamesService', () => {
       where: {
         visibility: 'PUBLIC',
         moderationState: 'CLEAR',
+        reviewState: 'APPROVED',
         OR: [
           { title: { contains: 'space', mode: 'insensitive' } },
           { description: { contains: 'space', mode: 'insensitive' } },
@@ -98,7 +103,11 @@ describe('PublicGamesService', () => {
     vi.mocked(games.findMany).mockResolvedValueOnce([]);
     await service.discover({ cursor: result.nextCursor! });
     expect(games.findMany).toHaveBeenLastCalledWith({
-      where: { visibility: 'PUBLIC', moderationState: 'CLEAR' },
+      where: {
+        visibility: 'PUBLIC',
+        moderationState: 'CLEAR',
+        reviewState: 'APPROVED',
+      },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       cursor: { id: 'game-2' },
       skip: 1,
@@ -120,6 +129,7 @@ describe('PublicGamesService', () => {
         slug: 'draft-game',
         visibility: 'PUBLIC',
         moderationState: 'CLEAR',
+        reviewState: 'APPROVED',
       },
     });
   });
