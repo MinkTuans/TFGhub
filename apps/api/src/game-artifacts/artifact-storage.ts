@@ -1,13 +1,14 @@
 import { randomUUID } from 'node:crypto';
 import {
   mkdir,
+  lstat,
   readFile,
   rename,
   rm,
   writeFile,
 } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve, sep } from 'node:path';
+import { dirname, join, relative, resolve, sep } from 'node:path';
 import { Injectable } from '@nestjs/common';
 import type { ArtifactFile, StoredArtifactFile } from './artifact-types.js';
 
@@ -32,6 +33,20 @@ function within(root: string, candidate: string): string {
   }
 
   return resolvedCandidate;
+}
+
+async function rejectSymbolicLinks(root: string, candidate: string): Promise<void> {
+  const resolvedRoot = resolve(root);
+  const resolvedCandidate = within(resolvedRoot, candidate);
+  const components = relative(resolvedRoot, resolvedCandidate).split(sep);
+  let current = resolvedRoot;
+
+  for (const component of components) {
+    current = join(current, component);
+    if ((await lstat(current)).isSymbolicLink()) {
+      throw new Error('Artifact path must not contain symbolic links');
+    }
+  }
 }
 
 @Injectable()
@@ -93,14 +108,20 @@ export class ArtifactStorage {
 
     const artifactDirectory = within(this.root, resolve(this.root, gameId, String(version)));
     const filePath = within(artifactDirectory, resolve(artifactDirectory, path));
+    const manifestPath = join(artifactDirectory, manifestName);
+
+    await rejectSymbolicLinks(this.root, artifactDirectory);
+    await rejectSymbolicLinks(artifactDirectory, manifestPath);
     const manifest = JSON.parse(
-      await readFile(join(artifactDirectory, manifestName), 'utf8'),
+      await readFile(manifestPath, 'utf8'),
     ) as ArtifactManifest;
     const metadata = manifest.files.find((file) => file.path === path);
 
     if (metadata === undefined) {
       throw new Error('Artifact file was not installed');
     }
+
+    await rejectSymbolicLinks(artifactDirectory, filePath);
 
     return {
       path,

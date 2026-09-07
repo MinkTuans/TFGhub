@@ -1,4 +1,11 @@
-import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import {
+  mkdtemp,
+  readFile,
+  readdir,
+  rm,
+  symlink,
+  writeFile,
+} from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -67,5 +74,26 @@ describe('ArtifactStorage', () => {
     await expect(storage.read('game-1', 1, '../secret.txt')).rejects.toThrow(
       'Artifact path must stay within its artifact directory',
     );
+  });
+
+  it('rejects an installed artifact file replaced with an external symlink', async () => {
+    const outsideRoot = await mkdtemp(join(tmpdir(), 'indieforge-outside-'));
+    const externalFile = join(outsideRoot, 'secret.txt');
+    const artifactFile = join(storageRoot, 'game-1', '1', 'index.html');
+
+    try {
+      await storage.install('game-1', 1, [
+        { path: 'index.html', content: 'safe', contentType: 'text/html' },
+      ]);
+      await writeFile(externalFile, 'private');
+      await rm(artifactFile);
+      await symlink(externalFile, artifactFile);
+
+      await expect(storage.read('game-1', 1, 'index.html')).rejects.toThrow(
+        'Artifact path must not contain symbolic links',
+      );
+    } finally {
+      await rm(outsideRoot, { recursive: true, force: true });
+    }
   });
 });
