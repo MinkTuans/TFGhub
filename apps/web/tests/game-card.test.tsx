@@ -12,6 +12,10 @@ test("links to public game metadata and credits its developer", () => {
         developer: { displayName: "Minh" },
         artifactVersion: 1,
         artifactReady: true,
+        coverVersion: 0,
+        coverContentType: null,
+        viewportWidth: 16,
+        viewportHeight: 9,
       }}
     />,
   );

@@ -9,7 +9,7 @@ ALTER TABLE "Game"
   CHECK (
     ("coverVersion" = 0 AND "coverContentType" IS NULL)
     OR
-    ("coverVersion" > 0 AND "coverContentType" IN ('image/jpeg', 'image/png', 'image/webp'))
+    ("coverVersion" > 0 AND "coverContentType" IS NOT NULL AND "coverContentType" IN ('image/jpeg', 'image/png', 'image/webp'))
   );
 
 ALTER TABLE "Game"

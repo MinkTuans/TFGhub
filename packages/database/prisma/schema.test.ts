@@ -7,6 +7,9 @@ import { describe, expect, it } from 'vitest';
 const require = createRequire(import.meta.url);
 const prismaCliPath = require.resolve('prisma/build/index.js');
 const schemaPath = fileURLToPath(new URL('./schema.prisma', import.meta.url));
+const coverMigrationPath = fileURLToPath(
+  new URL('./migrations/20260907190000_game_covers/migration.sql', import.meta.url),
+);
 
 describe('database schema', () => {
   it('is accepted by the Prisma schema validator', () => {
@@ -30,5 +33,13 @@ describe('database schema', () => {
     expect(schema).toContain('coverContentType String?');
     expect(schema).toContain('viewportWidth    Int             @default(16)');
     expect(schema).toContain('viewportHeight   Int             @default(9)');
+  });
+
+  it('rejects a positive cover version without a content type', () => {
+    const migration = readFileSync(coverMigrationPath, 'utf8');
+
+    expect(migration).toContain(
+      '("coverVersion" > 0 AND "coverContentType" IS NOT NULL AND "coverContentType" IN (\'image/jpeg\', \'image/png\', \'image/webp\'))',
+    );
   });
 });
