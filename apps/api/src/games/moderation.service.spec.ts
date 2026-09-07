@@ -20,6 +20,10 @@ const pendingGame = {
   projectData: { unpublishedSource: 'MODERATION_SOURCE_SENTINEL' },
   artifactVersion: 1,
   artifactReady: true,
+  coverVersion: 0,
+  coverContentType: null,
+  viewportWidth: 16,
+  viewportHeight: 9,
   reviewNote: null,
   submittedAt: new Date('2026-09-05T12:01:00.000Z'),
   reviewedAt: null,
@@ -58,6 +62,10 @@ describe('ModerationService', () => {
         reviewState: 'PENDING',
         artifactVersion: 1,
         artifactReady: true,
+        coverVersion: 0,
+        coverContentType: null,
+        viewportWidth: 16,
+        viewportHeight: 9,
       },
     ]);
     expect(result[0]).not.toHaveProperty('projectData');
@@ -78,6 +86,10 @@ describe('ModerationService', () => {
       visibility: 'PUBLIC',
       artifactVersion: 1,
       artifactReady: true,
+      coverVersion: 0,
+      coverContentType: null,
+      viewportWidth: 16,
+      viewportHeight: 9,
     });
     expect(result).not.toHaveProperty('projectData');
     expect(games.approve).toHaveBeenCalledWith('game-1', {

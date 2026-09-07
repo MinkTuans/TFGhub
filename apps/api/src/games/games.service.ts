@@ -18,6 +18,8 @@ type CreateGameInput = {
   description: string;
   accessMode: 'GUEST_ALLOWED' | 'AUTH_REQUIRED';
   sourceType?: GameSourceType;
+  viewportWidth: number;
+  viewportHeight: number;
 };
 
 export type StoredGame = {
@@ -36,6 +38,10 @@ export type StoredGame = {
   projectData: GameSummary['projectData'];
   artifactVersion: number;
   artifactReady: boolean;
+  coverVersion: number;
+  coverContentType: string | null;
+  viewportWidth: number;
+  viewportHeight: number;
   reviewNote: string | null;
   submittedAt: Date | null;
   reviewedAt: Date | null;
@@ -89,6 +95,8 @@ export abstract class GamesRepository {
     visibility: 'DRAFT';
     moderationState: 'CLEAR';
     sourceType?: GameSourceType;
+    viewportWidth: number;
+    viewportHeight: number;
   }): Promise<StoredGame>;
   abstract findManyByOwner(ownerId: string): Promise<StoredGame[]>;
   abstract findPending(): Promise<ModerationStoredGame[]>;
@@ -130,6 +138,10 @@ export function gameSummary(game: StoredGame): GameSummary {
     projectData: game.projectData,
     artifactVersion: game.artifactVersion,
     artifactReady: game.artifactReady,
+    coverVersion: game.coverVersion,
+    coverContentType: game.coverContentType as GameSummary['coverContentType'],
+    viewportWidth: game.viewportWidth,
+    viewportHeight: game.viewportHeight,
     reviewNote: game.reviewNote,
     submittedAt: game.submittedAt?.toISOString() ?? null,
     reviewedAt: game.reviewedAt?.toISOString() ?? null,
@@ -153,6 +165,10 @@ export function moderationActionSummary(
     reviewState: game.reviewState,
     artifactVersion: game.artifactVersion,
     artifactReady: game.artifactReady,
+    coverVersion: game.coverVersion,
+    coverContentType: game.coverContentType as GameSummary['coverContentType'],
+    viewportWidth: game.viewportWidth,
+    viewportHeight: game.viewportHeight,
     reviewNote: game.reviewNote,
     submittedAt: game.submittedAt?.toISOString() ?? null,
     reviewedAt: game.reviewedAt?.toISOString() ?? null,
@@ -184,6 +200,8 @@ export class GamesService {
         accessMode: input.accessMode,
         visibility: 'DRAFT',
         moderationState: 'CLEAR',
+        viewportWidth: input.viewportWidth,
+        viewportHeight: input.viewportHeight,
         ...(input.sourceType ? { sourceType: input.sourceType } : {}),
       });
       return gameSummary(game);

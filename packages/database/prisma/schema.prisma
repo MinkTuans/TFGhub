@@ -76,6 +76,10 @@ model Game {
   projectData     Json?
   artifactVersion Int             @default(0)
   artifactReady   Boolean         @default(false)
+  coverVersion     Int             @default(0)
+  coverContentType String?
+  viewportWidth    Int             @default(16)
+  viewportHeight   Int             @default(9)
   reviewNote      String?
   submittedAt     DateTime?
   reviewedAt      DateTime?

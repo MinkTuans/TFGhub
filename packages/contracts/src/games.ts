@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 export const GameSourceType = z.enum(['UPLOAD', 'CODE', 'STORY', 'PLATFORMER']);
 export const GameReviewState = z.enum(['DRAFT', 'PENDING', 'APPROVED', 'REJECTED']);
+const CoverContentType = z.enum(['image/jpeg', 'image/png', 'image/webp']);
 
 export const CreateGameInput = z.object({
   title: z.string().trim().min(1).max(80),
@@ -9,12 +10,16 @@ export const CreateGameInput = z.object({
   description: z.string().trim().max(2000).default(''),
   accessMode: z.enum(['GUEST_ALLOWED', 'AUTH_REQUIRED']).default('GUEST_ALLOWED'),
   sourceType: GameSourceType.default('UPLOAD'),
+  viewportWidth: z.coerce.number().int().min(1).max(4096).default(16),
+  viewportHeight: z.coerce.number().int().min(1).max(4096).default(9),
 });
 
 export const UpdateGameInput = CreateGameInput.pick({
   title: true,
   description: true,
   accessMode: true,
+  viewportWidth: true,
+  viewportHeight: true,
 }).partial().refine((value) => Object.keys(value).length > 0, 'At least one field is required');
 
 export const CodeProjectInput = z.object({
@@ -165,6 +170,10 @@ export const GameSummary = z.object({
   projectData: z.unknown().refine((value) => value !== undefined).nullable(),
   artifactVersion: z.number().int().nonnegative(),
   artifactReady: z.boolean(),
+  coverVersion: z.number().int().nonnegative(),
+  coverContentType: CoverContentType.nullable(),
+  viewportWidth: z.number().int().min(1).max(4096),
+  viewportHeight: z.number().int().min(1).max(4096),
   reviewNote: z.string().max(500).nullable(),
   submittedAt: z.string().datetime().nullable(),
   reviewedAt: z.string().datetime().nullable(),
@@ -186,6 +195,10 @@ export const PublicGameSummary = z.object({
   createdAt: z.string().datetime(),
   artifactVersion: z.number().int().nonnegative(),
   artifactReady: z.boolean(),
+  coverVersion: z.number().int().nonnegative(),
+  coverContentType: CoverContentType.nullable(),
+  viewportWidth: z.number().int().min(1).max(4096),
+  viewportHeight: z.number().int().min(1).max(4096),
 });
 
 export const DiscoverGamesResponse = z.object({

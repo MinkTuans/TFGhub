@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { describe, expect, it } from 'vitest';
@@ -20,5 +21,14 @@ describe('database schema', () => {
         stdio: 'pipe',
       });
     }).not.toThrow();
+  });
+
+  it('declares versioned cover metadata and bounded viewport defaults', () => {
+    const schema = readFileSync(schemaPath, 'utf8');
+
+    expect(schema).toContain('coverVersion     Int             @default(0)');
+    expect(schema).toContain('coverContentType String?');
+    expect(schema).toContain('viewportWidth    Int             @default(16)');
+    expect(schema).toContain('viewportHeight   Int             @default(9)');
   });
 });

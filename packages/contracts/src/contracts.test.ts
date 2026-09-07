@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import * as contracts from './index';
 
-const { CreateGameInput, GameSummary, RegisterInput } = contracts;
+const {
+  CreateGameInput,
+  GameSummary,
+  PublicGameSummary,
+  RegisterInput,
+  UpdateGameInput,
+} = contracts;
 
 function gameProjectInput() {
   const schema = (contracts as Record<string, unknown>).GameProjectInput;
@@ -131,10 +137,87 @@ describe('contracts', () => {
         projectData: { sourceType: 'CODE', html: '', css: '', javascript: '' },
         artifactVersion: 2,
         artifactReady: true,
+        coverVersion: 0,
+        coverContentType: null,
+        viewportWidth: 16,
+        viewportHeight: 9,
         reviewNote: null,
         submittedAt: '2026-09-07T01:00:00.000Z',
         reviewedAt: null,
       }).success,
     ).toBe(true);
+  });
+
+  it('retains versioned cover metadata and viewport dimensions in game summaries', () => {
+    const game = {
+      id: 'game-1',
+      slug: 'demo',
+      title: 'Demo',
+      description: '',
+      visibility: 'DRAFT',
+      accessMode: 'GUEST_ALLOWED',
+      moderationState: 'CLEAR',
+      sourceType: 'UPLOAD',
+      reviewState: 'DRAFT',
+      projectData: null,
+      artifactVersion: 0,
+      artifactReady: false,
+      reviewNote: null,
+      submittedAt: null,
+      reviewedAt: null,
+      createdAt: '2026-09-07T00:00:00.000Z',
+      updatedAt: '2026-09-07T00:00:00.000Z',
+    };
+
+    expect(GameSummary.parse({
+      ...game,
+      coverVersion: 0,
+      coverContentType: null,
+      viewportWidth: 16,
+      viewportHeight: 9,
+    })).toMatchObject({
+      coverVersion: 0,
+      coverContentType: null,
+      viewportWidth: 16,
+      viewportHeight: 9,
+    });
+  });
+
+  it('retains cover metadata and viewport dimensions in public game summaries', () => {
+    const publicGame = {
+      slug: 'demo',
+      title: 'Demo',
+      description: '',
+      developer: { displayName: 'Developer' },
+      createdAt: '2026-09-07T00:00:00.000Z',
+      artifactVersion: 2,
+      artifactReady: true,
+    };
+
+    expect(PublicGameSummary.parse({
+      ...publicGame,
+      coverVersion: 2,
+      coverContentType: 'image/webp',
+      viewportWidth: 16,
+      viewportHeight: 9,
+    })).toMatchObject({
+      coverVersion: 2,
+      coverContentType: 'image/webp',
+      viewportWidth: 16,
+      viewportHeight: 9,
+    });
+  });
+
+  it('defaults and updates bounded viewport dimensions from form values', () => {
+    expect(CreateGameInput.parse({ title: 'Demo', slug: 'demo' })).toMatchObject({
+      viewportWidth: 16,
+      viewportHeight: 9,
+    });
+    expect(UpdateGameInput.parse({ viewportWidth: '320' })).toMatchObject({
+      viewportWidth: 320,
+    });
+    expect(UpdateGameInput.parse({ viewportHeight: '240' })).toMatchObject({
+      viewportHeight: 240,
+    });
   });
 });

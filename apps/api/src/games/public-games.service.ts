@@ -1,4 +1,5 @@
 import { BadRequestException, Inject, Injectable } from '@nestjs/common';
+import type { PublicGameSummary } from '@indieforge/contracts';
 
 export type PublicGame = {
   id: string;
@@ -8,6 +9,10 @@ export type PublicGame = {
   createdAt: Date;
   artifactVersion: number;
   artifactReady: boolean;
+  coverVersion: number;
+  coverContentType: string | null;
+  viewportWidth: number;
+  viewportHeight: number;
   owner: { profile: { displayName: string } | null };
 };
 
@@ -71,6 +76,10 @@ function summary(game: PublicGame) {
     createdAt: game.createdAt.toISOString(),
     artifactVersion: game.artifactVersion,
     artifactReady: game.artifactReady,
+    coverVersion: game.coverVersion,
+    coverContentType: game.coverContentType as PublicGameSummary['coverContentType'],
+    viewportWidth: game.viewportWidth,
+    viewportHeight: game.viewportHeight,
   };
 }
 
