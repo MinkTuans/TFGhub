@@ -1,0 +1,11 @@
+{$DEPLOY_ADDRESS} {
+  encode zstd gzip
+
+  handle_path /api/* {
+    reverse_proxy api:3001
+  }
+
+  handle {
+    reverse_proxy web:3000
+  }
+}

@@ -7,6 +7,7 @@
     "dev": "pnpm db:generate && turbo dev",
     "test": "pnpm db:generate && turbo test",
     "test:containers": "node scripts/test-container-contract.mjs",
+    "test:deploy-config": "node scripts/test-deployment-config.mjs",
     "lint": "turbo lint",
     "typecheck": "pnpm db:generate && turbo typecheck"
   },

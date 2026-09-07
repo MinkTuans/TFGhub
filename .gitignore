@@ -7,5 +7,8 @@ coverage/
 .turbo/
 .env
 .env.local
+.env.production
+.env.production.local
+backups/
 *.tsbuildinfo
 packages/database/generated/
