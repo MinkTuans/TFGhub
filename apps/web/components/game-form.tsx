@@ -4,6 +4,7 @@ import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { CreateGameInput, type GameSummary } from "@indieforge/contracts";
 import { api, ApiError } from "../lib/api-client";
+import { apiErrorMessage } from "../lib/api-error-message";
 
 export function GameForm() {
   const router = useRouter();
@@ -32,9 +33,7 @@ export function GameForm() {
         return;
       }
       setError(
-        error instanceof ApiError
-          ? error.message
-          : "Không thể kết nối. Vui lòng thử lại.",
+        apiErrorMessage(error, "Không thể tạo bản nháp. Vui lòng thử lại."),
       );
     } finally {
       setPending(false);

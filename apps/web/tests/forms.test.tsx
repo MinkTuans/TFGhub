@@ -156,7 +156,7 @@ test("registration reports the API conflict and permits another attempt", async 
     screen.getByRole("button", { name: "Tạo tài khoản" }).closest("form")!,
   );
   expect(await screen.findByRole("alert")).toHaveTextContent(
-    "Email already registered",
+    "Email này đã được đăng ký.",
   );
   expect(screen.getByRole("button", { name: "Tạo tài khoản" })).toBeEnabled();
 });
@@ -181,7 +181,7 @@ test("draft creation keeps input visible after a duplicate slug rejection", asyn
     screen.getByRole("button", { name: "Tạo bản nháp" }).closest("form")!,
   );
   expect(await screen.findByRole("alert")).toHaveTextContent(
-    "Game slug already exists",
+    "Đường dẫn game đã tồn tại. Hãy chọn đường dẫn khác.",
   );
   expect(screen.getByLabelText("Tên game")).toHaveValue("My game");
   expect(screen.getByRole("button", { name: "Tạo bản nháp" })).toBeEnabled();
@@ -211,6 +211,75 @@ test("draft creation submits the selected source type", async () => {
   expect(JSON.parse(fetch.mock.calls[0][1].body)).toMatchObject({
     sourceType: "UPLOAD",
   });
+});
+
+test.each([
+  ["Invalid email or password", "Email hoặc mật khẩu không đúng."],
+  ["Unexpected backend detail", "Không thể đăng nhập. Vui lòng thử lại."],
+])("login translates API error %s", async (message, expected) => {
+  vi.stubGlobal(
+    "fetch",
+    vi
+      .fn()
+      .mockResolvedValue(
+        new Response(JSON.stringify({ message }), { status: 401 }),
+      ),
+  );
+  render(<AuthForm mode="login" />);
+  fireEvent.change(screen.getByLabelText("Email"), {
+    target: { value: "me@example.com" },
+  });
+  fireEvent.change(screen.getByLabelText("Mật khẩu"), {
+    target: { value: "password123" },
+  });
+  fireEvent.submit(
+    screen.getByRole("button", { name: "Đăng nhập" }).closest("form")!,
+  );
+  expect(await screen.findByRole("alert")).toHaveTextContent(expected);
+  expect(screen.getByRole("button", { name: "Đăng nhập" })).toBeEnabled();
+});
+
+test("build translates unavailable storage without losing the saved source", async () => {
+  vi.stubGlobal(
+    "fetch",
+    vi
+      .fn()
+      .mockResolvedValue(
+        new Response(
+          JSON.stringify({ message: "Artifact storage is unavailable" }),
+          { status: 503 },
+        ),
+      ),
+  );
+  render(<GameWorkspace initialGame={codeGame()} />);
+  fireEvent.click(screen.getByRole("button", { name: "Tạo bản chơi thử" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "Dịch vụ lưu bản chơi thử tạm thời không khả dụng. Vui lòng thử lại sau.",
+  );
+  expect(screen.getByLabelText("HTML")).toHaveValue("<h1>Saved quest</h1>");
+});
+
+test("moderation translates a stale review revision and retains the review card", async () => {
+  vi.stubGlobal(
+    "fetch",
+    vi
+      .fn()
+      .mockResolvedValue(
+        new Response(
+          JSON.stringify({ message: "Game is not pending review" }),
+          { status: 409 },
+        ),
+      ),
+  );
+  render(
+    <ModerationQueue initialGames={[moderationGame("game-1", "Review me")]} />,
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Duyệt" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "Game không còn chờ duyệt. Hãy tải lại danh sách.",
+  );
+  expect(screen.getByRole("article", { name: "Review me" })).toBeVisible();
+  expect(screen.getByRole("button", { name: "Duyệt" })).toBeEnabled();
 });
 
 test("logout reports a network failure and permits another attempt", async () => {
@@ -405,7 +474,7 @@ test("platformer editor retains values after a failed save", async () => {
   fireEvent.click(screen.getByRole("button", { name: "Lưu game đi cảnh" }));
 
   expect(await screen.findByRole("alert")).toHaveTextContent(
-    "Platformer could not be saved",
+    "Không thể lưu hoặc tạo bản chơi thử. Vui lòng thử lại.",
   );
   expect(screen.getByLabelText("Vị trí X nhân vật")).toHaveValue(42);
 });
@@ -461,7 +530,7 @@ test("story editor retains input after a failed save", async () => {
   fireEvent.click(screen.getByRole("button", { name: "Lưu cốt truyện" }));
 
   expect(await screen.findByRole("alert")).toHaveTextContent(
-    "Story could not be saved",
+    "Không thể lưu hoặc tạo bản chơi thử. Vui lòng thử lại.",
   );
   expect(within(opening).getByLabelText("Lời thoại")).toHaveValue(
     "The story survives the error.",
@@ -569,7 +638,7 @@ test("code editor preserves edits after a failed source save", async () => {
   fireEvent.click(screen.getByRole("button", { name: "Lưu mã nguồn" }));
 
   expect(await screen.findByRole("alert")).toHaveTextContent(
-    "Source could not be saved",
+    "Không thể lưu hoặc tạo bản chơi thử. Vui lòng thử lại.",
   );
   expect(screen.getByLabelText("HTML")).toHaveValue("<h1>Edited quest</h1>");
 });
@@ -679,19 +748,17 @@ test("creation sends explicit viewport dimensions and defaults to 16 by 9", asyn
 });
 
 test("workspace cover upload replaces owner preview and review state from the response", async () => {
-  const fetch = vi
-    .fn()
-    .mockResolvedValue(
-      new Response(
-        JSON.stringify(
-          codeGame({
-            coverVersion: 1,
-            coverContentType: "image/png",
-            reviewState: "PENDING",
-          }),
-        ),
+  const fetch = vi.fn().mockResolvedValue(
+    new Response(
+      JSON.stringify(
+        codeGame({
+          coverVersion: 1,
+          coverContentType: "image/png",
+          reviewState: "PENDING",
+        }),
       ),
-    );
+    ),
+  );
   vi.stubGlobal("fetch", fetch);
   render(<GameWorkspace initialGame={codeGame()} />);
   const panel = screen.getByRole("region", { name: "Ảnh bìa và thông tin" });
@@ -717,16 +784,28 @@ test("workspace cover upload replaces owner preview and review state from the re
   expect(screen.getByRole("button", { name: "Gửi duyệt" })).toBeDisabled();
 });
 
-test.each(["network", "http"])(
+test.each([
+  [0, "Không thể tải ảnh bìa. Vui lòng thử lại."],
+  [400, "Ảnh bìa không hợp lệ. Chọn một ảnh JPG, PNG hoặc WebP."],
+  [403, "Bạn không có quyền thay đổi ảnh bìa game này."],
+  [413, "Ảnh bìa quá lớn. Chọn ảnh không quá 5 MiB."],
+  [503, "Dịch vụ lưu ảnh bìa tạm thời không khả dụng. Vui lòng thử lại sau."],
+  [500, "Không thể tải ảnh bìa. Vui lòng thử lại."],
+] as const)(
   "cover upload %s failure retains existing preview and enables retry",
-  async (failure) => {
+  async (failure, expected) => {
     vi.stubGlobal(
       "fetch",
-      failure === "network"
+      failure === 0
         ? vi.fn().mockRejectedValue(new TypeError("offline"))
         : vi
             .fn()
-            .mockResolvedValue(new Response("Upload failed", { status: 503 })),
+            .mockResolvedValue(
+              new Response(
+                JSON.stringify({ message: "Email already registered" }),
+                { status: failure },
+              ),
+            ),
     );
     render(
       <GameWorkspace
@@ -744,9 +823,7 @@ test.each(["network", "http"])(
     fireEvent.submit(
       screen.getByRole("button", { name: "Tải ảnh bìa lên" }).closest("form")!,
     );
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "Không thể tải ảnh bìa. Vui lòng thử lại.",
-    );
+    expect(await screen.findByRole("alert")).toHaveTextContent(expected);
     expect(
       screen.getByRole("button", { name: "Tải ảnh bìa lên" }),
     ).toBeEnabled();
@@ -757,19 +834,17 @@ test.each(["network", "http"])(
 );
 
 test("display settings patch dimensions and update the shared game state", async () => {
-  const fetch = vi
-    .fn()
-    .mockResolvedValue(
-      new Response(
-        JSON.stringify(
-          codeGame({
-            viewportWidth: 4,
-            viewportHeight: 3,
-            reviewState: "PENDING",
-          }),
-        ),
+  const fetch = vi.fn().mockResolvedValue(
+    new Response(
+      JSON.stringify(
+        codeGame({
+          viewportWidth: 4,
+          viewportHeight: 3,
+          reviewState: "PENDING",
+        }),
       ),
-    );
+    ),
+  );
   vi.stubGlobal("fetch", fetch);
   render(<GameWorkspace initialGame={codeGame()} />);
   const panel = screen.getByRole("region", { name: "Cài đặt hiển thị" });
@@ -798,13 +873,11 @@ test("display settings patch dimensions and update the shared game state", async
 });
 
 test("display settings reject invalid dimensions and retain values after an API error", async () => {
-  const fetch = vi
-    .fn()
-    .mockResolvedValue(
-      new Response(JSON.stringify({ message: "Không thể lưu" }), {
-        status: 503,
-      }),
-    );
+  const fetch = vi.fn().mockResolvedValue(
+    new Response(JSON.stringify({ message: "Không thể lưu" }), {
+      status: 503,
+    }),
+  );
   vi.stubGlobal("fetch", fetch);
   render(<GameWorkspace initialGame={codeGame()} />);
   const width = screen.getByLabelText("Chiều rộng hiển thị");
@@ -819,7 +892,9 @@ test("display settings reject invalid dimensions and retain values after an API 
   );
   fireEvent.change(width, { target: { value: "4" } });
   fireEvent.submit(form);
-  expect(await screen.findByRole("alert")).toHaveTextContent("Không thể lưu");
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "Không thể lưu hiển thị. Vui lòng thử lại.",
+  );
   expect(width).toHaveValue(4);
   expect(screen.getByRole("button", { name: "Lưu hiển thị" })).toBeEnabled();
 });

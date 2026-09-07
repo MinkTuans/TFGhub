@@ -4,6 +4,7 @@ import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { DeveloperProfileInput } from "@indieforge/contracts";
 import { api, ApiError } from "../lib/api-client";
+import { apiErrorMessage } from "../lib/api-error-message";
 
 export type Profile = { displayName: string; bio: string };
 
@@ -19,9 +20,7 @@ export function ProfileForm({ profile }: { profile: Profile | null }) {
     );
     setSaved(false);
     if (!input.success) {
-      setError(
-        "Tên hiển thị cần có 2–50 ký tự; giới thiệu tối đa 500 ký tự.",
-      );
+      setError("Tên hiển thị cần có 2–50 ký tự; giới thiệu tối đa 500 ký tự.");
       return;
     }
     setError("");
@@ -36,9 +35,7 @@ export function ProfileForm({ profile }: { profile: Profile | null }) {
         return;
       }
       setError(
-        error instanceof ApiError
-          ? error.message
-          : "Không thể kết nối. Vui lòng thử lại.",
+        apiErrorMessage(error, "Không thể lưu hồ sơ. Vui lòng thử lại."),
       );
     } finally {
       setPending(false);

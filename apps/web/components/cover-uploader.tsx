@@ -4,6 +4,21 @@ import { useState, type FormEvent } from "react";
 import type { GameSummary } from "@indieforge/contracts";
 import { GameCover } from "./game-cover";
 
+function uploadErrorMessage(status: number): string {
+  switch (status) {
+    case 400:
+      return "Ảnh bìa không hợp lệ. Chọn một ảnh JPG, PNG hoặc WebP.";
+    case 403:
+      return "Bạn không có quyền thay đổi ảnh bìa game này.";
+    case 413:
+      return "Ảnh bìa quá lớn. Chọn ảnh không quá 5 MiB.";
+    case 503:
+      return "Dịch vụ lưu ảnh bìa tạm thời không khả dụng. Vui lòng thử lại sau.";
+    default:
+      return "Không thể tải ảnh bìa. Vui lòng thử lại.";
+  }
+}
+
 export function CoverUploader({
   game,
   onUploaded,
@@ -35,7 +50,7 @@ export function CoverUploader({
         },
       );
       if (!response.ok) {
-        setError("Không thể tải ảnh bìa. Vui lòng thử lại.");
+        setError(uploadErrorMessage(response.status));
         return;
       }
       onUploaded((await response.json()) as GameSummary);

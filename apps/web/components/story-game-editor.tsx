@@ -6,7 +6,8 @@ import {
   type GameSummary,
   type StoryProjectInput as StoryProject,
 } from "@indieforge/contracts";
-import { api, ApiError } from "../lib/api-client";
+import { api } from "../lib/api-client";
+import { apiErrorMessage } from "../lib/api-error-message";
 
 type Choice = StoryProject["scenes"][number]["choices"][number] & {
   key: string;
@@ -65,9 +66,10 @@ function toProject(startSceneId: string, scenes: Scene[]): StoryProject {
 }
 
 function errorMessage(error: unknown): string {
-  return error instanceof ApiError
-    ? error.message
-    : "Không thể kết nối. Vui lòng thử lại.";
+  return apiErrorMessage(
+    error,
+    "Không thể lưu hoặc tạo bản chơi thử. Vui lòng thử lại.",
+  );
 }
 
 export function StoryGameEditor({
@@ -97,14 +99,17 @@ export function StoryGameEditor({
 
   function updateScene(key: string, update: Partial<Scene>) {
     setScenes((current) =>
-      current.map((scene) => (scene.key === key ? { ...scene, ...update } : scene)),
+      current.map((scene) =>
+        scene.key === key ? { ...scene, ...update } : scene,
+      ),
     );
   }
 
   function addScene() {
     setScenes((current) => {
       let number = current.length + 1;
-      while (current.some((scene) => scene.id === `scene-${number}`)) number += 1;
+      while (current.some((scene) => scene.id === `scene-${number}`))
+        number += 1;
       return [
         ...current,
         {
@@ -168,7 +173,9 @@ export function StoryGameEditor({
         scene.key === sceneKey
           ? {
               ...scene,
-              choices: scene.choices.filter((choice) => choice.key !== choiceKey),
+              choices: scene.choices.filter(
+                (choice) => choice.key !== choiceKey,
+              ),
             }
           : scene,
       ),
@@ -180,16 +187,21 @@ export function StoryGameEditor({
     const parsed = StoryProjectInput.safeParse(project);
     if (!parsed.success) {
       const message = parsed.error.issues[0]?.message;
-      setError(message === "Scene identifiers must be unique"
-        ? "Mỗi cảnh phải có mã riêng."
-        : message === "Choice targets must reference an existing scene"
-          ? "Lựa chọn phải dẫn đến một cảnh có sẵn."
-          : "Kiểm tra mã cảnh, lời thoại và các lựa chọn.");
+      setError(
+        message === "Scene identifiers must be unique"
+          ? "Mỗi cảnh phải có mã riêng."
+          : message === "Choice targets must reference an existing scene"
+            ? "Lựa chọn phải dẫn đến một cảnh có sẵn."
+            : "Kiểm tra mã cảnh, lời thoại và các lựa chọn.",
+      );
       return;
     }
     setOperation("save");
     try {
-      const game = await api.put<GameSummary>(`/games/${gameId}/project`, parsed.data);
+      const game = await api.put<GameSummary>(
+        `/games/${gameId}/project`,
+        parsed.data,
+      );
       setSaved(parsed.data);
       setHasSavedProject(true);
       onSaved(game);
@@ -213,7 +225,10 @@ export function StoryGameEditor({
   }
 
   return (
-    <section className="panel editor-panel" aria-labelledby="story-editor-heading">
+    <section
+      className="panel editor-panel"
+      aria-labelledby="story-editor-heading"
+    >
       <h2 id="story-editor-heading">Trình tạo cốt truyện</h2>
       <div className="form-stack">
         <label>
@@ -234,7 +249,9 @@ export function StoryGameEditor({
               <input
                 disabled={operation !== null}
                 maxLength={64}
-                onChange={(event) => updateScene(scene.key, { id: event.target.value })}
+                onChange={(event) =>
+                  updateScene(scene.key, { id: event.target.value })
+                }
                 required
                 value={scene.id}
               />
@@ -267,7 +284,9 @@ export function StoryGameEditor({
               <input
                 disabled={operation !== null}
                 onChange={(event) =>
-                  updateScene(scene.key, { backgroundColor: event.target.value })
+                  updateScene(scene.key, {
+                    backgroundColor: event.target.value,
+                  })
                 }
                 pattern="#[0-9a-fA-F]{6}"
                 type="text"
@@ -283,7 +302,9 @@ export function StoryGameEditor({
                     disabled={operation !== null}
                     maxLength={200}
                     onChange={(event) =>
-                      updateChoice(scene.key, choice.key, { text: event.target.value })
+                      updateChoice(scene.key, choice.key, {
+                        text: event.target.value,
+                      })
                     }
                     required
                     value={choice.text}
@@ -337,7 +358,11 @@ export function StoryGameEditor({
         </button>
         {error && <p role="alert">{error}</p>}
         <div className="editor-actions">
-          <button disabled={operation !== null} onClick={saveStory} type="button">
+          <button
+            disabled={operation !== null}
+            onClick={saveStory}
+            type="button"
+          >
             {operation === "save" ? "Đang lưu…" : "Lưu cốt truyện"}
           </button>
           <button

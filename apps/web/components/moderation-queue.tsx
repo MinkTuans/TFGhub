@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useSyncExternalStore } from "react";
-import { api, ApiError, resolvePublicApiBaseUrl } from "../lib/api-client";
+import { api, resolvePublicApiBaseUrl } from "../lib/api-client";
+import { apiErrorMessage } from "../lib/api-error-message";
 
 export type ModerationGame = {
   id: string;
@@ -18,13 +19,21 @@ export type ModerationGame = {
 
 const subscribeToNothing = () => () => {};
 
-export function ModerationQueue({ initialGames }: { initialGames: ModerationGame[] }) {
+export function ModerationQueue({
+  initialGames,
+}: {
+  initialGames: ModerationGame[];
+}) {
   const [games, setGames] = useState(initialGames);
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [reviewing, setReviewing] = useState<Set<string>>(() => new Set());
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  const hydrated = useSyncExternalStore(subscribeToNothing, () => true, () => false);
+  const hydrated = useSyncExternalStore(
+    subscribeToNothing,
+    () => true,
+    () => false,
+  );
 
   async function review(game: ModerationGame, action: "approve" | "reject") {
     const note = notes[game.id]?.trim() ?? "";
@@ -44,9 +53,7 @@ export function ModerationQueue({ initialGames }: { initialGames: ModerationGame
       setMessage(action === "approve" ? "Đã duyệt game." : "Đã từ chối game.");
     } catch (failure) {
       setError(
-        failure instanceof ApiError
-          ? failure.message
-          : "Không thể duyệt game này. Vui lòng thử lại.",
+        apiErrorMessage(failure, "Không thể duyệt game này. Vui lòng thử lại."),
       );
     } finally {
       setReviewing((current) => {
@@ -58,7 +65,11 @@ export function ModerationQueue({ initialGames }: { initialGames: ModerationGame
   }
 
   return (
-    <section aria-label="Game chờ duyệt" data-hydrated={hydrated} data-testid="moderation-queue">
+    <section
+      aria-label="Game chờ duyệt"
+      data-hydrated={hydrated}
+      data-testid="moderation-queue"
+    >
       {message && <p role="status">{message}</p>}
       {error && <p role="alert">{error}</p>}
       {games.length === 0 ? (
@@ -69,11 +80,28 @@ export function ModerationQueue({ initialGames }: { initialGames: ModerationGame
             const busy = reviewing.has(game.id);
             const note = notes[game.id] ?? "";
             return (
-              <article className="panel moderation-card" aria-label={game.title} key={game.id}>
+              <article
+                className="panel moderation-card"
+                aria-label={game.title}
+                key={game.id}
+              >
                 <h2>{game.title}</h2>
                 <p>Tác giả: {game.creator.displayName ?? "Chưa có tên"}</p>
-                <p>Nguồn: {{ UPLOAD: "HTML5 ZIP", CODE: "Trình soạn mã", STORY: "Cốt truyện / đố vui", PLATFORMER: "Đi cảnh 2D" }[game.sourceType]}</p>
-                <p>Ngày gửi: <time dateTime={game.submittedAt}>{game.submittedAt}</time></p>
+                <p>
+                  Nguồn:{" "}
+                  {
+                    {
+                      UPLOAD: "HTML5 ZIP",
+                      CODE: "Trình soạn mã",
+                      STORY: "Cốt truyện / đố vui",
+                      PLATFORMER: "Đi cảnh 2D",
+                    }[game.sourceType]
+                  }
+                </p>
+                <p>
+                  Ngày gửi:{" "}
+                  <time dateTime={game.submittedAt}>{game.submittedAt}</time>
+                </p>
                 <p className="description">{game.description}</p>
                 {game.artifactReady && game.artifactVersion > 0 && (
                   <iframe
@@ -88,12 +116,19 @@ export function ModerationQueue({ initialGames }: { initialGames: ModerationGame
                     value={note}
                     maxLength={500}
                     onChange={(event) =>
-                      setNotes((current) => ({ ...current, [game.id]: event.target.value }))
+                      setNotes((current) => ({
+                        ...current,
+                        [game.id]: event.target.value,
+                      }))
                     }
                   />
                 </label>
                 <div className="actions">
-                  <button type="button" disabled={busy} onClick={() => review(game, "approve")}>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => review(game, "approve")}
+                  >
                     {busy ? "Đang duyệt…" : "Duyệt"}
                   </button>
                   <button

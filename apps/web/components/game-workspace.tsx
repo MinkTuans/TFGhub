@@ -2,7 +2,8 @@
 
 import { useState, type FormEvent } from "react";
 import { UpdateGameInput, type GameSummary } from "@indieforge/contracts";
-import { api, ApiError } from "../lib/api-client";
+import { api } from "../lib/api-client";
+import { apiErrorMessage } from "../lib/api-error-message";
 import { CodeGameEditor } from "./code-game-editor";
 import { GamePreview } from "./game-preview";
 import { PlatformerGameEditor } from "./platformer-game-editor";
@@ -49,9 +50,7 @@ export function GameWorkspace({ initialGame }: { initialGame: GameSummary }) {
       setGame(await api.patch<GameSummary>(`/games/${game.id}`, parsed.data));
     } catch (error) {
       setDisplayError(
-        error instanceof ApiError
-          ? error.message
-          : "Không thể kết nối. Vui lòng thử lại.",
+        apiErrorMessage(error, "Không thể lưu hiển thị. Vui lòng thử lại."),
       );
     } finally {
       setSavingDisplay(false);
@@ -65,9 +64,7 @@ export function GameWorkspace({ initialGame }: { initialGame: GameSummary }) {
       setGame(await api.post<GameSummary>(`/games/${game.id}/submit`, {}));
     } catch (error) {
       setError(
-        error instanceof ApiError
-          ? error.message
-          : "Không thể kết nối. Vui lòng thử lại.",
+        apiErrorMessage(error, "Không thể gửi duyệt. Vui lòng thử lại."),
       );
     } finally {
       setPending(false);

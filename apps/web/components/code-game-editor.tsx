@@ -1,11 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import {
-  CodeProjectInput,
-  type GameSummary,
-} from "@indieforge/contracts";
-import { api, ApiError } from "../lib/api-client";
+import { CodeProjectInput, type GameSummary } from "@indieforge/contracts";
+import { api } from "../lib/api-client";
+import { apiErrorMessage } from "../lib/api-error-message";
 
 const SOURCE_LIMIT = 50_000;
 
@@ -24,9 +22,10 @@ function savedSource(projectData: GameSummary["projectData"]): Source {
 }
 
 function errorMessage(error: unknown): string {
-  return error instanceof ApiError
-    ? error.message
-    : "Không thể kết nối. Vui lòng thử lại.";
+  return apiErrorMessage(
+    error,
+    "Không thể lưu hoặc tạo bản chơi thử. Vui lòng thử lại.",
+  );
 }
 
 export function CodeGameEditor({
@@ -57,7 +56,10 @@ export function CodeGameEditor({
     setError("");
     setOperation("save");
     try {
-      const game = await api.put<GameSummary>(`/games/${gameId}/project`, source);
+      const game = await api.put<GameSummary>(
+        `/games/${gameId}/project`,
+        source,
+      );
       setSaved(source);
       setHasSavedProject(true);
       onSaved(game);
@@ -81,7 +83,10 @@ export function CodeGameEditor({
   }
 
   return (
-    <section className="panel editor-panel" aria-labelledby="code-editor-heading">
+    <section
+      className="panel editor-panel"
+      aria-labelledby="code-editor-heading"
+    >
       <h2 id="code-editor-heading">Trình soạn mã</h2>
       <div className="form-stack">
         <label>
@@ -137,7 +142,11 @@ export function CodeGameEditor({
         </p>
         {error && <p role="alert">{error}</p>}
         <div className="editor-actions">
-          <button disabled={operation !== null} onClick={saveSource} type="button">
+          <button
+            disabled={operation !== null}
+            onClick={saveSource}
+            type="button"
+          >
             {operation === "save" ? "Đang lưu…" : "Lưu mã nguồn"}
           </button>
           <button

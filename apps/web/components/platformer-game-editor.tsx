@@ -6,7 +6,8 @@ import {
   type GameSummary,
   type PlatformerProjectInput as PlatformerProject,
 } from "@indieforge/contracts";
-import { api, ApiError } from "../lib/api-client";
+import { api } from "../lib/api-client";
+import { apiErrorMessage } from "../lib/api-error-message";
 
 type Platform = PlatformerProject["platforms"][number] & { key: string };
 
@@ -16,24 +17,28 @@ const defaultProject: PlatformerProject = {
   backgroundColor: "#111827",
   player: { x: 24, y: 0, color: "#2563eb" },
   goal: { x: 300, y: 416, color: "#16a34a" },
-  platforms: [
-    { x: 0, y: 440, width: 640, height: 40, color: "#6b7280" },
-  ],
+  platforms: [{ x: 0, y: 440, width: 640, height: 40, color: "#6b7280" }],
 };
 
-function savedProject(projectData: GameSummary["projectData"]): PlatformerProject {
+function savedProject(
+  projectData: GameSummary["projectData"],
+): PlatformerProject {
   const parsed = PlatformerProjectInput.safeParse(projectData);
   return parsed.success ? parsed.data : defaultProject;
 }
 
 function withKeys(project: PlatformerProject): Platform[] {
-  return project.platforms.map((platform, index) => ({ ...platform, key: `platform-${index}` }));
+  return project.platforms.map((platform, index) => ({
+    ...platform,
+    key: `platform-${index}`,
+  }));
 }
 
 function errorMessage(error: unknown): string {
-  return error instanceof ApiError
-    ? error.message
-    : "Không thể kết nối. Vui lòng thử lại.";
+  return apiErrorMessage(
+    error,
+    "Không thể lưu hoặc tạo bản chơi thử. Vui lòng thử lại.",
+  );
 }
 
 export function PlatformerGameEditor({
@@ -50,7 +55,9 @@ export function PlatformerGameEditor({
   const initial = savedProject(initialProject);
   const nextKey = useRef(0);
   const [canvas, setCanvas] = useState(initial.canvas);
-  const [backgroundColor, setBackgroundColor] = useState(initial.backgroundColor);
+  const [backgroundColor, setBackgroundColor] = useState(
+    initial.backgroundColor,
+  );
   const [player, setPlayer] = useState(initial.player);
   const [goal, setGoal] = useState(initial.goal);
   const [platforms, setPlatforms] = useState(() => withKeys(initial));
@@ -102,14 +109,20 @@ export function PlatformerGameEditor({
     setError("");
     const parsed = PlatformerProjectInput.safeParse(project);
     if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message === "Platform geometry must be inside the canvas"
-        ? "Nền tảng phải nằm trong khung vẽ."
-        : "Kiểm tra khung vẽ, nhân vật, đích đến và các nền tảng.");
+      setError(
+        parsed.error.issues[0]?.message ===
+          "Platform geometry must be inside the canvas"
+          ? "Nền tảng phải nằm trong khung vẽ."
+          : "Kiểm tra khung vẽ, nhân vật, đích đến và các nền tảng.",
+      );
       return;
     }
     setOperation("save");
     try {
-      const game = await api.put<GameSummary>(`/games/${gameId}/project`, parsed.data);
+      const game = await api.put<GameSummary>(
+        `/games/${gameId}/project`,
+        parsed.data,
+      );
       setSaved(parsed.data);
       setHasSavedProject(true);
       onSaved(game);
@@ -133,7 +146,10 @@ export function PlatformerGameEditor({
   }
 
   return (
-    <section className="panel editor-panel" aria-labelledby="platformer-editor-heading">
+    <section
+      className="panel editor-panel"
+      aria-labelledby="platformer-editor-heading"
+    >
       <h2 id="platformer-editor-heading">Trình tạo game đi cảnh</h2>
       <div className="form-stack">
         <fieldset>
@@ -145,7 +161,10 @@ export function PlatformerGameEditor({
               max={1920}
               min={320}
               onChange={(event) =>
-                setCanvas((current) => ({ ...current, width: Number(event.target.value) }))
+                setCanvas((current) => ({
+                  ...current,
+                  width: Number(event.target.value),
+                }))
               }
               type="number"
               value={canvas.width}
@@ -158,7 +177,10 @@ export function PlatformerGameEditor({
               max={1080}
               min={240}
               onChange={(event) =>
-                setCanvas((current) => ({ ...current, height: Number(event.target.value) }))
+                setCanvas((current) => ({
+                  ...current,
+                  height: Number(event.target.value),
+                }))
               }
               type="number"
               value={canvas.height}
@@ -182,7 +204,10 @@ export function PlatformerGameEditor({
               disabled={operation !== null}
               min={0}
               onChange={(event) =>
-                setPlayer((current) => ({ ...current, x: Number(event.target.value) }))
+                setPlayer((current) => ({
+                  ...current,
+                  x: Number(event.target.value),
+                }))
               }
               type="number"
               value={player.x}
@@ -194,7 +219,10 @@ export function PlatformerGameEditor({
               disabled={operation !== null}
               min={0}
               onChange={(event) =>
-                setPlayer((current) => ({ ...current, y: Number(event.target.value) }))
+                setPlayer((current) => ({
+                  ...current,
+                  y: Number(event.target.value),
+                }))
               }
               type="number"
               value={player.y}
@@ -205,7 +233,10 @@ export function PlatformerGameEditor({
             <input
               disabled={operation !== null}
               onChange={(event) =>
-                setPlayer((current) => ({ ...current, color: event.target.value }))
+                setPlayer((current) => ({
+                  ...current,
+                  color: event.target.value,
+                }))
               }
               type="color"
               value={player.color}
@@ -220,7 +251,10 @@ export function PlatformerGameEditor({
               disabled={operation !== null}
               min={0}
               onChange={(event) =>
-                setGoal((current) => ({ ...current, x: Number(event.target.value) }))
+                setGoal((current) => ({
+                  ...current,
+                  x: Number(event.target.value),
+                }))
               }
               type="number"
               value={goal.x}
@@ -232,7 +266,10 @@ export function PlatformerGameEditor({
               disabled={operation !== null}
               min={0}
               onChange={(event) =>
-                setGoal((current) => ({ ...current, y: Number(event.target.value) }))
+                setGoal((current) => ({
+                  ...current,
+                  y: Number(event.target.value),
+                }))
               }
               type="number"
               value={goal.y}
@@ -243,7 +280,10 @@ export function PlatformerGameEditor({
             <input
               disabled={operation !== null}
               onChange={(event) =>
-                setGoal((current) => ({ ...current, color: event.target.value }))
+                setGoal((current) => ({
+                  ...current,
+                  color: event.target.value,
+                }))
               }
               type="color"
               value={goal.color}
@@ -259,7 +299,9 @@ export function PlatformerGameEditor({
                 disabled={operation !== null}
                 min={0}
                 onChange={(event) =>
-                  updatePlatform(platform.key, { x: Number(event.target.value) })
+                  updatePlatform(platform.key, {
+                    x: Number(event.target.value),
+                  })
                 }
                 type="number"
                 value={platform.x}
@@ -271,7 +313,9 @@ export function PlatformerGameEditor({
                 disabled={operation !== null}
                 min={0}
                 onChange={(event) =>
-                  updatePlatform(platform.key, { y: Number(event.target.value) })
+                  updatePlatform(platform.key, {
+                    y: Number(event.target.value),
+                  })
                 }
                 type="number"
                 value={platform.y}
@@ -283,7 +327,9 @@ export function PlatformerGameEditor({
                 disabled={operation !== null}
                 min={1}
                 onChange={(event) =>
-                  updatePlatform(platform.key, { width: Number(event.target.value) })
+                  updatePlatform(platform.key, {
+                    width: Number(event.target.value),
+                  })
                 }
                 type="number"
                 value={platform.width}
@@ -295,7 +341,9 @@ export function PlatformerGameEditor({
                 disabled={operation !== null}
                 min={1}
                 onChange={(event) =>
-                  updatePlatform(platform.key, { height: Number(event.target.value) })
+                  updatePlatform(platform.key, {
+                    height: Number(event.target.value),
+                  })
                 }
                 type="number"
                 value={platform.height}
@@ -334,7 +382,11 @@ export function PlatformerGameEditor({
         </button>
         {error && <p role="alert">{error}</p>}
         <div className="editor-actions">
-          <button disabled={operation !== null} onClick={savePlatformer} type="button">
+          <button
+            disabled={operation !== null}
+            onClick={savePlatformer}
+            type="button"
+          >
             {operation === "save" ? "Đang lưu…" : "Lưu game đi cảnh"}
           </button>
           <button

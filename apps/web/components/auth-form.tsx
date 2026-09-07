@@ -3,7 +3,8 @@
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { LoginInput, RegisterInput } from "@indieforge/contracts";
-import { api, ApiError } from "../lib/api-client";
+import { api } from "../lib/api-client";
+import { apiErrorMessage } from "../lib/api-error-message";
 
 export function AuthForm({ mode }: { mode: "register" | "login" }) {
   const router = useRouter();
@@ -26,9 +27,12 @@ export function AuthForm({ mode }: { mode: "register" | "login" }) {
       router.refresh();
     } catch (error) {
       setError(
-        error instanceof ApiError
-          ? error.message
-          : "Không thể kết nối. Vui lòng thử lại.",
+        apiErrorMessage(
+          error,
+          mode === "register"
+            ? "Không thể tạo tài khoản. Vui lòng thử lại."
+            : "Không thể đăng nhập. Vui lòng thử lại.",
+        ),
       );
     } finally {
       setPending(false);
@@ -53,9 +57,7 @@ export function AuthForm({ mode }: { mode: "register" | "login" }) {
           required
         />
       </label>
-      {mode === "register" && (
-        <p className="hint">Sử dụng ít nhất 10 ký tự.</p>
-      )}
+      {mode === "register" && <p className="hint">Sử dụng ít nhất 10 ký tự.</p>}
       {error && <p role="alert">{error}</p>}
       <button disabled={pending}>
         {pending
