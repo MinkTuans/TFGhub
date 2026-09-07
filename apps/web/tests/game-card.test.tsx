@@ -4,6 +4,7 @@ import { render, screen } from "@testing-library/react";
 import { expect, test } from "vitest";
 import { GameCover, coverHue } from "../components/game-cover";
 import { GameCard } from "../components/game-card";
+import { RelatedGames } from "../components/related-games";
 
 const globalStyles = readFileSync(resolve(process.cwd(), "app/globals.css"), "utf8");
 
@@ -19,6 +20,21 @@ const tinyQuest = {
   viewportWidth: 16,
   viewportHeight: 9,
 };
+
+test("excludes the current game before limiting related games to six compact cards", () => {
+  const games = [tinyQuest, ...Array.from({ length: 8 }, (_, index) => ({ ...tinyQuest, slug: `related-${index}`, title: `Related ${index}` }))];
+  render(<RelatedGames games={games} currentSlug="tiny-quest" />);
+  expect(screen.queryByRole("link", { name: /Tiny Quest/ })).not.toBeInTheDocument();
+  expect(screen.getAllByRole("link")).toHaveLength(6);
+  expect(screen.getByRole("link", { name: /Related 5/ })).toBeVisible();
+  expect(screen.queryByRole("link", { name: /Related 6/ })).not.toBeInTheDocument();
+  expect(screen.queryByText("A demo")).not.toBeInTheDocument();
+});
+
+test("omits the related heading when there are no other games", () => {
+  render(<RelatedGames games={[tinyQuest]} currentSlug="tiny-quest" />);
+  expect(screen.queryByRole("heading")).not.toBeInTheDocument();
+});
 
 test("links the complete public game card and shows its versioned cover", () => {
   render(
