@@ -376,25 +376,25 @@
 - Produces: role-aware navigation, moderation queue/actions, and public player.
 - Consumes: auth/me, moderation APIs, public game summary and play route.
 
-- [ ] **Step 1: Write failing role and journey tests**
+- [x] **Step 1: Write failing role and journey tests**
 
   Assert regular users never see/access moderation, moderator can preview then
   reject with a required note or approve, approval makes the game discoverable,
   and the public page embeds only the approved artifact with the exact sandbox.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
   Run: `pnpm --filter web test && PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/google-chrome pnpm --filter web e2e --grep "moderation"`
 
   Expected: tests fail because moderator/public player UI is absent.
 
-- [ ] **Step 3: Implement role-aware server layout and queue**
+- [x] **Step 3: Implement role-aware server layout and queue**
 
   Add an optional server session lookup that maps 401 to null without redirect.
   Use server-fetched queue data and client mutation controls. Add the public
   iframe only when the expanded public summary reports a playable artifact.
 
-- [ ] **Step 4: Verify GREEN and commit**
+- [x] **Step 4: Verify GREEN and commit**
 
   Run: `pnpm --filter web test && pnpm --filter web typecheck && pnpm --filter web lint && PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/google-chrome pnpm --filter web e2e && git add apps/web && git commit -m "feat(web): add moderation and public game player"`
 
