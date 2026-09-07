@@ -218,8 +218,9 @@ export class CoverStorage {
     if (
       !/^[a-zA-Z0-9_-]+$/.test(gameId) ||
       !Number.isSafeInteger(referencedVersion) ||
-      referencedVersion <= 0 ||
+      referencedVersion < 0 ||
       !Number.isSafeInteger(version) ||
+      version <= 0 ||
       version !== referencedVersion + 1
     ) {
       throw new Error(

@@ -64,6 +64,21 @@ describe('CoverStorage', () => {
     expect(await readdir(join(storageRoot, 'covers', 'game-1'))).toEqual(['1']);
   });
 
+  it('removes staging and preserves a published version when a staged cover write fails', async () => {
+    await storage.install('game-1', 1, cover);
+    const invalidCover = {
+      content: undefined,
+      contentType: 'image/png',
+    } as unknown as StoredCover;
+
+    await expect(storage.install('game-1', 2, invalidCover)).rejects.toThrow(
+      TypeError,
+    );
+
+    await expect(storage.read('game-1', 1)).resolves.toEqual(cover);
+    expect(await readdir(join(storageRoot, 'covers', 'game-1'))).toEqual(['1']);
+  });
+
   it.each(['../escape', '/tmp/escape', 'nested/../../escape'])(
     'rejects a game id that escapes the cover root: %s',
     async (gameId) => {
@@ -120,6 +135,15 @@ describe('CoverStorage', () => {
     await expect(storage.read('game-1', 2)).resolves.toMatchObject({
       contentType: 'image/webp',
     });
+  });
+
+  it('discards the first unreferenced version when the database references no cover', async () => {
+    await storage.install('game-1', 1, cover);
+
+    await storage.discardUnreferenced('game-1', 1, 0);
+
+    await expect(storage.read('game-1', 1)).rejects.toThrow();
+    expect(await readdir(join(storageRoot, 'covers', 'game-1'))).toEqual([]);
   });
 
   it('discards only the explicitly unreferenced next version', async () => {
