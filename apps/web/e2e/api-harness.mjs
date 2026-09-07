@@ -54,6 +54,10 @@ const games = new Map([
       projectData: null,
       artifactVersion: 0,
       artifactReady: false,
+      coverVersion: 0,
+      coverContentType: null,
+      viewportWidth: 16,
+      viewportHeight: 9,
       reviewNote: null,
       submittedAt: null,
       reviewedAt: null,
@@ -121,6 +125,10 @@ const testingModule = await Test.createTestingModule({ imports: [AppModule] })
         projectData: null,
         artifactVersion: 0,
         artifactReady: false,
+        coverVersion: 0,
+        coverContentType: null,
+        viewportWidth: input.viewportWidth ?? 16,
+        viewportHeight: input.viewportHeight ?? 9,
         reviewNote: null,
         submittedAt: null,
         reviewedAt: null,
@@ -224,6 +232,15 @@ const testingModule = await Test.createTestingModule({ imports: [AppModule] })
         current.updatedAt.getTime() !== expectedUpdatedAt.getTime()
       )
         return null;
+      const game = { ...current, ...input, updatedAt: new Date() };
+      games.set(id, game);
+      return game;
+    },
+    async updateCover(id, ownerId, expectedUpdatedAt, expectedCoverVersion, input) {
+      const current = games.get(id);
+      if (!current || current.ownerId !== ownerId ||
+          current.updatedAt.getTime() !== expectedUpdatedAt.getTime() ||
+          current.coverVersion !== expectedCoverVersion) return null;
       const game = { ...current, ...input, updatedAt: new Date() };
       games.set(id, game);
       return game;

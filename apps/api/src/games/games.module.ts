@@ -3,6 +3,11 @@ import { database } from '@indieforge/database';
 import { AuthModule } from '../auth/auth.module.js';
 import { GameArtifactsModule } from '../game-artifacts/game-artifacts.module.js';
 import { GameCoversModule } from '../game-covers/game-covers.module.js';
+import {
+  GameCoverController,
+  GameCoverOwnerGuard,
+} from '../game-covers/game-cover.controller.js';
+import { GameCoverService } from '../game-covers/game-cover.service.js';
 import { GameContentService } from './game-content.service.js';
 import {
   GameContentController,
@@ -94,10 +99,13 @@ const publicGameSelect = {
     GamesController,
     PublicGamesController,
     GameContentController,
+    GameCoverController,
     ModerationController,
   ],
   providers: [
     GamesService,
+    GameCoverService,
+    GameCoverOwnerGuard,
     ModerationService,
     PublicGamesService,
     GameContentService,
@@ -106,6 +114,27 @@ const publicGameSelect = {
     {
       provide: GamesRepository,
       useFactory: (): GamesRepository => ({
+        updateCover: (
+          id,
+          ownerId,
+          expectedUpdatedAt,
+          expectedCoverVersion,
+          input,
+        ) =>
+          database.$transaction(async (tx) => {
+            const result = await tx.game.updateMany({
+              where: {
+                id,
+                ownerId,
+                updatedAt: expectedUpdatedAt,
+                coverVersion: expectedCoverVersion,
+              },
+              data: input,
+            });
+            return result.count === 1
+              ? tx.game.findUnique({ where: { id }, select: gameSummarySelect })
+              : null;
+          }),
         create: (input) =>
           database.game.create({ data: input, select: gameSummarySelect }),
         findManyByOwner: (ownerId) =>

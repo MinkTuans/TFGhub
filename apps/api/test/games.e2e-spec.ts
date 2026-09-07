@@ -11,6 +11,7 @@ import { mkdtemp, chmod, readdir, rm, readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { ArtifactStorage } from '../src/game-artifacts/artifact-storage.js';
+import { CoverStorage } from '../src/game-covers/cover-storage.js';
 import type {
   StoredGame,
   WorkspaceUpdate,
@@ -51,6 +52,8 @@ describe('Developer profile and game draft HTTP boundary', () => {
     const module = await Test.createTestingModule({ imports: [AppModule] })
       .overrideProvider(ArtifactStorage)
       .useValue(new ArtifactStorage(storageRoot))
+      .overrideProvider(CoverStorage)
+      .useValue(new CoverStorage(storageRoot))
       .overrideProvider(AuthUsersRepository)
       .useValue({
         async create(input: { email: string; passwordHash: string }) {
@@ -70,6 +73,15 @@ describe('Developer profile and game draft HTTP boundary', () => {
       })
       .overrideProvider(GamesRepository)
       .useValue({
+        async updateCover(id: string, ownerId: string, expectedUpdatedAt: Date, expectedCoverVersion: number,
+          input: Parameters<GamesRepositoryContract['updateCover']>[4]) {
+          const game = games.get(id);
+          if (!game || game.ownerId !== ownerId || game.updatedAt.getTime() !== expectedUpdatedAt.getTime() ||
+              game.coverVersion !== expectedCoverVersion) return null;
+          const updated = { ...game, ...input, updatedAt: new Date() };
+          games.set(id, updated);
+          return updated;
+        },
         async create(input: Parameters<GamesRepositoryContract['create']>[0]) {
           if ([...games.values()].some((game) => game.slug === input.slug)) {
             throw { code: 'P2002', meta: { target: ['slug'] } };
@@ -267,6 +279,75 @@ describe('Developer profile and game draft HTTP boundary', () => {
       .post('/games')
       .send({ title: 'Demo game', slug: 'demo-game' })
       .expect(401);
+  });
+
+  it('uploads owner covers and serves draft and approved covers with correct access and headers', async () => {
+    const { developer, game } = await createGame();
+    const bytes = Buffer.from('RIFF0000WEBPcover');
+    await developer.post(`/games/${game.id}/cover`)
+      .attach('cover', bytes, { filename: 'cover.webp', contentType: 'image/webp' })
+      .expect(201).expect(({ body }) => {
+        expect(body).toMatchObject({ coverVersion: 1, coverContentType: 'image/webp', reviewState: 'DRAFT' });
+      });
+    await request(app.getHttpServer()).get('/covers/demo-game/1').expect(404);
+    await request(app.getHttpServer()).get(`/games/${game.id}/cover/1`).expect(401);
+    const other = await agent('other@example.com');
+    await other.get(`/games/${game.id}/cover/1`).expect(403);
+    await developer.get(`/games/${game.id}/cover/1`).expect(200)
+      .expect('Content-Type', 'image/webp').expect('X-Content-Type-Options', 'nosniff')
+      .expect('Cache-Control', 'private, no-store').expect(({ body }) => expect(body).toEqual(bytes));
+    Object.assign(games.get(game.id)!, { visibility: 'PUBLIC', reviewState: 'APPROVED' });
+    await request(app.getHttpServer()).get('/covers/demo-game/1').expect(200)
+      .expect('Content-Type', 'image/webp').expect('X-Content-Type-Options', 'nosniff')
+      .expect('Cache-Control', 'public, max-age=31536000, immutable')
+      .expect(({ body }) => expect(body).toEqual(bytes));
+    await developer.post(`/games/${game.id}/cover`)
+      .attach('cover', bytes, { filename: 'cover.webp', contentType: 'image/webp' }).expect(201)
+      .expect(({ body }) => expect(body).toMatchObject({ coverVersion: 2, reviewState: 'APPROVED', visibility: 'PUBLIC' }));
+    for (const version of ['1', '0', '2junk', '2.0', '9007199254740992']) {
+      await request(app.getHttpServer()).get(`/covers/demo-game/${version}`).expect(404);
+      await developer.get(`/games/${game.id}/cover/${version}`).expect(404);
+    }
+  });
+
+  it('rejects unauthenticated, nonowner, missing, mismatched, fake and oversized cover uploads', async () => {
+    const { developer, game } = await createGame();
+    const png = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+    const other = await agent('other@example.com');
+    await request(app.getHttpServer()).post(`/games/${game.id}/cover`).expect(401);
+    await other.post(`/games/${game.id}/cover`).attach('cover', png, 'cover.png').expect(403);
+    await developer.post(`/games/${game.id}/cover`).expect(400);
+    await developer.post(`/games/${game.id}/cover`)
+      .attach('cover', Buffer.from('not an image'), { filename: 'fake.png', contentType: 'image/png' }).expect(400);
+    await developer.post(`/games/${game.id}/cover`)
+      .attach('cover', png, { filename: 'fake.webp', contentType: 'image/webp' }).expect(400);
+    const oversized = Buffer.alloc(5 * 1024 * 1024 + 1);
+    png.copy(oversized);
+    await developer.post(`/games/${game.id}/cover`)
+      .attach('cover', oversized, 'large.png').expect(413);
+    expect(games.get(game.id)!.coverVersion).toBe(0);
+    expect(await readdir(storageRoot)).toEqual([]);
+  });
+
+  it('allows multipart cover uploads only at the exact route with existing origin protections', async () => {
+    const { developer, game } = await createGame();
+    const png = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+    for (const origin of ['http://evil.example', 'null']) {
+      await developer.post(`/games/${game.id}/cover`).set('Origin', origin)
+        .attach('cover', png, 'cover.png').expect(403);
+    }
+    await developer.post(`/games/${game.id}/cover`).set('Sec-Fetch-Site', 'same-origin')
+      .attach('cover', png, 'cover.png').expect(403);
+    await developer.put(`/games/${game.id}/cover`).attach('cover', png, 'cover.png').expect(415);
+    await developer.post(`/games/${game.id}/cover/extra`).attach('cover', png, 'cover.png').expect(415);
+    await developer.post(`/games/${game.id}/cover`).attach('wrong', png, 'cover.png').expect(400);
+    await developer.post(`/games/${game.id}/cover`).attach('cover', png, 'cover.png')
+      .attach('cover', png, 'second.png').expect(400);
+    expect(await readdir(storageRoot)).toEqual([]);
+    const maxBytes = Buffer.alloc(5 * 1024 * 1024);
+    png.copy(maxBytes);
+    await developer.post(`/games/${game.id}/cover`).set('Origin', 'http://localhost:3000')
+      .attach('cover', maxBytes, 'cover.png').expect(201);
   });
 
   it('opens an owner workspace and denies other users', async () => {

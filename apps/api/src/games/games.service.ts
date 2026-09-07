@@ -86,6 +86,16 @@ export type ModerationActionSummary = Omit<GameSummary, 'projectData'>;
 export type SubmittedRevision = { artifactVersion: number; submittedAt: Date };
 
 export abstract class GamesRepository {
+  abstract updateCover(
+    id: string,
+    ownerId: string,
+    expectedUpdatedAt: Date,
+    expectedCoverVersion: number,
+    input: {
+      coverVersion: number;
+      coverContentType: 'image/jpeg' | 'image/png' | 'image/webp';
+    },
+  ): Promise<StoredGame | null>;
   abstract create(input: {
     ownerId: string;
     slug: string;

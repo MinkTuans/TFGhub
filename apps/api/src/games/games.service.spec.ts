@@ -29,6 +29,7 @@ const storedGame = {
 
 function fixture() {
   const games: GamesRepository = {
+    updateCover: vi.fn(),
     create: vi.fn().mockResolvedValue(storedGame),
     findManyByOwner: vi.fn().mockResolvedValue([storedGame]),
     findPending: vi.fn().mockResolvedValue([]),
