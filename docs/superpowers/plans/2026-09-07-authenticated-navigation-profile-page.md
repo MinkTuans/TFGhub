@@ -69,12 +69,12 @@
   Run the repository test, typecheck, lint, browser E2E, deployment contract,
   and production build checks already used by this branch.
 
-- [ ] **Step 2: Rebuild only the affected production service and deploy**
+- [x] **Step 2: Rebuild only the affected production service and deploy**
 
   Use the existing production compose project and secret env file; do not
   recreate PostgreSQL or expose any new ports.
 
-- [ ] **Step 3: Verify the public browser journey**
+- [x] **Step 3: Verify the public browser journey**
 
   Register a disposable account through `http://161.248.81.59`, assert the
   authenticated menu, save profile data on `/profile`, confirm Studio has no
