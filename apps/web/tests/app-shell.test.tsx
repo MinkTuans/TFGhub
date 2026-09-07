@@ -1,5 +1,8 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
+import RootLayout from "../app/layout";
 import { TfgLogo } from "../components/tfg-logo";
 import { SiteNavigation } from "../components/site-navigation";
 import { ThemeToggle } from "../components/theme-toggle";
@@ -7,6 +10,12 @@ import { ThemeToggle } from "../components/theme-toggle";
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace: vi.fn(), refresh: vi.fn() }),
 }));
+
+vi.mock("../lib/session", () => ({
+  optionalSession: vi.fn(async () => null),
+}));
+
+const globalStyles = readFileSync(resolve(process.cwd(), "app/globals.css"), "utf8");
 
 afterEach(() => {
   document.documentElement.removeAttribute("data-theme");
@@ -35,6 +44,27 @@ test("renders the accessible TFG monogram and Vietnamese guest navigation", () =
   expect(within(navigation).getByRole("link", { name: "Đăng nhập" })).toHaveAttribute(
     "href",
     "/login",
+  );
+});
+
+test("suppresses the expected root hydration warning from the theme bootstrap", async () => {
+  const layout = await RootLayout({ children: <main>Trang chủ</main> });
+
+  expect(layout.props.suppressHydrationWarning).toBe(true);
+});
+
+test("keeps form boundaries on the dedicated high-contrast control token", () => {
+  expect(globalStyles.match(/--control-border:/g)).toHaveLength(3);
+  expect(globalStyles).toMatch(
+    /input, textarea, select \{[\s\S]*?border: 1px solid var\(--control-border\);/,
+  );
+});
+
+test("uses distinct semantic tokens for skeleton shimmer", () => {
+  expect(globalStyles.match(/--skeleton-base:/g)).toHaveLength(3);
+  expect(globalStyles.match(/--skeleton-highlight:/g)).toHaveLength(3);
+  expect(globalStyles).toMatch(
+    /\.skeleton \{[\s\S]*?var\(--skeleton-base\)[\s\S]*?var\(--skeleton-highlight\)/,
   );
 });
 

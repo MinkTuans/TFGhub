@@ -32,7 +32,7 @@ export default async function RootLayout({
   const session = await optionalSession();
 
   return (
-    <html lang="vi">
+    <html lang="vi" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeBootstrap }} />
       </head>
