@@ -14,11 +14,15 @@ the repository root `.env` automatically.
 The API URL must be reachable by both the browser and Next server. Use the same
 hostname for web and API in development (different ports are fine) so the API's
 HTTP-only, SameSite=Lax cookie reaches the web server. Configure `WEB_ORIGIN` on
-the API to the exact web origin. Production requires HTTPS with web and API on
+the API to the exact web origin. Production uses HTTPS with web and API on
 a shared hostname, for example through a reverse proxy: the API's host-only cookie
 does not reach the web server on a separate subdomain. Browser requests
 include credentials; server requests forward the incoming cookie and never cache
 private responses. Tokens are never stored in JavaScript or local storage.
+
+For a temporary bare-IP HTTP preview, the production API supports the explicit
+`COOKIE_SECURE=false` override. Keep the secure default for HTTPS and follow
+[the deployment runbook](../../docs/deployment.md) for the matching proxy and origin settings.
 
 ## Verify
 

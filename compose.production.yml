@@ -39,6 +39,7 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:?set POSTGRES_USER}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:?set POSTGRES_DB}
       JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET}
       WEB_ORIGIN: ${SITE_ORIGIN:?set SITE_ORIGIN}
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
     healthcheck:
       test:
         - CMD

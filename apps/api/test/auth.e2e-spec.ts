@@ -21,6 +21,7 @@ describe('Authentication HTTP boundary', () => {
   beforeEach(async () => {
     vi.stubEnv('JWT_SECRET', testSecret);
     vi.stubEnv('NODE_ENV', 'test');
+    vi.stubEnv('COOKIE_SECURE', undefined);
     vi.stubEnv('WEB_ORIGIN', 'http://localhost:3000');
     users = new Map();
     const module = await Test.createTestingModule({ imports: [AppModule] })
@@ -223,6 +224,34 @@ describe('Authentication HTTP boundary', () => {
       .expect(204);
     expect(logout.headers['set-cookie'][0]).toContain('; Secure');
   });
+
+  it('supports cookie sessions on an explicitly configured HTTP preview', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('COOKIE_SECURE', 'false');
+    const agent = request.agent(app.getHttpServer());
+    for (const route of ['register', 'login']) {
+      const response = await agent
+        .post(`/auth/${route}`)
+        .send(credentials)
+        .expect(route === 'register' ? 201 : 200);
+      expect(response.headers['set-cookie'][0]).not.toContain('; Secure');
+      expect(response.headers['set-cookie'][0]).toContain('HttpOnly');
+      await agent.get('/auth/me').expect(200);
+    }
+    const logout = await agent.post('/auth/logout').expect(204);
+    expect(logout.headers['set-cookie'][0]).not.toContain('; Secure');
+    await agent.get('/auth/me').expect(401);
+  });
+
+  it.each(['true', '', 'FALSE', 'invalid'])(
+    'keeps production cookies secure unless the override is exactly false: %s',
+    async (value) => {
+      vi.stubEnv('NODE_ENV', 'production');
+      vi.stubEnv('COOKIE_SECURE', value);
+      const response = await register();
+      expect(response.headers['set-cookie'][0]).toContain('; Secure');
+    },
+  );
 
   it('allows credentialed browser requests from the configured web origin', async () => {
     await request(app.getHttpServer())

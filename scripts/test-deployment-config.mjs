@@ -43,10 +43,18 @@ try {
       '--format',
       'json',
     ],
-    { encoding: 'utf8' },
+    { encoding: 'utf8', env: { ...process.env, COOKIE_SECURE: '' } },
   );
   const configuration = JSON.parse(rendered);
   const { services } = configuration;
+
+  assert.equal(services.api.environment.COOKIE_SECURE, 'true');
+  const previewConfiguration = JSON.parse(execFileSync(
+    'docker',
+    ['compose', '--env-file', environmentFile, '-f', 'compose.production.yml', 'config', '--format', 'json'],
+    { encoding: 'utf8', env: { ...process.env, COOKIE_SECURE: 'false' } },
+  ));
+  assert.equal(previewConfiguration.services.api.environment.COOKIE_SECURE, 'false');
 
   assert.deepEqual(Object.keys(services).sort(), [
     'api',
