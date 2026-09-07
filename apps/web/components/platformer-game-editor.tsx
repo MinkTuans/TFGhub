@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   PlatformerProjectInput,
   type GameSummary,
@@ -21,17 +21,13 @@ const defaultProject: PlatformerProject = {
   ],
 };
 
-function uiKey(): string {
-  return globalThis.crypto.randomUUID();
-}
-
 function savedProject(projectData: GameSummary["projectData"]): PlatformerProject {
   const parsed = PlatformerProjectInput.safeParse(projectData);
   return parsed.success ? parsed.data : defaultProject;
 }
 
 function withKeys(project: PlatformerProject): Platform[] {
-  return project.platforms.map((platform) => ({ ...platform, key: uiKey() }));
+  return project.platforms.map((platform, index) => ({ ...platform, key: `platform-${index}` }));
 }
 
 function errorMessage(error: unknown): string {
@@ -52,6 +48,7 @@ export function PlatformerGameEditor({
   onBuilt: (game: GameSummary) => void;
 }) {
   const initial = savedProject(initialProject);
+  const nextKey = useRef(0);
   const [canvas, setCanvas] = useState(initial.canvas);
   const [backgroundColor, setBackgroundColor] = useState(initial.backgroundColor);
   const [player, setPlayer] = useState(initial.player);
@@ -91,7 +88,7 @@ export function PlatformerGameEditor({
     setPlatforms((current) => [
       ...current,
       {
-        key: uiKey(),
+        key: `platform-added-${nextKey.current++}`,
         x: 0,
         y: Math.max(0, canvas.height - 40),
         width: Math.min(160, canvas.width),

@@ -63,5 +63,8 @@ describe('game artifact compilers', () => {
     expect(artifact.content).toContain("addEventListener('keyup'");
     expect(artifact.content).toContain('requestAnimationFrame(frame)');
     expect(artifact.content).toContain('overlaps(player, platform)');
+    expect(artifact.content).toContain("keys.has('ArrowUp') || keys.has(' ')");
+    expect(artifact.content).toContain("event.key.toLowerCase() === 'r'");
+    expect(artifact.content).toContain('function reset()');
   });
 });

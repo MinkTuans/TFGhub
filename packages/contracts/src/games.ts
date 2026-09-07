@@ -143,7 +143,12 @@ export const GameProjectInput = z.discriminatedUnion('sourceType', [
   if (value.sourceType === 'PLATFORMER') validatePlatformerProject(value, context);
 });
 
-export const ReviewGameInput = z.object({
+export const ReviewRevisionInput = z.object({
+  artifactVersion: z.number().int().positive(),
+  submittedAt: z.string().datetime(),
+});
+
+export const ReviewGameInput = ReviewRevisionInput.extend({
   reviewNote: z.string().trim().min(1).max(500),
 });
 
@@ -196,6 +201,7 @@ export type StoryProjectInput = z.infer<typeof StoryProjectInput>;
 export type PlatformerProjectInput = z.infer<typeof PlatformerProjectInput>;
 export type GameProjectInput = z.infer<typeof GameProjectInput>;
 export type ReviewGameInput = z.infer<typeof ReviewGameInput>;
+export type ReviewRevisionInput = z.infer<typeof ReviewRevisionInput>;
 export type GameSummary = z.infer<typeof GameSummary>;
 export type DiscoverGamesInput = z.infer<typeof DiscoverGamesInput>;
 export type PublicGameSummary = z.infer<typeof PublicGameSummary>;

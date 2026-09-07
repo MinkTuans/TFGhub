@@ -147,9 +147,13 @@ describe('Developer profile and game draft HTTP boundary', () => {
           games.set(id, updated);
           return updated;
         },
-        async approve(id: string) {
+        async approve(id: string, revision) {
           const game = games.get(id);
-          if (!game || game.reviewState !== 'PENDING') return null;
+          if (
+            !game || game.reviewState !== 'PENDING' ||
+            game.artifactVersion !== revision.artifactVersion ||
+            game.submittedAt?.getTime() !== revision.submittedAt.getTime()
+          ) return null;
           const updated: StoredGame = {
             ...game,
             reviewState: 'APPROVED',
@@ -161,9 +165,13 @@ describe('Developer profile and game draft HTTP boundary', () => {
           games.set(id, updated);
           return updated;
         },
-        async reject(id: string, reviewNote: string) {
+        async reject(id: string, revision, reviewNote: string) {
           const game = games.get(id);
-          if (!game || game.reviewState !== 'PENDING') return null;
+          if (
+            !game || game.reviewState !== 'PENDING' ||
+            game.artifactVersion !== revision.artifactVersion ||
+            game.submittedAt?.getTime() !== revision.submittedAt.getTime()
+          ) return null;
           const updated: StoredGame = {
             ...game,
             reviewState: 'REJECTED',
@@ -887,6 +895,10 @@ describe('Developer profile and game draft HTTP boundary', () => {
 
     await moderator
       .post(`/moderation/games/${game.id}/approve`)
+      .send({
+        artifactVersion: games.get(game.id)!.artifactVersion,
+        submittedAt: games.get(game.id)!.submittedAt!.toISOString(),
+      })
       .expect(201)
       .expect((response) => {
         expect(response.body).toMatchObject({
@@ -898,7 +910,46 @@ describe('Developer profile and game draft HTTP boundary', () => {
         expect(response.body.reviewedAt).not.toBeNull();
         expect(response.body).not.toHaveProperty('projectData');
       });
-    await moderator.post(`/moderation/games/${game.id}/approve`).expect(409);
+    await moderator.post(`/moderation/games/${game.id}/approve`).send({
+      artifactVersion: games.get(game.id)!.artifactVersion,
+      submittedAt: games.get(game.id)!.submittedAt!.toISOString(),
+    }).expect(409);
+  });
+
+  it('rejects a stale moderation action after the owner changes and resubmits a newer revision', async () => {
+    const { developer, game } = await createGame();
+    await developer
+      .post(`/games/${game.id}/upload`)
+      .attach('game', zipFixture([{ name: 'index.html', content: '<h1>Version 1</h1>' }]), 'game.zip')
+      .expect(201);
+    const first = await developer.post(`/games/${game.id}/submit`).expect(201);
+    const staleRevision = {
+      artifactVersion: first.body.artifactVersion,
+      submittedAt: first.body.submittedAt,
+    };
+    const moderator = await agent('moderator@example.com');
+    users.get('user-2')!.role = 'MODERATOR';
+    await moderator.get('/moderation/games').expect(200).expect((response) => {
+      expect(response.body[0]).toMatchObject(staleRevision);
+    });
+
+    await developer.patch(`/games/${game.id}`).send({ title: 'Version 2' }).expect(200).expect((response) => {
+      expect(response.body).toMatchObject({ reviewState: 'DRAFT', submittedAt: null });
+    });
+    await developer
+      .post(`/games/${game.id}/upload`)
+      .attach('game', zipFixture([{ name: 'index.html', content: '<h1>Version 2</h1>' }]), 'game.zip')
+      .expect(201);
+    const second = await developer.post(`/games/${game.id}/submit`).expect(201);
+    expect(second.body.artifactVersion).toBe(2);
+
+    await moderator.post(`/moderation/games/${game.id}/approve`).send(staleRevision).expect(409);
+    await moderator.post(`/moderation/games/${game.id}/approve`).send({
+      artifactVersion: second.body.artifactVersion,
+      submittedAt: second.body.submittedAt,
+    }).expect(201).expect((response) => {
+      expect(response.body).toMatchObject({ reviewState: 'APPROVED', artifactVersion: 2 });
+    });
   });
 
   it('requires a rejection note and returns the game to draft', async () => {
@@ -924,7 +975,11 @@ describe('Developer profile and game draft HTTP boundary', () => {
       .expect(400);
     await moderator
       .post(`/moderation/games/${game.id}/reject`)
-      .send({ reviewNote: '  Add instructions  ' })
+      .send({
+        artifactVersion: games.get(game.id)!.artifactVersion,
+        submittedAt: games.get(game.id)!.submittedAt!.toISOString(),
+        reviewNote: '  Add instructions  ',
+      })
       .expect(201)
       .expect((response) => {
         expect(response.body).toMatchObject({

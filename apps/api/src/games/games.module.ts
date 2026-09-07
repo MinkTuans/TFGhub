@@ -166,10 +166,10 @@ const publicGameSelect = {
               ? tx.game.findUnique({ where: { id }, select: gameSummarySelect })
               : null;
           }),
-        approve: (id) =>
+        approve: (id, revision) =>
           database.$transaction(async (tx) => {
             const result = await tx.game.updateMany({
-              where: { id, reviewState: 'PENDING' },
+              where: { id, reviewState: 'PENDING', ...revision },
               data: {
                 reviewState: 'APPROVED',
                 visibility: 'PUBLIC',
@@ -181,10 +181,10 @@ const publicGameSelect = {
               ? tx.game.findUnique({ where: { id }, select: gameSummarySelect })
               : null;
           }),
-        reject: (id, reviewNote) =>
+        reject: (id, revision, reviewNote) =>
           database.$transaction(async (tx) => {
             const result = await tx.game.updateMany({
-              where: { id, reviewState: 'PENDING' },
+              where: { id, reviewState: 'PENDING', ...revision },
               data: {
                 reviewState: 'REJECTED',
                 visibility: 'DRAFT',

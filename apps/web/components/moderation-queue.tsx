@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useSyncExternalStore } from "react";
-import { api, ApiError, resolveApiBaseUrl } from "../lib/api-client";
+import { api, ApiError, resolvePublicApiBaseUrl } from "../lib/api-client";
 
 export type ModerationGame = {
   id: string;
@@ -12,7 +12,7 @@ export type ModerationGame = {
   sourceType: "UPLOAD" | "CODE" | "STORY" | "PLATFORMER";
   artifactVersion: number;
   artifactReady: boolean;
-  submittedAt: string | null;
+  submittedAt: string;
   creator: { id: string; displayName: string | null };
 };
 
@@ -34,7 +34,11 @@ export function ModerationQueue({ initialGames }: { initialGames: ModerationGame
     try {
       await api.post(
         `/moderation/games/${encodeURIComponent(game.id)}/${action}`,
-        action === "reject" ? { reviewNote: note } : {},
+        {
+          artifactVersion: game.artifactVersion,
+          submittedAt: game.submittedAt,
+          ...(action === "reject" ? { reviewNote: note } : {}),
+        },
       );
       setGames((current) => current.filter(({ id }) => id !== game.id));
       setMessage(action === "approve" ? "Game approved." : "Game rejected.");
@@ -68,11 +72,13 @@ export function ModerationQueue({ initialGames }: { initialGames: ModerationGame
               <article className="card" aria-label={game.title} key={game.id}>
                 <h2>{game.title}</h2>
                 <p>By {game.creator.displayName ?? "Unknown developer"}</p>
+                <p>Source: {{ UPLOAD: "HTML5 ZIP", CODE: "Code editor", STORY: "Story / quiz", PLATFORMER: "2D platformer" }[game.sourceType]}</p>
+                <p>Submitted: <time dateTime={game.submittedAt}>{game.submittedAt}</time></p>
                 <p className="description">{game.description}</p>
                 {game.artifactReady && game.artifactVersion > 0 && (
                   <iframe
                     title="Game preview"
-                    src={`${resolveApiBaseUrl()}/games/${encodeURIComponent(game.id)}/preview/?v=${game.artifactVersion}`}
+                    src={`${resolvePublicApiBaseUrl()}/games/${encodeURIComponent(game.id)}/preview/?v=${game.artifactVersion}`}
                     sandbox="allow-scripts allow-pointer-lock"
                   />
                 )}

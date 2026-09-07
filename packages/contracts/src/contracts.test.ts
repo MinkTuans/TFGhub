@@ -19,6 +19,17 @@ describe('contracts', () => {
     expect(() => CreateGameInput.parse({ title: 'Demo', slug: 'Not Valid' })).toThrow();
   });
 
+  it('requires the exact submitted revision for a moderation action', () => {
+    expect(contracts.ReviewRevisionInput.safeParse({}).success).toBe(false);
+    expect(contracts.ReviewRevisionInput.parse({
+      artifactVersion: 2,
+      submittedAt: '2026-09-07T09:00:00.000Z',
+    })).toEqual({
+      artifactVersion: 2,
+      submittedAt: '2026-09-07T09:00:00.000Z',
+    });
+  });
+
   it.each(['UPLOAD', 'CODE', 'STORY', 'PLATFORMER'] as const)(
     'retains %s as the selected game source type',
     (sourceType) => {

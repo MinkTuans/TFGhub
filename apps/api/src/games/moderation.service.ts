@@ -4,6 +4,7 @@ import {
   moderationActionSummary,
   moderationGameSummary,
 } from './games.service.js';
+import type { ReviewGameInput, ReviewRevisionInput } from '@indieforge/contracts';
 
 @Injectable()
 export class ModerationService {
@@ -15,14 +16,21 @@ export class ModerationService {
     return (await this.games.findPending()).map(moderationGameSummary);
   }
 
-  async approve(gameId: string) {
-    const game = await this.games.approve(gameId);
+  async approve(gameId: string, input: ReviewRevisionInput) {
+    const game = await this.games.approve(gameId, {
+      artifactVersion: input.artifactVersion,
+      submittedAt: new Date(input.submittedAt),
+    });
     if (!game) throw new ConflictException('Game is not pending review');
     return moderationActionSummary(game);
   }
 
-  async reject(gameId: string, reviewNote: string) {
-    const game = await this.games.reject(gameId, reviewNote.trim());
+  async reject(gameId: string, input: ReviewGameInput) {
+    const game = await this.games.reject(
+      gameId,
+      { artifactVersion: input.artifactVersion, submittedAt: new Date(input.submittedAt) },
+      input.reviewNote.trim(),
+    );
     if (!game) throw new ConflictException('Game is not pending review');
     return moderationActionSummary(game);
   }

@@ -149,6 +149,31 @@ describe('GamesService', () => {
     );
   });
 
+  it('invalidates a pending review when its owner edits metadata', async () => {
+    const { service, games } = fixture();
+    games.findUnique.mockResolvedValue({
+      ...storedGame,
+      reviewState: 'PENDING',
+      artifactVersion: 2,
+      artifactReady: true,
+      submittedAt: new Date('2026-09-05T12:01:00.000Z'),
+    });
+
+    await service.updateOwned('game-1', 'owner-1', { title: 'Changed' });
+
+    expect(games.updateOwned).toHaveBeenCalledWith(
+      'game-1',
+      'owner-1',
+      storedGame.updatedAt,
+      expect.objectContaining({
+        title: 'Changed',
+        visibility: 'DRAFT',
+        reviewState: 'DRAFT',
+        submittedAt: null,
+      }),
+    );
+  });
+
   it('does not overwrite a moderator approval that happens after the owner read', async () => {
     const { service, games } = fixture();
     const observedAt = new Date('2026-09-05T12:00:00.000Z');

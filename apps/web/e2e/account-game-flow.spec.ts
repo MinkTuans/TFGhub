@@ -1,6 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
 
+const externalServices = process.env.E2E_EXTERNAL_SERVICES === "1";
+const moderatorEmail = process.env.E2E_MODERATOR_EMAIL ?? (externalServices ? "" : "moderator@example.com");
+const moderatorPassword = process.env.E2E_MODERATOR_PASSWORD ?? (externalServices ? "" : "moderator-password123");
+
 for (const route of ["register", "login"] as const) {
   test(`${route} native submission keeps credentials out of the URL without JavaScript`, async ({
     browser,
@@ -194,6 +198,7 @@ test("an HTML5 upload can be retried, previewed, and submitted for review", asyn
 test("moderation hides from regular users, requires a rejection note, and publishes approved artifacts", async ({
   page,
 }) => {
+  test.skip(!moderatorEmail || !moderatorPassword, "External moderation requires disposable moderator credentials.");
   test.setTimeout(120_000);
   const suffix = randomUUID();
   const email = `moderation-${suffix}@example.com`;
@@ -224,8 +229,8 @@ test("moderation hides from regular users, requires a rejection note, and publis
   await expect(page.getByRole("status")).toHaveText("Pending review");
   await navigation.getByRole("button", { name: "Đăng xuất" }).click();
 
-  await page.getByLabel("Email").fill("moderator@example.com");
-  await page.getByLabel("Password").fill("moderator-password123");
+  await page.getByLabel("Email").fill(moderatorEmail);
+  await page.getByLabel("Password").fill(moderatorPassword);
   await page.getByRole("button", { name: "Log in" }).click();
   await expect(navigation.getByRole("link", { name: "Moderation" })).toBeVisible();
   await navigation.getByRole("link", { name: "Moderation" }).click();
@@ -263,8 +268,8 @@ test("moderation hides from regular users, requires a rejection note, and publis
   await page.getByRole("button", { name: "Submit for review" }).click();
   await navigation.getByRole("button", { name: "Đăng xuất" }).click();
 
-  await page.getByLabel("Email").fill("moderator@example.com");
-  await page.getByLabel("Password").fill("moderator-password123");
+  await page.getByLabel("Email").fill(moderatorEmail);
+  await page.getByLabel("Password").fill(moderatorPassword);
   await page.getByRole("button", { name: "Log in" }).click();
   await navigation.getByRole("link", { name: "Moderation" }).click();
   await page.getByRole("article", { name: title }).getByRole("button", { name: "Approve" }).click();
@@ -374,6 +379,14 @@ test("a platformer game builds a collision-safe preview that reaches its goal by
   await page.getByRole("button", { name: "Create draft" }).click();
 
   await page.getByRole("link", { name: title }).click();
+  await page.getByLabel("Goal X").fill("205");
+  await page.getByLabel("Goal Y").fill("316");
+  await page.getByRole("button", { name: "Add platform" }).click();
+  const elevated = page.getByRole("group", { name: "Platform 2" });
+  await elevated.getByLabel("X").fill("130");
+  await elevated.getByLabel("Y").fill("340");
+  await elevated.getByLabel("Width").fill("240");
+  await elevated.getByLabel("Height").fill("20");
   await page.getByRole("button", { name: "Save platformer" }).click();
   await page.getByRole("button", { name: "Build preview" }).click();
 
@@ -395,6 +408,18 @@ test("a platformer game builds a collision-safe preview that reaches its goal by
 
   await canvas.click();
   await page.keyboard.down("ArrowRight");
+  await page.waitForTimeout(200);
+  await page.keyboard.down("ArrowUp");
+  await expect.poll(async () => Number(await canvas.getAttribute("data-player-y"))).toBeLessThan(390);
   await expect(game.getByRole("status")).toHaveText("Goal reached!");
+  await page.keyboard.up("ArrowUp");
   await page.keyboard.up("ArrowRight");
+  await page.keyboard.press("r");
+  await expect(game.getByRole("status")).toHaveText("");
+  await expect.poll(async () =>
+    canvas.evaluate((element) => {
+      const context = (element as HTMLCanvasElement).getContext("2d");
+      return context ? Array.from(context.getImageData(36, 428, 1, 1).data) : [];
+    }),
+  ).toEqual([37, 99, 235, 255]);
 });

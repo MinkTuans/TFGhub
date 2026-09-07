@@ -1,8 +1,10 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
+import { renderToString } from "react-dom/server";
 import { AuthForm } from "../components/auth-form";
 import { GameForm } from "../components/game-form";
 import { GameWorkspace } from "../components/game-workspace";
+import { GamePreview } from "../components/game-preview";
 import { LogoutButton } from "../components/logout-button";
 import { ModerationQueue, type ModerationGame } from "../components/moderation-queue";
 import type { GameSummary } from "@indieforge/contracts";
@@ -11,7 +13,10 @@ import type { GameSummary } from "@indieforge/contracts";
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace: vi.fn(), refresh: vi.fn() }),
 }));
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllEnvs();
+  vi.unstubAllGlobals();
+});
 
 function codeGame(overrides: Partial<GameSummary> = {}): GameSummary {
   return {
@@ -229,6 +234,39 @@ test("moderation keeps every active review disabled when two cards are actioned"
     for (const button of within(card).getAllByRole("button"))
       expect(button).toBeDisabled();
   }
+});
+
+test("moderation binds actions to the displayed submission and renders its context", async () => {
+  const fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({})));
+  vi.stubGlobal("fetch", fetch);
+  render(<ModerationQueue initialGames={[moderationGame("game-1", "Review me")]} />);
+
+  const card = screen.getByRole("article", { name: "Review me" });
+  expect(within(card).getByText("Source: Code editor")).toBeVisible();
+  expect(within(card).getByText(/Submitted:/)).toBeVisible();
+  fireEvent.click(within(card).getByRole("button", { name: "Approve" }));
+
+  await screen.findByText("Game approved.");
+  expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({
+    artifactVersion: 1,
+    submittedAt: "2026-09-07T09:00:00.000Z",
+  });
+});
+
+test("story and platformer editors render when crypto.randomUUID is unavailable", () => {
+  vi.stubGlobal("crypto", {});
+  expect(() => render(<GameWorkspace initialGame={storyGame()} />)).not.toThrow();
+  expect(() => render(<GameWorkspace initialGame={platformerGame()} />)).not.toThrow();
+});
+
+test("a server-rendered preview uses the browser-safe public API URL", () => {
+  vi.stubEnv("API_INTERNAL_URL", "http://private-api:3001");
+  vi.stubEnv("NEXT_PUBLIC_API_URL", "https://public.example/api");
+  const html = renderToString(<GamePreview gameId="game-1" revision={3} />);
+  expect(html).toContain(
+    'src="https://public.example/api/games/game-1/preview/?v=3"',
+  );
+  expect(html).not.toContain("private-api");
 });
 
 test("workspace shows a moderator rejection note to its owner", () => {

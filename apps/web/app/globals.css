@@ -67,6 +67,13 @@ main {
 main.narrow {
   max-width: 560px;
 }
+iframe {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-height: min(70vh, 640px);
+  border: 1px solid #dce3d8;
+}
 .hero {
   padding: 56px 0;
   max-width: 800px;

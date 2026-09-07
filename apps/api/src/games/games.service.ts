@@ -77,6 +77,7 @@ export type ModerationGameSummary = Omit<GameSummary, 'projectData'> & {
 };
 
 export type ModerationActionSummary = Omit<GameSummary, 'projectData'>;
+export type SubmittedRevision = { artifactVersion: number; submittedAt: Date };
 
 export abstract class GamesRepository {
   abstract create(input: {
@@ -103,8 +104,8 @@ export abstract class GamesRepository {
     input: WorkspaceUpdate,
   ): Promise<StoredGame | null>;
   abstract submit(id: string): Promise<StoredGame | null>;
-  abstract approve(id: string): Promise<StoredGame | null>;
-  abstract reject(id: string, reviewNote: string): Promise<StoredGame | null>;
+  abstract approve(id: string, revision: SubmittedRevision): Promise<StoredGame | null>;
+  abstract reject(id: string, revision: SubmittedRevision, reviewNote: string): Promise<StoredGame | null>;
   abstract updateOwned(
     id: string,
     ownerId: string,
@@ -216,7 +217,7 @@ export class GamesService {
       throw new ForbiddenException('You do not own this game');
     }
     const resetReview =
-      game.reviewState === 'APPROVED' && game.visibility === 'PUBLIC'
+      game.reviewState === 'PENDING' || game.reviewState === 'APPROVED'
         ? {
             visibility: 'DRAFT' as const,
             reviewState: 'DRAFT' as const,

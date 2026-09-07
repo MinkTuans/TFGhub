@@ -44,9 +44,12 @@ does **not** prove Prisma queries, migrations, PostgreSQL constraints, concurren
 or persistence across process restarts.
 
 To exercise an already running web/API/PostgreSQL stack, use
-`E2E_EXTERNAL_SERVICES=1 E2E_WEB_URL=http://localhost:3000 pnpm --filter web e2e`.
+`E2E_EXTERNAL_SERVICES=1 E2E_WEB_URL=http://localhost:3000 E2E_MODERATOR_EMAIL='<disposable account>' E2E_MODERATOR_PASSWORD='<disposable password>' pnpm --filter web e2e`.
 The account journey uses unique data and creates real test records. The public
-seed test is skipped in external mode.
+seed test is skipped in external mode. The moderator account must be registered
+and granted by an operator before the run, then revoked or removed afterward;
+omitting either credential skips only the moderation journey. Local harness
+credentials are never used as external defaults.
 
 If Chromium is already installed, set
 `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/absolute/path/to/chrome`. Prefer Playwright's

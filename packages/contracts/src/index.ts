@@ -12,6 +12,7 @@ export {
   PlatformerProjectInput,
   PublicGameSummary,
   ReviewGameInput,
+  ReviewRevisionInput,
   StoryProjectInput,
   UpdateGameInput,
 } from './games.js';
@@ -22,5 +23,6 @@ export type {
   GameSourceType as GameSourceTypeType,
   PlatformerProjectInput as PlatformerProjectInputType,
   ReviewGameInput as ReviewGameInputType,
+  ReviewRevisionInput as ReviewRevisionInputType,
   StoryProjectInput as StoryProjectInputType,
 } from './games.js';

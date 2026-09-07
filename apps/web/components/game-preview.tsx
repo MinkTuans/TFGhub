@@ -1,6 +1,6 @@
 "use client";
 
-import { resolveApiBaseUrl } from "../lib/api-client";
+import { resolvePublicApiBaseUrl } from "../lib/api-client";
 
 export function GamePreview({
   gameId,
@@ -14,7 +14,7 @@ export function GamePreview({
       <h2 id="preview-heading">Preview</h2>
       <iframe
         title="Game preview"
-        src={`${resolveApiBaseUrl()}/games/${encodeURIComponent(gameId)}/preview/?v=${revision}`}
+        src={`${resolvePublicApiBaseUrl()}/games/${encodeURIComponent(gameId)}/preview/?v=${revision}`}
         sandbox="allow-scripts allow-pointer-lock"
       />
     </section>

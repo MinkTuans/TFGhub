@@ -12,7 +12,7 @@ export function compilePlatformer(input: PlatformerProjectInput): ArtifactFile[]
     contentType: 'text/html; charset=utf-8',
     content: `<!doctype html>
 <html lang="en">
-  <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head>
+  <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><style>html,body{margin:0}canvas{display:block;max-width:100%;height:auto}</style></head>
   <body>
     <canvas id="game" aria-label="Platform game"></canvas>
     <p id="status" role="status"></p>
@@ -24,9 +24,16 @@ export function compilePlatformer(input: PlatformerProjectInput): ArtifactFile[]
       const status = document.getElementById('status');
       canvas.width = project.canvas.width;
       canvas.height = project.canvas.height;
-      const player = { ...project.player, width: 24, height: 24, velocityX: 0, velocityY: 0 };
+      const player = { ...project.player, width: 24, height: 24, velocityX: 0, velocityY: 0, grounded: false };
       const keys = new Set();
-      addEventListener('keydown', (event) => keys.add(event.key));
+      function reset() {
+        Object.assign(player, project.player, { velocityX: 0, velocityY: 0, grounded: false });
+        status.textContent = '';
+      }
+      addEventListener('keydown', (event) => {
+        keys.add(event.key);
+        if (event.key.toLowerCase() === 'r') reset();
+      });
       addEventListener('keyup', (event) => keys.delete(event.key));
       function overlaps(left, right) {
         return left.x < right.x + right.width && left.x + left.width > right.x
@@ -34,19 +41,29 @@ export function compilePlatformer(input: PlatformerProjectInput): ArtifactFile[]
       }
       function update() {
         player.velocityX = (keys.has('ArrowRight') ? 4 : 0) - (keys.has('ArrowLeft') ? 4 : 0);
+        if ((keys.has('ArrowUp') || keys.has(' ')) && player.grounded) {
+          player.velocityY = -11;
+          player.grounded = false;
+        }
         player.velocityY += 0.5;
         player.x = Math.max(0, Math.min(canvas.width - player.width, player.x + player.velocityX));
         player.y = Math.min(canvas.height - player.height, player.y + player.velocityY);
+        let grounded = false;
         for (const platform of project.platforms) {
           if (player.velocityY >= 0 && overlaps(player, platform)
             && player.y + player.height - player.velocityY <= platform.y) {
             player.y = platform.y - player.height;
             player.velocityY = 0;
+            grounded = true;
           }
         }
+        player.grounded = grounded;
         if (overlaps(player, { ...project.goal, width: 24, height: 24 })) status.textContent = 'Goal reached!';
       }
       function draw() {
+        canvas.dataset.playerX = String(Math.round(player.x));
+        canvas.dataset.playerY = String(Math.round(player.y));
+        canvas.dataset.grounded = String(player.grounded);
         context.fillStyle = project.backgroundColor;
         context.fillRect(0, 0, canvas.width, canvas.height);
         for (const platform of project.platforms) {

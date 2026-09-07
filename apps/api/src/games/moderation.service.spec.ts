@@ -69,7 +69,10 @@ describe('ModerationService', () => {
   it('publishes an artifact only when its review is still pending', async () => {
     const { service, games } = fixture();
 
-    const result = await service.approve('game-1');
+    const result = await service.approve('game-1', {
+      artifactVersion: 1,
+      submittedAt: '2026-09-05T12:01:00.000Z',
+    });
     expect(result).toMatchObject({
       reviewState: 'APPROVED',
       visibility: 'PUBLIC',
@@ -77,26 +80,40 @@ describe('ModerationService', () => {
       artifactReady: true,
     });
     expect(result).not.toHaveProperty('projectData');
-    expect(games.approve).toHaveBeenCalledWith('game-1');
+    expect(games.approve).toHaveBeenCalledWith('game-1', {
+      artifactVersion: 1,
+      submittedAt: new Date('2026-09-05T12:01:00.000Z'),
+    });
   });
 
   it('returns conflict instead of reviewing an already-handled game', async () => {
     const { service, games } = fixture();
     games.approve.mockResolvedValue(null);
 
-    await expect(service.approve('game-1')).rejects.toThrow(ConflictException);
+    await expect(service.approve('game-1', {
+      artifactVersion: 1,
+      submittedAt: '2026-09-05T12:01:00.000Z',
+    })).rejects.toThrow(ConflictException);
   });
 
   it('rejects a pending game with a trimmed moderator note', async () => {
     const { service, games } = fixture();
 
-    const result = await service.reject('game-1', '  Needs a title screen  ');
+    const result = await service.reject('game-1', {
+      artifactVersion: 1,
+      submittedAt: '2026-09-05T12:01:00.000Z',
+      reviewNote: '  Needs a title screen  ',
+    });
     expect(result).toMatchObject({
       reviewState: 'REJECTED',
       visibility: 'DRAFT',
       artifactReady: true,
     });
     expect(result).not.toHaveProperty('projectData');
-    expect(games.reject).toHaveBeenCalledWith('game-1', 'Needs a title screen');
+    expect(games.reject).toHaveBeenCalledWith(
+      'game-1',
+      { artifactVersion: 1, submittedAt: new Date('2026-09-05T12:01:00.000Z') },
+      'Needs a title screen',
+    );
   });
 });

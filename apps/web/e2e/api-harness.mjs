@@ -169,9 +169,13 @@ const testingModule = await Test.createTestingModule({ imports: [AppModule] })
       games.set(id, game);
       return game;
     },
-    async approve(id) {
+    async approve(id, revision) {
       const current = games.get(id);
-      if (!current || current.reviewState !== "PENDING") return null;
+      if (
+        !current || current.reviewState !== "PENDING" ||
+        current.artifactVersion !== revision.artifactVersion ||
+        current.submittedAt?.getTime() !== revision.submittedAt.getTime()
+      ) return null;
       const game = {
         ...current,
         visibility: "PUBLIC",
@@ -183,9 +187,13 @@ const testingModule = await Test.createTestingModule({ imports: [AppModule] })
       games.set(id, game);
       return game;
     },
-    async reject(id, reviewNote) {
+    async reject(id, revision, reviewNote) {
       const current = games.get(id);
-      if (!current || current.reviewState !== "PENDING") return null;
+      if (
+        !current || current.reviewState !== "PENDING" ||
+        current.artifactVersion !== revision.artifactVersion ||
+        current.submittedAt?.getTime() !== revision.submittedAt.getTime()
+      ) return null;
       const game = {
         ...current,
         visibility: "DRAFT",

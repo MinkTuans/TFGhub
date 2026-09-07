@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   StoryProjectInput,
   type GameSummary,
@@ -31,20 +31,19 @@ const defaultProject: StoryProject = {
   ],
 };
 
-function uiKey(): string {
-  return globalThis.crypto.randomUUID();
-}
-
 function savedProject(projectData: GameSummary["projectData"]): StoryProject {
   const parsed = StoryProjectInput.safeParse(projectData);
   return parsed.success ? parsed.data : defaultProject;
 }
 
 function toEditorScenes(project: StoryProject): Scene[] {
-  return project.scenes.map((scene) => ({
+  return project.scenes.map((scene, sceneIndex) => ({
     ...scene,
-    key: uiKey(),
-    choices: scene.choices.map((choice) => ({ ...choice, key: uiKey() })),
+    key: `scene-${sceneIndex}`,
+    choices: scene.choices.map((choice, choiceIndex) => ({
+      ...choice,
+      key: `scene-${sceneIndex}-choice-${choiceIndex}`,
+    })),
   }));
 }
 
@@ -83,6 +82,8 @@ export function StoryGameEditor({
   onBuilt: (game: GameSummary) => void;
 }) {
   const initial = savedProject(initialProject);
+  const nextKey = useRef(0);
+  const addedKey = (kind: string) => `${kind}-added-${nextKey.current++}`;
   const [startSceneId, setStartSceneId] = useState(initial.startSceneId);
   const [scenes, setScenes] = useState(() => toEditorScenes(initial));
   const [saved, setSaved] = useState(initial);
@@ -107,7 +108,7 @@ export function StoryGameEditor({
       return [
         ...current,
         {
-          key: uiKey(),
+          key: addedKey("scene"),
           id: `scene-${number}`,
           speaker: "Narrator",
           dialogue: "",
@@ -131,7 +132,7 @@ export function StoryGameEditor({
               choices: [
                 ...scene.choices,
                 {
-                  key: uiKey(),
+                  key: addedKey("choice"),
                   text: "Continue",
                   targetSceneId: current[0]?.id ?? "",
                 },

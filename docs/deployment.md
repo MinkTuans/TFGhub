@@ -81,10 +81,13 @@ Expect `{"status":"ok"}`. In a browser at that origin, register a disposable acc
 From a checkout with dependencies and Playwright Chromium installed, the same account journey can target this stack:
 
 ```bash
-E2E_EXTERNAL_SERVICES=1 E2E_WEB_URL="$PUBLIC_ORIGIN" pnpm --filter web e2e
+E2E_EXTERNAL_SERVICES=1 E2E_WEB_URL="$PUBLIC_ORIGIN" \
+  E2E_MODERATOR_EMAIL='<disposable-moderator@example.com>' \
+  E2E_MODERATOR_PASSWORD='<unique-disposable-password>' \
+  pnpm --filter web e2e
 ```
 
-This creates real test records; the fixture-dependent public discovery test is skipped. See [browser setup](../apps/web/README.md#verify). The separate `pnpm test:deploy-smoke` creates and deletes a disposable Compose project and its volumes; run it on a validation host with free ports 8080 and 443, not alongside this production proxy.
+Register the disposable account first, grant it `MODERATOR` with the operator-only function below, and use credentials created solely for this run. If either moderator variable is omitted, the external moderation journey is skipped; the local harness alone supplies its documented deterministic defaults. After verification, revoke the role (or delete the disposable account and its test data through an audited operator procedure) and unset both variables. Never reuse or commit production credentials. This creates real test records; the fixture-dependent public discovery test is skipped. See [browser setup](../apps/web/README.md#verify). The separate `pnpm test:deploy-smoke` creates and deletes a disposable Compose project and its volumes; run it on a validation host with free ports 8080 and 443, not alongside this production proxy.
 
 ## Routine operations
 
@@ -335,6 +338,32 @@ grant_moderator
 
 Sign out and back in after an elevation so navigation updates. Use `ADMIN` only
 when the broader administrative role is actually required.
+
+After an external E2E run, revoke the disposable account immediately with the
+same stdin-only targeting pattern (then remove the account through the normal
+audited account-retention procedure if one exists):
+
+```bash
+revoke_moderator() {
+  local email confirmation
+  read -r -p 'Disposable moderator email to revoke: ' email
+  test -n "$email" || return 1
+  printf 'Revoke MODERATOR from %s in project indieforge? Type REVOKE: ' "$email"
+  read -r confirmation
+  test "$confirmation" = REVOKE || return 1
+  printf '%s\n' "$email" | compose exec -T postgres sh -ec '
+    IFS= read -r email
+    psql --set=ON_ERROR_STOP=1 --set="email=$email" \
+      --username="$POSTGRES_USER" --dbname="$POSTGRES_DB" --file=/dev/stdin <<'"'"'SQL'"'"'
+UPDATE "User"
+SET "role" = '"'"'USER'"'"'
+WHERE "email" = :'"'"'email'"'"' AND "role" = '"'"'MODERATOR'"'"'
+RETURNING "email", "role";
+SQL
+  '
+}
+revoke_moderator
+```
 
 ## Upgrade
 
