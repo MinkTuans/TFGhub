@@ -1,19 +1,27 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const jwtSecret =
   '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
+const postgresPassword = '0123456789abcdef0123456789abcdef';
 const environment = `DEPLOY_ADDRESS=:80
 HTTP_PORT=8080
 SITE_ORIGIN=http://localhost:8080
 POSTGRES_DB=indieforge
 POSTGRES_USER=indieforge
-POSTGRES_PASSWORD=0123456789abcdef0123456789abcdef
+POSTGRES_PASSWORD=${postgresPassword}
 JWT_SECRET=${jwtSecret}
 `;
+
+const environmentExample = await readFile('.env.production.example', 'utf8');
+const postgresPasswordDocumentation =
+  environmentExample.match(/(?:^#.*\n)+POSTGRES_PASSWORD=/m)?.[0] ?? '';
+assert.match(postgresPasswordDocumentation, /URL-safe hexadecimal/i);
+assert.match(postgresPasswordDocumentation, /openssl rand -hex 32/);
+assert.match(postgresPassword, /^[0-9a-f]+$/);
 
 const temporaryDirectory = await mkdtemp(
   join(tmpdir(), 'indieforge-deployment-config-'),
@@ -70,6 +78,10 @@ try {
     services.api.environment.WEB_ORIGIN,
     'http://localhost:8080',
   );
+  const expectedDatabaseUrl =
+    `postgresql://indieforge:${postgresPassword}@postgres:5432/indieforge`;
+  assert.equal(services.migrate.environment.DATABASE_URL, expectedDatabaseUrl);
+  assert.equal(services.api.environment.DATABASE_URL, expectedDatabaseUrl);
   assert.ok(
     services.proxy.ports.some(
       (port) => String(port.published) === '8080' && port.target === 80,
