@@ -59,9 +59,10 @@ on `/moderation` and received the 404 page instead of the expected redirect.
   pending-request test first showed the first card becoming enabled when the
   second action started; it now proves every active card remains disabled.
 - Restored Playwright's physical `click()`. The test waits for explicit client
-  hydration and for the selected card's signed preview iframe content before
-  clicking. It no longer reloads immediately after the action, which had
-  aborted an in-flight action in the previous version.
+  hydration and for the selected card's signed preview iframe content, then
+  moves focus out of the controlled rejection-note field before clicking. It
+  no longer reloads immediately after the action, which had aborted an
+  in-flight action in the previous version.
 
 ## E2E follow-up
 
@@ -71,11 +72,8 @@ The final prescribed combined command was run once with the Chrome override:
 PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/google-chrome pnpm --filter web e2e --grep 'HTML5 upload|moderation'
 ```
 
-It failed at the real `Reject` click: Playwright reports the action completed,
-but its trace contains no `/moderation/:id/reject` request and no success
-status. The DOM retains the exact target card and note. This happens only in
-the combined two-card state; it is recorded as an unresolved E2E concern rather
-than masked with `dispatchEvent` or another speculative change. The focused run
-without the Chrome override was also blocked before test execution by a missing
-Playwright-managed Chromium executable; the prescribed Chrome override removed
-that infrastructure blocker.
+The controlled textarea was still focused at the instant of the pointer click
+in the failing two-card run. Explicitly completing that edit with `Tab` before
+the real click removes the focus/update race without bypassing browser
+actionability. Fresh result: 2 passed (HTML5 upload plus moderation), including
+the real rejection click and observed success status.

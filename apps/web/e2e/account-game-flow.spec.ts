@@ -246,6 +246,7 @@ test("moderation hides from regular users, requires a rejection note, and publis
   const reject = queued.getByRole("button", { name: "Reject" });
   await expect(reject).toBeDisabled();
   await queued.getByLabel("Rejection note").fill("Please add instructions.");
+  await queued.getByLabel("Rejection note").press("Tab");
   await expect(reject).toBeEnabled();
   await reject.click();
   await expect(page.getByRole("status")).toHaveText("Game rejected.");
