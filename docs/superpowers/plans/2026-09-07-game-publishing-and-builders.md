@@ -137,7 +137,7 @@
   public `GET /play/:slug/*`.
 - Consumes: artifact interfaces from Task 2 and domain contracts from Task 1.
 
-- [ ] **Step 1: Write failing service/API tests**
+- [x] **Step 1: Write failing service/API tests**
 
   Prove ownership before file access, source-type matching, successful build
   increments the version, build resets approval/public visibility, upload
@@ -145,13 +145,13 @@
   current version, preview is owner-only, guest/auth play rules work, and
   unapproved content returns 404.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
   Run: `pnpm --filter api test && pnpm --filter api test:e2e`
 
   Expected: new tests fail on missing routes and behavior.
 
-- [ ] **Step 3: Implement ZIP reader, workspace service, and content response**
+- [x] **Step 3: Implement ZIP reader, workspace service, and content response**
 
   Add one pure-JavaScript streaming ZIP dependency. Validate entry names before
   extracting, reject symlinks/encryption, count expanded bytes while streaming,
@@ -159,13 +159,13 @@
   `X-Content-Type-Options:nosniff`, and exact MIME types on content responses.
   Allow multipart only on `/games/:id/upload`; retain origin enforcement.
 
-- [ ] **Step 4: Verify GREEN**
+- [x] **Step 4: Verify GREEN**
 
   Run: `pnpm --filter api test && pnpm --filter api test:e2e && pnpm --filter api typecheck && pnpm --filter api lint`
 
   Expected: all commands exit 0.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
   Run: `git add apps/api apps/api/package.json pnpm-lock.yaml && git commit -m "feat(api): upload and serve HTML5 games"`
 
