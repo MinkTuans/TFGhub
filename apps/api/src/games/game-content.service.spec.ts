@@ -19,19 +19,39 @@ const project = {
   javascript: '',
 };
 
+function deferred() {
+  let resolve!: () => void;
+  const promise = new Promise<void>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
+
 describe('GameContentService with real artifacts and ZIP streams', () => {
   let root: string;
   let game: StoredGame;
   let service: GameContentService;
   let storage: ArtifactStorage;
-  let finalization: 'ok' | 'fail' | 'commit-then-fail' | 'fail-and-offline';
+  let finalization:
+    | 'ok'
+    | 'fail'
+    | 'commit-then-fail'
+    | 'fail-and-offline'
+    | 'fail-before-commit';
   let offline: boolean;
   let tokens: JwtService;
+  let games: GamesRepository;
+  let pendingCommit: ReturnType<typeof deferred> | undefined;
+  let finishCommit: (() => void) | undefined;
+  let reconciliationRequested: ReturnType<typeof deferred>;
   beforeEach(async () => {
     root = await mkdtemp(join(tmpdir(), 'content-test-'));
     storage = new ArtifactStorage(root);
     finalization = 'ok';
     offline = false;
+    pendingCommit = undefined;
+    finishCommit = undefined;
+    reconciliationRequested = deferred();
     tokens = new JwtService({ secret: 'test-only-capability-signing-secret' });
     game = {
       id: 'game-1',
@@ -52,13 +72,19 @@ describe('GameContentService with real artifacts and ZIP streams', () => {
       createdAt: new Date(),
       updatedAt: new Date(),
     };
-    const games = {
+    games = {
       async findUnique(id: string) {
         if (offline) throw new Error('Database unavailable');
         return id === game.id ? game : null;
       },
       async findBySlug(slug: string) {
         return slug === game.slug ? game : null;
+      },
+      async lockForArtifactReconciliation(id: string) {
+        reconciliationRequested.resolve();
+        await pendingCommit?.promise;
+        if (offline) throw new Error('Database unavailable');
+        return id === game.id ? game : null;
       },
       async updateWorkspace(
         id: string,
@@ -70,6 +96,14 @@ describe('GameContentService with real artifacts and ZIP streams', () => {
         if (finalization === 'fail-and-offline') {
           offline = true;
           throw new Error('Database unavailable');
+        }
+        if (finalization === 'fail-before-commit') {
+          pendingCommit = deferred();
+          finishCommit = () => {
+            game = { ...game, ...input, updatedAt: new Date() };
+            pendingCommit!.resolve();
+          };
+          throw new Error('Connection lost while commit is still in flight');
         }
         game = { ...game, ...input, updatedAt: new Date() };
         if (finalization === 'commit-then-fail')
@@ -374,6 +408,87 @@ describe('GameContentService with real artifacts and ZIP streams', () => {
     expect(
       (await storage.read(game.id, 2, 'index.html')).content.toString(),
     ).toContain('Playable');
+    expect(
+      (await storage.read(game.id, 1, 'index.html')).content.toString(),
+    ).toBe('original');
+  });
+
+  it('waits for an in-flight finalization commit before deciding whether its bytes are unreferenced', async () => {
+    game.sourceType = 'CODE';
+    game.projectData = project;
+    finalization = 'fail-before-commit';
+    const outcome = service.build(game.id, 'owner-1').then(
+      (value) => ({ value }),
+      (error: unknown) => ({ error }),
+    );
+    try {
+      const reached = await Promise.race([
+        reconciliationRequested.promise.then(() => 'locked'),
+        outcome.then(() => 'finished without waiting'),
+      ]);
+      expect(reached).toBe('locked');
+      // An ordinary READ COMMITTED lookup still sees version 1 while the
+      // original transaction holds the row and has not completed its commit.
+      expect((await games.findUnique(game.id))?.artifactVersion).toBe(1);
+      expect(
+        (await storage.read(game.id, 2, 'index.html')).content.toString(),
+      ).toContain('Playable');
+    } finally {
+      finishCommit?.();
+    }
+    expect(await outcome).toMatchObject({ value: { artifactVersion: 2 } });
+    expect(game.artifactVersion).toBe(2);
+    expect(
+      (await storage.read(game.id, 2, 'index.html')).content.toString(),
+    ).toContain('Playable');
+    expect(
+      (await storage.read(game.id, 1, 'index.html')).content.toString(),
+    ).toBe('original');
+  });
+
+  it('waits for an in-flight commit on a version collision and preserves the original committed bytes', async () => {
+    game.sourceType = 'CODE';
+    game.projectData = project;
+    await storage.install(game.id, 2, [
+      {
+        path: 'index.html',
+        content: 'in-flight artifact',
+        contentType: 'text/html',
+      },
+    ]);
+    pendingCommit = deferred();
+    finishCommit = () => {
+      game = {
+        ...game,
+        artifactVersion: 2,
+        visibility: 'DRAFT',
+        reviewState: 'DRAFT',
+        updatedAt: new Date(),
+      };
+      pendingCommit!.resolve();
+    };
+    const outcome = service.build(game.id, 'owner-1').then(
+      (value) => ({ value }),
+      (error: unknown) => ({ error }),
+    );
+    try {
+      const reached = await Promise.race([
+        reconciliationRequested.promise.then(() => 'locked'),
+        outcome.then(() => 'finished without waiting'),
+      ]);
+      expect(reached).toBe('locked');
+      expect((await games.findUnique(game.id))?.artifactVersion).toBe(1);
+      expect(
+        (await storage.read(game.id, 2, 'index.html')).content.toString(),
+      ).toBe('in-flight artifact');
+    } finally {
+      finishCommit();
+    }
+    expect(await outcome).toMatchObject({ error: { status: 409 } });
+    expect(game.artifactVersion).toBe(2);
+    expect(
+      (await storage.read(game.id, 2, 'index.html')).content.toString(),
+    ).toBe('in-flight artifact');
     expect(
       (await storage.read(game.id, 1, 'index.html')).content.toString(),
     ).toBe('original');

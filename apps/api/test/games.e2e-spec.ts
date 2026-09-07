@@ -96,6 +96,9 @@ describe('Developer profile and game draft HTTP boundary', () => {
           const game = games.get(id);
           return game ?? null;
         },
+        async lockForArtifactReconciliation(id: string) {
+          return games.get(id) ?? null;
+        },
         async findBySlug(slug: string) {
           return [...games.values()].find((game) => game.slug === slug) ?? null;
         },

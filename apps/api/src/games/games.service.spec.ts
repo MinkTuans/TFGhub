@@ -27,6 +27,7 @@ function fixture() {
     create: vi.fn().mockResolvedValue(storedGame),
     findManyByOwner: vi.fn().mockResolvedValue([storedGame]),
     findUnique: vi.fn().mockResolvedValue(storedGame),
+    lockForArtifactReconciliation: vi.fn().mockResolvedValue(storedGame),
     update: vi.fn().mockResolvedValue(storedGame),
     findBySlug: vi.fn().mockResolvedValue(storedGame),
     updateWorkspace: vi.fn().mockResolvedValue(storedGame),

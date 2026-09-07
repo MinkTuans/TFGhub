@@ -63,6 +63,10 @@ export abstract class GamesRepository {
   }): Promise<StoredGame>;
   abstract findManyByOwner(ownerId: string): Promise<StoredGame[]>;
   abstract findUnique(id: string): Promise<StoredGame | null>;
+  /** Wait for in-flight row writers before returning artifact reconciliation state. */
+  abstract lockForArtifactReconciliation(
+    id: string,
+  ): Promise<StoredGame | null>;
   abstract findBySlug(slug: string): Promise<StoredGame | null>;
   abstract updateWorkspace(
     id: string,

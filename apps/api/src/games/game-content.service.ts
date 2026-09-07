@@ -269,7 +269,7 @@ export class GameContentService {
       }
       // A previous request may have lost its DB connection after installation.
       // Never delete the current version or any historical referenced version.
-      const fresh = await this.current(game.id);
+      const fresh = await this.reconciliationState(game.id);
       if (!fresh || fresh.artifactVersion >= artifactVersion) {
         throw new ConflictException('Game changed; reload the workspace');
       }
@@ -288,9 +288,9 @@ export class GameContentService {
     try {
       return await this.update(game, { ...resetReview, artifactVersion });
     } catch (error) {
-      // A lost commit response is ambiguous: first establish which bytes the
-      // database references. If that read fails, preserve bytes for a retry.
-      const fresh = await this.current(game.id);
+      // A lost commit response can leave the original transaction in flight.
+      // Wait on its row lock before deciding which bytes are unreferenced.
+      const fresh = await this.reconciliationState(game.id);
       if (fresh?.artifactVersion === artifactVersion) return gameSummary(fresh);
       if (fresh && fresh.artifactVersion < artifactVersion) {
         await this.discard(game.id, artifactVersion, fresh.artifactVersion);
@@ -302,9 +302,9 @@ export class GameContentService {
     }
   }
 
-  private async current(gameId: string) {
+  private async reconciliationState(gameId: string) {
     try {
-      return await this.games.findUnique(gameId);
+      return await this.games.lockForArtifactReconciliation(gameId);
     } catch {
       throw new ServiceUnavailableException(
         'Artifact finalization is unavailable',

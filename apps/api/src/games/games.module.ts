@@ -70,6 +70,16 @@ const publicGameSelect = {
             where: { id },
             select: gameSummarySelect,
           }),
+        lockForArtifactReconciliation: (id) =>
+          database.$transaction(async (tx) => {
+            // The original finalization may still hold this row lock after its
+            // client connection failed. Wait for commit/rollback before reading.
+            await tx.$queryRaw`SELECT "id" FROM "Game" WHERE "id" = ${id} FOR UPDATE`;
+            return tx.game.findUnique({
+              where: { id },
+              select: gameSummarySelect,
+            });
+          }),
         findBySlug: (slug) =>
           database.game.findUnique({
             where: { slug },
