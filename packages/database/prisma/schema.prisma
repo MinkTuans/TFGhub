@@ -31,6 +31,20 @@ enum ModerationState {
   QUARANTINED
 }
 
+enum GameSourceType {
+  UPLOAD
+  CODE
+  STORY
+  PLATFORMER
+}
+
+enum GameReviewState {
+  DRAFT
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 model User {
   id           String            @id @default(cuid())
   email        String            @unique
@@ -57,6 +71,13 @@ model Game {
   visibility      GameVisibility  @default(DRAFT)
   accessMode      GameAccessMode  @default(GUEST_ALLOWED)
   moderationState ModerationState @default(CLEAR)
+  sourceType      GameSourceType  @default(UPLOAD)
+  reviewState     GameReviewState @default(DRAFT)
+  projectData     Json?
+  artifactVersion Int             @default(0)
+  reviewNote      String?
+  submittedAt     DateTime?
+  reviewedAt      DateTime?
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
   owner           User            @relation(fields: [ownerId], references: [id], onDelete: Cascade)
