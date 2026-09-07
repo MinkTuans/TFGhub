@@ -1,17 +1,50 @@
 import { randomUUID } from "node:crypto";
-import { expect, test as base, type Locator } from "@playwright/test";
+import { expect, test as base, type Browser, type BrowserContext, type BrowserContextOptions, type Locator, type Request } from "@playwright/test";
+
+function auditGoogleRequests(context: BrowserContext) {
+  const requests: string[] = [];
+  const record = (request: Request) => {
+    const host = new URL(request.url()).hostname;
+    if (host.includes("googlesyndication.com") || host.includes("doubleclick.net")) {
+      requests.push(request.url());
+    }
+  };
+  context.on("request", record);
+  return {
+    requests,
+    finish() {
+      context.off("request", record);
+      expect(requests, "Disabled advertising must make no Google ad requests").toEqual([]);
+    },
+  };
+}
+
+async function withBrowserContext(
+  browser: Browser,
+  options: BrowserContextOptions,
+  visit: (context: BrowserContext) => Promise<void>,
+) {
+  const context = await browser.newContext(options);
+  const audit = auditGoogleRequests(context);
+  try {
+    await visit(context);
+  } finally {
+    try {
+      audit.finish();
+    } finally {
+      await context.close();
+    }
+  }
+}
 
 const test = base.extend<{ googleRequests: string[] }>({
-  googleRequests: [async ({ context }, use) => {
-    const requests: string[] = [];
-    context.on("request", (request) => {
-      const host = new URL(request.url()).hostname;
-      if (host.includes("googlesyndication.com") || host.includes("doubleclick.net")) {
-        requests.push(request.url());
-      }
-    });
-    await use(requests);
-    expect(requests, "Disabled advertising must make no Google ad requests").toEqual([]);
+  googleRequests: [async ({ context }, provide) => {
+    const audit = auditGoogleRequests(context);
+    try {
+      await provide(audit.requests);
+    } finally {
+      audit.finish();
+    }
   }, { auto: true }],
 });
 
@@ -32,6 +65,29 @@ async function expectLoadedCover(cover: Locator) {
 const externalServices = process.env.E2E_EXTERNAL_SERVICES === "1";
 const moderatorEmail = process.env.E2E_MODERATOR_EMAIL ?? (externalServices ? "" : "moderator@example.com");
 const moderatorPassword = process.env.E2E_MODERATOR_PASSWORD ?? (externalServices ? "" : "moderator-password123");
+
+test("manual browser contexts audit forbidden image requests before teardown without external network", async ({ browser }) => {
+  for (const javaScriptEnabled of [false, true]) {
+    for (const hostname of ["pagead2.googlesyndication.com", "ad.doubleclick.net"]) {
+      const forbiddenUrl = `https://${hostname}/audit-probe.png`;
+      let closed = false;
+      const journey = withBrowserContext(browser, { javaScriptEnabled }, async (context) => {
+        context.on("close", () => { closed = true; });
+        await context.route("**/*", (route) => route.fulfill({
+          status: 200,
+          contentType: "image/png",
+          body: tinyPng,
+        }));
+        const page = await context.newPage();
+        const response = page.waitForResponse(forbiddenUrl);
+        await page.setContent(`<img alt="Audit probe" src="${forbiddenUrl}">`);
+        expect((await response).status()).toBe(200);
+      });
+      await expect(journey).rejects.toThrow("Disabled advertising must make no Google ad requests");
+      expect(closed).toBe(true);
+    }
+  }
+});
 
 test("same-origin gateway preserves cookies, query strings, origin checks and artifact redirects", async ({ request, baseURL }) => {
   test.skip(externalServices, "Verifies the local production-shaped gateway and seed.");
@@ -200,29 +256,29 @@ for (const route of ["register", "login"] as const) {
     browser,
     baseURL,
   }) => {
-    const context = await browser.newContext({
+    await withBrowserContext(browser, {
       javaScriptEnabled: false,
       baseURL,
+    }, async (context) => {
+      const page = await context.newPage();
+      await page.goto(`/${route}`);
+      await page.getByLabel("Email").fill("native-submit@example.com");
+      await page.getByLabel("Mật khẩu").fill("native-password123");
+      const [request] = await Promise.all([
+        page.waitForRequest((request) => request.isNavigationRequest()),
+        page
+          .getByRole("button", {
+            name: route === "register" ? "Tạo tài khoản" : "Đăng nhập",
+          })
+          .click(),
+      ]);
+      expect(request.method()).toBe("POST");
+      expect(new URL(request.url()).search).toBe("");
+      expect(new URL(page.url()).search).toBe("");
+      expect(new URLSearchParams(request.postData() ?? "").get("password")).toBe(
+        "native-password123",
+      );
     });
-    const page = await context.newPage();
-    await page.goto(`/${route}`);
-    await page.getByLabel("Email").fill("native-submit@example.com");
-    await page.getByLabel("Mật khẩu").fill("native-password123");
-    const [request] = await Promise.all([
-      page.waitForRequest((request) => request.isNavigationRequest()),
-      page
-        .getByRole("button", {
-          name: route === "register" ? "Tạo tài khoản" : "Đăng nhập",
-        })
-        .click(),
-    ]);
-    expect(request.method()).toBe("POST");
-    expect(new URL(request.url()).search).toBe("");
-    expect(new URL(page.url()).search).toBe("");
-    expect(new URLSearchParams(request.postData() ?? "").get("password")).toBe(
-      "native-password123",
-    );
-    await context.close();
   });
 }
 
@@ -331,21 +387,21 @@ test("public discovery and metadata render without browser JavaScript", async ({
     process.env.E2E_EXTERNAL_SERVICES === "1",
     "Requires the deterministic public seed.",
   );
-  const context = await browser.newContext({
+  await withBrowserContext(browser, {
     javaScriptEnabled: false,
     baseURL,
+  }, async (context) => {
+    const page = await context.newPage();
+    await page.goto("/discover");
+    await page.getByRole("link", { name: "Chơi Tiny Quest", exact: true }).click();
+    await expect(
+      page.getByRole("heading", { name: "Tiny Quest", exact: true }),
+    ).toBeVisible();
+    const details = page.getByRole("article").filter({
+      has: page.getByRole("heading", { name: "Về game này", exact: true }),
+    });
+    await expect(details.getByText("Bởi Minh", { exact: true })).toBeVisible();
   });
-  const page = await context.newPage();
-  await page.goto("/discover");
-  await page.getByRole("link", { name: "Chơi Tiny Quest", exact: true }).click();
-  await expect(
-    page.getByRole("heading", { name: "Tiny Quest", exact: true }),
-  ).toBeVisible();
-  const details = page.getByRole("article").filter({
-    has: page.getByRole("heading", { name: "Về game này", exact: true }),
-  });
-  await expect(details.getByText("Bởi Minh", { exact: true })).toBeVisible();
-  await context.close();
 });
 
 test("an HTML5 upload can be retried, previewed, and submitted for review", async ({
@@ -447,17 +503,14 @@ test("moderation requires a rejection note and publishes the approved artifact a
   expect(privateCover.headers()["content-type"]).toContain("image/png");
   expect(await privateCover.body()).toEqual(tinyPng);
   expect((await page.request.get(`/api/covers/${slug}/1`)).status()).toBe(404);
-  const anonymous = await browser.newContext({ baseURL });
-  try {
+  await withBrowserContext(browser, { baseURL }, async (anonymous) => {
     expect((await anonymous.request.get(`/api/games/${gameId}/cover/1`)).status()).toBe(401);
     expect((await anonymous.request.get(`/api/covers/${slug}/1`)).status()).toBe(404);
     const visitor = await anonymous.newPage();
     await visitor.goto(`/discover?query=${encodeURIComponent(title)}`);
     await expect(visitor.getByRole("heading", { name: title, exact: true })).toHaveCount(0);
     expect((await visitor.goto(`/games/${slug}`))?.status()).toBe(404);
-  } finally {
-    await anonymous.close();
-  }
+  });
   await page.getByLabel("HTML").fill(`<h1>${title}</h1>`);
   await page.getByRole("button", { name: "Lưu mã nguồn" }).click();
   await page.getByRole("button", { name: "Tạo bản chơi thử" }).click();
