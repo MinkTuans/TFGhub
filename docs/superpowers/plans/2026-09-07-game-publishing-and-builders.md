@@ -187,31 +187,31 @@
   /moderation/games/:id/approve`, and `POST /moderation/games/:id/reject`.
 - Consumes: authenticated user roles and artifact/build fields.
 
-- [ ] **Step 1: Write failing transition/authorization tests**
+- [x] **Step 1: Write failing transition/authorization tests**
 
   Prove no-artifact submit fails, only an owner submits, regular users get 403,
   pending queue is role-gated, approve publishes only the pending artifact,
   reject requires a note, and concurrent/non-pending review returns conflict.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
   Run: `pnpm --filter api test && pnpm --filter api test:e2e`
 
   Expected: new tests fail because review APIs are absent.
 
-- [ ] **Step 3: Implement role guard and conditional transitions**
+- [x] **Step 3: Implement role guard and conditional transitions**
 
   The guard accepts `MODERATOR`/`ADMIN`. Repository transitions use
   `updateMany({where:{id,reviewState:'PENDING'},data:...})` and require count 1.
   Approve sets `APPROVED/PUBLIC`; reject sets `REJECTED/DRAFT` with trimmed note.
 
-- [ ] **Step 4: Verify GREEN**
+- [x] **Step 4: Verify GREEN**
 
   Run: `pnpm --filter api test && pnpm --filter api test:e2e && pnpm --filter api typecheck && pnpm --filter api lint`
 
   Expected: all commands exit 0.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
   Run: `git add apps/api && git commit -m "feat(api): add moderated game publishing"`
 
