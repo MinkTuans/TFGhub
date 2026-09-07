@@ -92,6 +92,11 @@ describe('Developer profile and game draft HTTP boundary', () => {
         async findManyByOwner(ownerId: string) {
           return [...games.values()].filter((game) => game.ownerId === ownerId);
         },
+        async findPending() {
+          return [...games.values()].filter(
+            (game) => game.reviewState === 'PENDING',
+          );
+        },
         async findUnique(id: string) {
           const game = games.get(id);
           return game ?? null;
@@ -110,6 +115,55 @@ describe('Developer profile and game draft HTTP boundary', () => {
           const game = games.get(id)!;
           if (game.updatedAt !== expected) return null;
           const updated = { ...game, ...input, updatedAt: new Date() };
+          games.set(id, updated);
+          return updated;
+        },
+        async submit(id: string) {
+          const game = games.get(id);
+          if (
+            !game ||
+            game.artifactVersion < 1 ||
+            !['DRAFT', 'REJECTED'].includes(game.reviewState)
+          ) {
+            return null;
+          }
+          const updated: StoredGame = {
+            ...game,
+            reviewState: 'PENDING',
+            visibility: 'DRAFT',
+            reviewNote: null,
+            submittedAt: new Date(),
+            reviewedAt: null,
+            updatedAt: new Date(),
+          };
+          games.set(id, updated);
+          return updated;
+        },
+        async approve(id: string) {
+          const game = games.get(id);
+          if (!game || game.reviewState !== 'PENDING') return null;
+          const updated: StoredGame = {
+            ...game,
+            reviewState: 'APPROVED',
+            visibility: 'PUBLIC',
+            reviewNote: null,
+            reviewedAt: new Date(),
+            updatedAt: new Date(),
+          };
+          games.set(id, updated);
+          return updated;
+        },
+        async reject(id: string, reviewNote: string) {
+          const game = games.get(id);
+          if (!game || game.reviewState !== 'PENDING') return null;
+          const updated: StoredGame = {
+            ...game,
+            reviewState: 'REJECTED',
+            visibility: 'DRAFT',
+            reviewNote,
+            reviewedAt: new Date(),
+            updatedAt: new Date(),
+          };
           games.set(id, updated);
           return updated;
         },
@@ -672,6 +726,91 @@ describe('Developer profile and game draft HTTP boundary', () => {
       .patch(`/games/${game.id}`)
       .send({ title: 'Changed' })
       .expect(403);
+  });
+
+  it('does not submit a game without a built artifact', async () => {
+    const { developer, game } = await createGame();
+
+    await developer.post(`/games/${game.id}/submit`).expect(409);
+  });
+
+  it('allows only the owner to submit an artifact for review', async () => {
+    const { developer, game } = await createGame();
+    await developer
+      .post(`/games/${game.id}/upload`)
+      .attach('game', zipFixture([{ name: 'index.html', content: '<h1>Ready</h1>' }]), 'game.zip')
+      .expect(201);
+    const other = await agent('other@example.com');
+
+    await other.post(`/games/${game.id}/submit`).expect(403);
+    await developer
+      .post(`/games/${game.id}/submit`)
+      .expect(201)
+      .expect((response) => {
+        expect(response.body).toMatchObject({
+          reviewState: 'PENDING',
+          visibility: 'DRAFT',
+          artifactVersion: 1,
+        });
+        expect(response.body.submittedAt).not.toBeNull();
+      });
+  });
+
+  it('gates the pending queue to moderators and administrators', async () => {
+    const regular = await agent('regular@example.com');
+    const moderator = await agent('moderator@example.com');
+    users.get('user-2')!.role = 'MODERATOR';
+
+    await regular.get('/moderation/games').expect(403);
+    await moderator.get('/moderation/games').expect(200, []);
+  });
+
+  it('approves a pending artifact once and publishes it', async () => {
+    const { developer, game } = await createGame();
+    await developer
+      .post(`/games/${game.id}/upload`)
+      .attach('game', zipFixture([{ name: 'index.html', content: '<h1>Ready</h1>' }]), 'game.zip')
+      .expect(201);
+    await developer.post(`/games/${game.id}/submit`).expect(201);
+    const moderator = await agent('moderator@example.com');
+    users.get('user-2')!.role = 'MODERATOR';
+
+    await moderator
+      .post(`/moderation/games/${game.id}/approve`)
+      .expect(201)
+      .expect((response) => {
+        expect(response.body).toMatchObject({
+          reviewState: 'APPROVED',
+          visibility: 'PUBLIC',
+          artifactVersion: 1,
+        });
+        expect(response.body.reviewedAt).not.toBeNull();
+      });
+    await moderator.post(`/moderation/games/${game.id}/approve`).expect(409);
+  });
+
+  it('requires a rejection note and returns the game to draft', async () => {
+    const { developer, game } = await createGame();
+    await developer
+      .post(`/games/${game.id}/upload`)
+      .attach('game', zipFixture([{ name: 'index.html', content: '<h1>Ready</h1>' }]), 'game.zip')
+      .expect(201);
+    await developer.post(`/games/${game.id}/submit`).expect(201);
+    const moderator = await agent('moderator@example.com');
+    users.get('user-2')!.role = 'MODERATOR';
+
+    await moderator.post(`/moderation/games/${game.id}/reject`).send({}).expect(400);
+    await moderator
+      .post(`/moderation/games/${game.id}/reject`)
+      .send({ reviewNote: '  Add instructions  ' })
+      .expect(201)
+      .expect((response) => {
+        expect(response.body).toMatchObject({
+          reviewState: 'REJECTED',
+          visibility: 'DRAFT',
+          reviewNote: 'Add instructions',
+        });
+      });
   });
 
   it('updates and reads the authenticated profile without exposing email', async () => {

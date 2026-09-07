@@ -10,6 +10,8 @@ import {
 } from './game-content.controller.js';
 import { GamesController } from './games.controller.js';
 import { GamesRepository, GamesService } from './games.service.js';
+import { ModerationController } from './moderation.controller.js';
+import { ModerationService } from './moderation.service.js';
 import { PublicGamesController } from './public-games.controller.js';
 import {
   PublicGamesRepository,
@@ -47,9 +49,15 @@ const publicGameSelect = {
 
 @Module({
   imports: [AuthModule, GameArtifactsModule],
-  controllers: [GamesController, PublicGamesController, GameContentController],
+  controllers: [
+    GamesController,
+    PublicGamesController,
+    GameContentController,
+    ModerationController,
+  ],
   providers: [
     GamesService,
+    ModerationService,
     PublicGamesService,
     GameContentService,
     GameOwnerGuard,
@@ -63,6 +71,12 @@ const publicGameSelect = {
           database.game.findMany({
             where: { ownerId },
             orderBy: { createdAt: 'desc' },
+            select: gameSummarySelect,
+          }),
+        findPending: () =>
+          database.game.findMany({
+            where: { reviewState: 'PENDING' },
+            orderBy: { submittedAt: 'asc' },
             select: gameSummarySelect,
           }),
         findUnique: (id) =>
@@ -90,6 +104,56 @@ const publicGameSelect = {
             const result = await tx.game.updateMany({
               where: { id, updatedAt: expectedUpdatedAt },
               data: input,
+            });
+            return result.count === 1
+              ? tx.game.findUnique({ where: { id }, select: gameSummarySelect })
+              : null;
+          }),
+        submit: (id) =>
+          database.$transaction(async (tx) => {
+            const result = await tx.game.updateMany({
+              where: {
+                id,
+                reviewState: { in: ['DRAFT', 'REJECTED'] },
+                artifactVersion: { gt: 0 },
+              },
+              data: {
+                reviewState: 'PENDING',
+                visibility: 'DRAFT',
+                reviewNote: null,
+                submittedAt: new Date(),
+                reviewedAt: null,
+              },
+            });
+            return result.count === 1
+              ? tx.game.findUnique({ where: { id }, select: gameSummarySelect })
+              : null;
+          }),
+        approve: (id) =>
+          database.$transaction(async (tx) => {
+            const result = await tx.game.updateMany({
+              where: { id, reviewState: 'PENDING' },
+              data: {
+                reviewState: 'APPROVED',
+                visibility: 'PUBLIC',
+                reviewNote: null,
+                reviewedAt: new Date(),
+              },
+            });
+            return result.count === 1
+              ? tx.game.findUnique({ where: { id }, select: gameSummarySelect })
+              : null;
+          }),
+        reject: (id, reviewNote) =>
+          database.$transaction(async (tx) => {
+            const result = await tx.game.updateMany({
+              where: { id, reviewState: 'PENDING' },
+              data: {
+                reviewState: 'REJECTED',
+                visibility: 'DRAFT',
+                reviewNote,
+                reviewedAt: new Date(),
+              },
             });
             return result.count === 1
               ? tx.game.findUnique({ where: { id }, select: gameSummarySelect })

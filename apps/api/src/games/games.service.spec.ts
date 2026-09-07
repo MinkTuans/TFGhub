@@ -26,9 +26,13 @@ function fixture() {
   const games: GamesRepository = {
     create: vi.fn().mockResolvedValue(storedGame),
     findManyByOwner: vi.fn().mockResolvedValue([storedGame]),
+    findPending: vi.fn().mockResolvedValue([]),
     findUnique: vi.fn().mockResolvedValue(storedGame),
     lockForArtifactReconciliation: vi.fn().mockResolvedValue(storedGame),
     update: vi.fn().mockResolvedValue(storedGame),
+    submit: vi.fn().mockResolvedValue(storedGame),
+    approve: vi.fn().mockResolvedValue(storedGame),
+    reject: vi.fn().mockResolvedValue(storedGame),
     findBySlug: vi.fn().mockResolvedValue(storedGame),
     updateWorkspace: vi.fn().mockResolvedValue(storedGame),
   };
@@ -108,6 +112,59 @@ describe('GamesService', () => {
       title: 'Changed',
       updatedAt: '2026-09-05T12:05:00.000Z',
     });
+  });
+
+  it('returns an approved public game to draft when its owner edits metadata', async () => {
+    const { service, games } = fixture();
+    vi.mocked(games.findUnique).mockResolvedValue({
+      ...storedGame,
+      reviewState: 'APPROVED',
+      visibility: 'PUBLIC',
+      reviewNote: 'Previously approved',
+      submittedAt: new Date('2026-09-05T12:01:00.000Z'),
+      reviewedAt: new Date('2026-09-05T12:02:00.000Z'),
+    });
+
+    await service.updateOwned('game-1', 'owner-1', { title: 'Changed' });
+
+    expect(games.update).toHaveBeenCalledWith('game-1', {
+      title: 'Changed',
+      visibility: 'DRAFT',
+      reviewState: 'DRAFT',
+      reviewNote: null,
+      submittedAt: null,
+      reviewedAt: null,
+    });
+  });
+
+  it('submits an owned game only when it has an artifact', async () => {
+    const { service, games } = fixture();
+    vi.mocked(games.findUnique).mockResolvedValue({
+      ...storedGame,
+      artifactVersion: 1,
+    });
+    vi.mocked(games.submit).mockResolvedValue({
+      ...storedGame,
+      artifactVersion: 1,
+      reviewState: 'PENDING',
+      submittedAt: new Date('2026-09-05T12:01:00.000Z'),
+    });
+
+    await expect(service.submitOwned('game-1', 'owner-1')).resolves.toMatchObject({
+      reviewState: 'PENDING',
+      artifactVersion: 1,
+    });
+    expect(games.submit).toHaveBeenCalledWith('game-1');
+  });
+
+  it('does not submit an artifact-free game', async () => {
+    const { service, games } = fixture();
+    vi.mocked(games.findUnique).mockResolvedValue({ ...storedGame });
+
+    await expect(service.submitOwned('game-1', 'owner-1')).rejects.toThrow(
+      ConflictException,
+    );
+    expect(games.submit).not.toHaveBeenCalled();
   });
 
   it('maps only a duplicate slug violation to conflict', async () => {

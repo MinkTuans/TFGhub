@@ -50,6 +50,14 @@ export type WorkspaceUpdate = {
   reviewedAt: null;
 };
 
+export type MetadataUpdate = UpdateGameInput &
+  Partial<
+    Pick<
+      WorkspaceUpdate,
+      'visibility' | 'reviewState' | 'reviewNote' | 'submittedAt' | 'reviewedAt'
+    >
+  >;
+
 export abstract class GamesRepository {
   abstract create(input: {
     ownerId: string;
@@ -62,6 +70,7 @@ export abstract class GamesRepository {
     sourceType?: GameSourceType;
   }): Promise<StoredGame>;
   abstract findManyByOwner(ownerId: string): Promise<StoredGame[]>;
+  abstract findPending(): Promise<StoredGame[]>;
   abstract findUnique(id: string): Promise<StoredGame | null>;
   /** Wait for in-flight row writers before returning artifact reconciliation state. */
   abstract lockForArtifactReconciliation(
@@ -73,7 +82,10 @@ export abstract class GamesRepository {
     expectedUpdatedAt: Date,
     input: WorkspaceUpdate,
   ): Promise<StoredGame | null>;
-  abstract update(id: string, input: UpdateGameInput): Promise<StoredGame>;
+  abstract submit(id: string): Promise<StoredGame | null>;
+  abstract approve(id: string): Promise<StoredGame | null>;
+  abstract reject(id: string, reviewNote: string): Promise<StoredGame | null>;
+  abstract update(id: string, input: MetadataUpdate): Promise<StoredGame>;
 }
 
 export function gameSummary(game: StoredGame): GameSummary {
@@ -145,6 +157,29 @@ export class GamesService {
     if (!game || game.ownerId !== userId) {
       throw new ForbiddenException('You do not own this game');
     }
-    return gameSummary(await this.games.update(gameId, input));
+    const resetReview =
+      game.reviewState === 'APPROVED' && game.visibility === 'PUBLIC'
+        ? {
+            visibility: 'DRAFT' as const,
+            reviewState: 'DRAFT' as const,
+            reviewNote: null,
+            submittedAt: null,
+            reviewedAt: null,
+          }
+        : {};
+    return gameSummary(await this.games.update(gameId, { ...input, ...resetReview }));
+  }
+
+  async submitOwned(gameId: string, userId: string): Promise<GameSummary> {
+    const game = await this.games.findUnique(gameId);
+    if (!game || game.ownerId !== userId) {
+      throw new ForbiddenException('You do not own this game');
+    }
+    if (game.artifactVersion < 1) {
+      throw new ConflictException('Build or upload a game artifact before review');
+    }
+    const submitted = await this.games.submit(gameId);
+    if (!submitted) throw new ConflictException('Game cannot be submitted');
+    return gameSummary(submitted);
   }
 }

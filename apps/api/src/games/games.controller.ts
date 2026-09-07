@@ -41,4 +41,9 @@ export class GamesController {
     if (!input.success) throw new BadRequestException('Invalid game input');
     return this.games.updateOwned(gameId, user.id, input.data);
   }
+
+  @Post(':id/submit')
+  submit(@CurrentUser() user: AuthenticatedUser, @Param('id') gameId: string) {
+    return this.games.submitOwned(gameId, user.id);
+  }
 }
