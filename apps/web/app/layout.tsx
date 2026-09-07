@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
-import { cookies } from "next/headers";
 import Link from "next/link";
 import { LogoutButton } from "../components/logout-button";
+import { optionalSession } from "../lib/session";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -14,7 +14,7 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const signedIn = (await cookies()).has("indieforge_access");
+  const session = await optionalSession();
 
   return (
     <html lang="en">
@@ -26,11 +26,14 @@ export default async function RootLayout({
           <nav aria-label="Main navigation">
             <Link href="/discover">Discover</Link>
             <Link href="/studio">Studio</Link>
-            {signedIn ? (
+            {session ? (
               <>
                 <Link href="/profile" lang="vi">
                   Thông tin cá nhân
                 </Link>
+                {(session.role === "MODERATOR" || session.role === "ADMIN") && (
+                  <Link href="/moderation">Moderation</Link>
+                )}
                 <LogoutButton />
               </>
             ) : (

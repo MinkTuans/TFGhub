@@ -8,6 +8,7 @@ requireApi("reflect-metadata");
 const { Test } = requireApi("@nestjs/testing");
 const { AppModule } = await import("../../api/dist/app.module.js");
 const { configureApp } = await import("../../api/dist/configure-app.js");
+const { argon2id, hash } = requireApi("argon2");
 const { AuthUsersRepository } =
   await import("../../api/dist/auth/auth.service.js");
 const { DeveloperProfilesRepository } =
@@ -18,7 +19,17 @@ const { PublicGamesRepository } =
   await import("../../api/dist/games/public-games.service.js");
 process.env.JWT_SECRET = "browser-tests-only-explicit-long-signing-secret";
 process.env.WEB_ORIGIN = "http://localhost:3100";
-const users = new Map();
+const users = new Map([
+  [
+    "moderator-1",
+    {
+      id: "moderator-1",
+      email: "moderator@example.com",
+      passwordHash: await hash("moderator-password123", { type: argon2id }),
+      role: "MODERATOR",
+    },
+  ],
+]);
 const profiles = new Map([
   ["seed-owner", { displayName: "Minh", bio: "Small adventures." }],
 ]);

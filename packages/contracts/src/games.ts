@@ -179,6 +179,8 @@ export const PublicGameSummary = z.object({
   description: z.string(),
   developer: z.object({ displayName: z.string() }),
   createdAt: z.string().datetime(),
+  artifactVersion: z.number().int().nonnegative(),
+  artifactReady: z.boolean(),
 });
 
 export const DiscoverGamesResponse = z.object({

@@ -191,6 +191,80 @@ test("an HTML5 upload can be retried, previewed, and submitted for review", asyn
   await expect(page.getByRole("status")).toHaveText("Pending review");
 });
 
+test("moderation hides from regular users, requires a rejection note, and publishes approved artifacts", async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  const suffix = randomUUID();
+  const email = `moderation-${suffix}@example.com`;
+  const title = `Moderated game ${suffix}`;
+  const slug = `moderated-game-${suffix}`;
+
+  await page.goto("/register");
+  await page.getByLabel("Email").fill(email);
+  await page.getByLabel("Password").fill("password123");
+  await page.getByRole("button", { name: "Create account" }).click();
+  const navigation = page.getByRole("navigation", {
+    name: "Main navigation",
+  });
+  await expect(navigation.getByRole("link", { name: "Moderation" })).toHaveCount(0);
+  await page.goto("/moderation");
+  await expect(page).toHaveURL("/");
+
+  await page.goto("/studio/games/new");
+  await page.getByLabel("Title").fill(title);
+  await page.getByLabel("Slug").fill(slug);
+  await page.getByLabel("Source type").selectOption("CODE");
+  await page.getByRole("button", { name: "Create draft" }).click();
+  await page.getByRole("link", { name: title }).click();
+  await page.getByLabel("HTML").fill(`<h1>${title}</h1>`);
+  await page.getByRole("button", { name: "Save source" }).click();
+  await page.getByRole("button", { name: "Build preview" }).click();
+  await page.getByRole("button", { name: "Submit for review" }).click();
+  await expect(page.getByRole("status")).toHaveText("Pending review");
+  await navigation.getByRole("button", { name: "Đăng xuất" }).click();
+
+  await page.getByLabel("Email").fill("moderator@example.com");
+  await page.getByLabel("Password").fill("moderator-password123");
+  await page.getByRole("button", { name: "Log in" }).click();
+  await expect(navigation.getByRole("link", { name: "Moderation" })).toBeVisible();
+  await navigation.getByRole("link", { name: "Moderation" }).click();
+  const queued = page.getByRole("article", { name: title });
+  await expect(queued.getByTitle("Game preview")).toHaveAttribute(
+    "sandbox",
+    "allow-scripts allow-pointer-lock",
+  );
+  await expect(queued.getByRole("button", { name: "Reject" })).toBeDisabled();
+  await queued.getByLabel("Rejection note").fill("Please add instructions.");
+  await queued.getByRole("button", { name: "Reject" }).click();
+  await page.reload();
+  await expect(page.getByRole("article", { name: title })).toHaveCount(0);
+  await navigation.getByRole("button", { name: "Đăng xuất" }).click();
+
+  await page.getByLabel("Email").fill(email);
+  await page.getByLabel("Password").fill("password123");
+  await page.getByRole("button", { name: "Log in" }).click();
+  await page.getByRole("link", { name: title }).click();
+  await expect(page.getByRole("main").getByRole("alert")).toHaveText(
+    "Please add instructions.",
+  );
+  await page.getByRole("button", { name: "Submit for review" }).click();
+  await navigation.getByRole("button", { name: "Đăng xuất" }).click();
+
+  await page.getByLabel("Email").fill("moderator@example.com");
+  await page.getByLabel("Password").fill("moderator-password123");
+  await page.getByRole("button", { name: "Log in" }).click();
+  await navigation.getByRole("link", { name: "Moderation" }).click();
+  await page.getByRole("article", { name: title }).getByRole("button", { name: "Approve" }).click();
+  await expect(page.getByRole("status")).toHaveText("Game approved.");
+  await page.getByRole("link", { name: "Discover", exact: true }).click();
+  await expect(page.getByRole("heading", { name: title })).toBeVisible();
+  await page.getByRole("link", { name: title }).click();
+  const player = page.getByTitle("Game player");
+  await expect(player).toHaveAttribute("sandbox", "allow-scripts allow-pointer-lock");
+  await expect(player).toHaveAttribute("src", new RegExp(`/play/${slug}/$`));
+});
+
 test("a code game saves source, rebuilds its sandboxed preview, and submits the compiled revision", async ({
   page,
 }) => {

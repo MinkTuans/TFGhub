@@ -6,6 +6,8 @@ export type PublicGame = {
   title: string;
   description: string;
   createdAt: Date;
+  artifactVersion: number;
+  artifactReady: boolean;
   owner: { profile: { displayName: string } | null };
 };
 
@@ -67,6 +69,8 @@ function summary(game: PublicGame) {
       displayName: game.owner.profile?.displayName ?? 'Unknown developer',
     },
     createdAt: game.createdAt.toISOString(),
+    artifactVersion: game.artifactVersion,
+    artifactReady: game.artifactReady,
   };
 }
 

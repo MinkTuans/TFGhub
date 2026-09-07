@@ -70,6 +70,8 @@ const publicGameSelect = {
   title: true,
   description: true,
   createdAt: true,
+  artifactVersion: true,
+  artifactReady: true,
   owner: { select: { profile: { select: { displayName: true } } } },
 } as const;
 
