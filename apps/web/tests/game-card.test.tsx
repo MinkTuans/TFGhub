@@ -10,6 +10,8 @@ test("links to public game metadata and credits its developer", () => {
         title: "Tiny Quest",
         description: "A demo",
         developer: { displayName: "Minh" },
+        artifactVersion: 1,
+        artifactReady: true,
       }}
     />,
   );

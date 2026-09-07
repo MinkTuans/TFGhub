@@ -4,6 +4,7 @@ import { AuthForm } from "../components/auth-form";
 import { GameForm } from "../components/game-form";
 import { GameWorkspace } from "../components/game-workspace";
 import { LogoutButton } from "../components/logout-button";
+import { ModerationQueue, type ModerationGame } from "../components/moderation-queue";
 import type { GameSummary } from "@indieforge/contracts";
 
 // Navigation needs a Next router; the form, validation and HTTP client stay real.
@@ -82,6 +83,21 @@ function platformerGame(overrides: Partial<GameSummary> = {}): GameSummary {
       artifactReady: true,
     }),
     ...overrides,
+  };
+}
+
+function moderationGame(id: string, title: string): ModerationGame {
+  return {
+    id,
+    slug: id,
+    title,
+    description: "A submitted game.",
+    accessMode: "GUEST_ALLOWED",
+    sourceType: "CODE",
+    artifactVersion: 1,
+    artifactReady: true,
+    submittedAt: "2026-09-07T09:00:00.000Z",
+    creator: { id: `creator-${id}`, displayName: "Creator" },
   };
 }
 
@@ -190,6 +206,29 @@ test("logout reports a network failure and permits another attempt", async () =>
     "Không thể đăng xuất. Vui lòng thử lại.",
   );
   expect(screen.getByRole("button", { name: "Đăng xuất" })).toBeEnabled();
+});
+
+test("moderation keeps every active review disabled when two cards are actioned", () => {
+  vi.stubGlobal("fetch", vi.fn().mockReturnValue(new Promise(() => {})));
+  render(
+    <ModerationQueue
+      initialGames={[
+        moderationGame("game-1", "First review"),
+        moderationGame("game-2", "Second review"),
+      ]}
+    />,
+  );
+
+  const first = screen.getByRole("article", { name: "First review" });
+  const second = screen.getByRole("article", { name: "Second review" });
+  fireEvent.click(within(first).getByRole("button", { name: "Approve" }));
+  fireEvent.click(within(second).getByRole("button", { name: "Approve" }));
+
+  for (const card of [first, second]) {
+    expect(within(card).getAllByRole("button", { name: "Reviewing…" })).toHaveLength(2);
+    for (const button of within(card).getAllByRole("button"))
+      expect(button).toBeDisabled();
+  }
 });
 
 test("workspace shows a moderator rejection note to its owner", () => {

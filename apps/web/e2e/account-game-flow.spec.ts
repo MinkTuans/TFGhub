@@ -229,19 +229,27 @@ test("moderation hides from regular users, requires a rejection note, and publis
   await page.getByRole("button", { name: "Log in" }).click();
   await expect(navigation.getByRole("link", { name: "Moderation" })).toBeVisible();
   await navigation.getByRole("link", { name: "Moderation" }).click();
+  await expect(page.getByTestId("moderation-queue")).toHaveAttribute(
+    "data-hydrated",
+    "true",
+  );
   const queued = page.getByRole("article", { name: title });
   await expect(queued.getByTitle("Game preview")).toHaveAttribute(
     "sandbox",
     "allow-scripts allow-pointer-lock",
   );
+  await expect(
+    queued.getByTitle("Game preview").contentFrame().getByRole("heading", {
+      name: title,
+    }),
+  ).toBeVisible();
   const reject = queued.getByRole("button", { name: "Reject" });
   await expect(reject).toBeDisabled();
   await queued.getByLabel("Rejection note").fill("Please add instructions.");
   await expect(reject).toBeEnabled();
-  await reject.dispatchEvent("click");
+  await reject.click();
   await expect(page.getByRole("status")).toHaveText("Game rejected.");
-  await page.reload();
-  await expect(page.getByRole("article", { name: title })).toHaveCount(0);
+  await expect(queued).toHaveCount(0);
   await navigation.getByRole("button", { name: "Đăng xuất" }).click();
 
   await page.getByLabel("Email").fill(email);

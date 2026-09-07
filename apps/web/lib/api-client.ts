@@ -18,6 +18,13 @@ export function resolveApiBaseUrl(): string {
   return (configured ?? "http://localhost:3001").replace(/\/$/, "");
 }
 
+export function resolvePublicApiBaseUrl(): string {
+  return (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001").replace(
+    /\/$/,
+    "",
+  );
+}
+
 async function request<T>(
   method: string,
   path: string,

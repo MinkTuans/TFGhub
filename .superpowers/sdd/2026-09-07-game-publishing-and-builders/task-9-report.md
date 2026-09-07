@@ -27,14 +27,12 @@ on `/moderation` and received the 404 page instead of the expected redirect.
 
 ## GREEN evidence
 
-- `pnpm --filter web test`: 3 files / 29 tests passed.
+- `pnpm --filter web test`: 3 files / 31 tests passed.
 - `pnpm --filter web typecheck`: route generation completed and `tsc --noEmit`
   finished without emitted diagnostics.
 - `pnpm --filter web lint`: ESLint finished without emitted diagnostics.
-- `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/google-chrome pnpm --filter web
-  e2e --grep "moderation"`: passed. It proves regular-user denial, invisible
-  navigation, moderator preview, disabled reject until a note, reject and
-  owner-visible note, resubmission/approval, discovery, and public sandbox.
+- The earlier focused moderation journey passed with the Chrome override. The
+  later review verification is recorded under **E2E follow-up** below.
 
 ## Self-review
 
@@ -48,14 +46,36 @@ on `/moderation` and received the 404 page instead of the expected redirect.
   short-lived redirect capability. It is absent for approved legacy games
   without an artifact-ready revision.
 
-## Shared-state E2E stabilization
+## Review follow-up: public base and concurrent review state
 
-The combined run exposed a test race: Playwright's pointer click returned
-before the React rejection action had observably completed when two sandboxed
-previews were present, and the test immediately reloaded the page. The journey
-now dispatches the button's click event and waits for the success status before
-reloading. The later approval still uses a physical click, so both moderation
-action wiring and a real pointer activation remain covered.
+- Added `resolvePublicApiBaseUrl`, which deliberately reads only
+  `NEXT_PUBLIC_API_URL`. The public Server Component now uses it for the player
+  iframe, preventing `API_INTERNAL_URL` (for example `http://api:3001`) from
+  being emitted into browser HTML.
+- Added a test with `API_INTERNAL_URL=http://api:3001` and
+  `NEXT_PUBLIC_API_URL=/api/`; it first failed because the resolver did not
+  exist, then passes with `/api` as the iframe base.
+- Changed the queue's review state from one id to a set of ids. A two-card
+  pending-request test first showed the first card becoming enabled when the
+  second action started; it now proves every active card remains disabled.
+- Restored Playwright's physical `click()`. The test waits for explicit client
+  hydration and for the selected card's signed preview iframe content before
+  clicking. It no longer reloads immediately after the action, which had
+  aborted an in-flight action in the previous version.
 
-- `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/google-chrome pnpm --filter web
-  e2e --grep 'HTML5 upload|moderation'`: 2 passed.
+## E2E follow-up
+
+The final prescribed combined command was run once with the Chrome override:
+
+```text
+PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/google-chrome pnpm --filter web e2e --grep 'HTML5 upload|moderation'
+```
+
+It failed at the real `Reject` click: Playwright reports the action completed,
+but its trace contains no `/moderation/:id/reject` request and no success
+status. The DOM retains the exact target card and note. This happens only in
+the combined two-card state; it is recorded as an unresolved E2E concern rather
+than masked with `dispatchEvent` or another speculative change. The focused run
+without the Chrome override was also blocked before test execution by a missing
+Playwright-managed Chromium executable; the prescribed Chrome override removed
+that infrastructure blocker.

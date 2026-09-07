@@ -42,6 +42,15 @@ test("uses the public API prefix in a browser", async () => {
   );
 });
 
+test("uses the public API prefix for server-rendered browser URLs", async () => {
+  vi.stubEnv("API_INTERNAL_URL", "http://api:3001");
+  vi.stubEnv("NEXT_PUBLIC_API_URL", "/api/");
+  vi.stubGlobal("window", undefined);
+  const { resolvePublicApiBaseUrl } = await import("../lib/api-client");
+
+  expect(resolvePublicApiBaseUrl()).toBe("/api");
+});
+
 test.each(["get", "post", "put", "patch"] as const)(
   "%s includes cookie credentials and returns the JSON body",
   async (method) => {

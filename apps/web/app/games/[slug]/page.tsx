@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import type { PublicGameSummary } from "@indieforge/contracts";
-import { api, ApiError, resolveApiBaseUrl } from "../../../lib/api-client";
+import { api, ApiError, resolvePublicApiBaseUrl } from "../../../lib/api-client";
 
 export default async function GamePage({
   params,
@@ -29,7 +29,7 @@ export default async function GamePage({
           <h2 id="player-heading">Play {game.title}</h2>
           <iframe
             title="Game player"
-            src={`${resolveApiBaseUrl()}/play/${encodeURIComponent(game.slug)}/`}
+            src={`${resolvePublicApiBaseUrl()}/play/${encodeURIComponent(game.slug)}/`}
             sandbox="allow-scripts allow-pointer-lock"
           />
         </section>

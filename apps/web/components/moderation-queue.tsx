@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { api, ApiError, resolveApiBaseUrl } from "../lib/api-client";
 
 export type ModerationGame = {
@@ -16,17 +16,20 @@ export type ModerationGame = {
   creator: { id: string; displayName: string | null };
 };
 
+const subscribeToNothing = () => () => {};
+
 export function ModerationQueue({ initialGames }: { initialGames: ModerationGame[] }) {
   const [games, setGames] = useState(initialGames);
   const [notes, setNotes] = useState<Record<string, string>>({});
-  const [reviewing, setReviewing] = useState<string | null>(null);
+  const [reviewing, setReviewing] = useState<Set<string>>(() => new Set());
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const hydrated = useSyncExternalStore(subscribeToNothing, () => true, () => false);
 
   async function review(game: ModerationGame, action: "approve" | "reject") {
     const note = notes[game.id]?.trim() ?? "";
     if (action === "reject" && !note) return;
-    setReviewing(game.id);
+    setReviewing((current) => new Set(current).add(game.id));
     setError("");
     try {
       await api.post(
@@ -42,12 +45,16 @@ export function ModerationQueue({ initialGames }: { initialGames: ModerationGame
           : "Unable to review this game. Please try again.",
       );
     } finally {
-      setReviewing(null);
+      setReviewing((current) => {
+        const next = new Set(current);
+        next.delete(game.id);
+        return next;
+      });
     }
   }
 
   return (
-    <section aria-label="Pending games">
+    <section aria-label="Pending games" data-hydrated={hydrated} data-testid="moderation-queue">
       {message && <p role="status">{message}</p>}
       {error && <p role="alert">{error}</p>}
       {games.length === 0 ? (
@@ -55,7 +62,7 @@ export function ModerationQueue({ initialGames }: { initialGames: ModerationGame
       ) : (
         <div className="grid">
           {games.map((game) => {
-            const busy = reviewing === game.id;
+            const busy = reviewing.has(game.id);
             const note = notes[game.id] ?? "";
             return (
               <article className="card" aria-label={game.title} key={game.id}>
