@@ -617,8 +617,9 @@ git commit -m "test: cover redesigned TFG desktop journeys"
 **Files:**
 - Modify: `docs/deployment.md`
 - Modify: `docs/api/foundation.md`
-- Modify: `scripts/verify-production-compose.sh`
-- Modify: `scripts/test-backup-restore.sh`
+- Modify: `scripts/test-deployment-config.mjs`
+- Modify: `scripts/test-deployment-runbook.mjs`
+- Modify: `scripts/test-restore-runbook.mjs`
 - Modify: `README.md` if it still displays IndieForge or English product copy
 - Modify: `docs/superpowers/plans/2026-09-07-tfg-desktop-ui-redesign.md` (check completed boxes only while executing)
 
@@ -632,7 +633,7 @@ Extend the compose verification to require the four `NEXT_PUBLIC_ADSENSE_*` buil
 
 - [ ] **Step 2: Run contract drills and verify RED**
 
-Run: `bash scripts/verify-production-compose.sh && bash scripts/test-backup-restore.sh`
+Run: `pnpm test:deploy-config && node scripts/test-deployment-runbook.mjs && node scripts/test-restore-runbook.mjs`
 
 Expected: FAIL because ad build contracts and cover restore assertions are not yet present/configured.
 
@@ -659,8 +660,10 @@ pnpm lint
 pnpm --filter api test:e2e -- --runInBand
 PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/google-chrome pnpm --filter web e2e
 pnpm build
-bash scripts/verify-production-compose.sh
-bash scripts/test-backup-restore.sh
+pnpm test:deploy-config
+node scripts/test-deployment-runbook.mjs
+node scripts/test-restore-runbook.mjs
+pnpm test:containers
 docker compose -f compose.production.yml --env-file .env.production config
 docker build -f apps/api/Dockerfile -t indieforge-api:tfg-ui .
 docker build -f apps/web/Dockerfile -t indieforge-web:tfg-ui \
