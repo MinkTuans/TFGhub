@@ -44,7 +44,7 @@
 - Produces contract fields `coverVersion`, `coverContentType`, `viewportWidth`, and `viewportHeight` on `GameSummary` and `PublicGameSummary`; `CreateGameInput` defaults the viewport to 16×9 and `UpdateGameInput` accepts either/both dimensions.
 - Produces `StoredGame.coverVersion`, `StoredGame.coverContentType`, and matching Prisma selections consumed by Tasks 3–9.
 
-- [ ] **Step 1: Write failing contract and schema assertions**
+- [x] **Step 1: Write failing contract and schema assertions**
 
 Add assertions equivalent to:
 
@@ -62,13 +62,13 @@ expect(schema).toContain('viewportWidth    Int             @default(16)');
 expect(schema).toContain('viewportHeight   Int             @default(9)');
 ```
 
-- [ ] **Step 2: Run the focused tests and verify RED**
+- [x] **Step 2: Run the focused tests and verify RED**
 
 Run: `pnpm --filter @indieforge/contracts test && pnpm --filter @indieforge/database test`
 
 Expected: FAIL because cover fields and the migration do not exist.
 
-- [ ] **Step 3: Add the nullable-compatible migration and contract fields**
+- [x] **Step 3: Add the nullable-compatible migration and contract fields**
 
 Use this migration shape:
 
@@ -107,13 +107,13 @@ viewportHeight: z.number().int().min(1).max(4096),
 
 Use `z.coerce.number().int().min(1).max(4096).default(...)` for the create input so native form values parse correctly, and optional equivalents in `UpdateGameInput`. Propagate all four fields through `StoredGame`, `gameSummary`, moderation summaries, `PublicGame`, `summary()`, `gameSummarySelect`, `moderationGameSelect`, and `publicGameSelect`. Update every typed test fixture with `coverVersion: 0`, `coverContentType: null`, `viewportWidth: 16`, and `viewportHeight: 9`.
 
-- [ ] **Step 4: Generate Prisma and verify GREEN**
+- [x] **Step 4: Generate Prisma and verify GREEN**
 
 Run: `pnpm --filter @indieforge/database prisma generate && pnpm --filter @indieforge/contracts test && pnpm --filter @indieforge/database test && pnpm --filter api test`
 
 Expected: all contract, schema, and API unit tests PASS.
 
-- [ ] **Step 5: Commit the schema/contract slice**
+- [x] **Step 5: Commit the schema/contract slice**
 
 ```bash
 git add packages/contracts packages/database apps/api/src/games
@@ -136,7 +136,7 @@ git commit -m "feat(games): add versioned cover metadata"
 - Produces injectable `CoverStorage` methods `install(gameId: string, version: number, cover: StoredCover): Promise<void>`, `read(gameId: string, version: number): Promise<StoredCover>`, and `discardUnreferenced(gameId: string, version: number, referencedVersion: number): Promise<void>`.
 - Stores covers below `${GAME_STORAGE_ROOT}/covers/<gameId>/<version>/cover` so artifact paths `${GAME_STORAGE_ROOT}/<gameId>/<artifactVersion>/...` remain unchanged.
 
-- [ ] **Step 1: Write storage tests for atomic install, immutable versions, reads, traversal, symlinks, and cleanup**
+- [x] **Step 1: Write storage tests for atomic install, immutable versions, reads, traversal, symlinks, and cleanup**
 
 Use a fresh `mkdtemp()` root per test and assert real filesystem behavior:
 
@@ -158,17 +158,17 @@ await storage.discardUnreferenced('game-1', 2, 1);
 
 Also assert a failed staged write leaves version 1 readable and no `.staging-*` entry remains.
 
-- [ ] **Step 2: Run the storage test and verify RED**
+- [x] **Step 2: Run the storage test and verify RED**
 
 Run: `pnpm --filter api test -- src/game-covers/cover-storage.spec.ts`
 
 Expected: FAIL because the cover storage module does not exist.
 
-- [ ] **Step 3: Implement minimal atomic storage**
+- [x] **Step 3: Implement minimal atomic storage**
 
 Follow the existing `ArtifactStorage` safety pattern: validate `gameId` with `/^[a-zA-Z0-9_-]+$/`, validate positive safe-integer versions, resolve every path inside the cover root, stage with `mkdir`/`writeFile({ flag: 'wx' })`, write a JSON metadata file containing only `contentType`, chmod files read-only, and atomically `rename` the staging directory. Reject symbolic links on reads and unseal only an explicitly validated unreferenced next version during cleanup.
 
-- [ ] **Step 4: Register the provider and verify GREEN**
+- [x] **Step 4: Register the provider and verify GREEN**
 
 Import `GameCoversModule` into `GamesModule`, export `CoverStorage`, then run:
 
@@ -176,7 +176,7 @@ Import `GameCoversModule` into `GamesModule`, export `CoverStorage`, then run:
 
 Expected: cover and artifact storage tests PASS, proving namespaces do not interfere.
 
-- [ ] **Step 5: Commit atomic cover storage**
+- [x] **Step 5: Commit atomic cover storage**
 
 ```bash
 git add apps/api/src/game-covers apps/api/src/games/games.module.ts
@@ -203,7 +203,7 @@ git commit -m "feat(api): add atomic game cover storage"
 - Produces authenticated owner `GET /games/:id/cover/:version` and public `GET /covers/:slug/:version`.
 - `GameCoverService.upload()` returns the updated `GameSummary`; read methods return `StoredCover`.
 
-- [ ] **Step 1: Write failing service and E2E tests**
+- [x] **Step 1: Write failing service and E2E tests**
 
 Cover the exact behaviors:
 
@@ -233,13 +233,13 @@ await request(app.getHttpServer())
 
 Also assert: missing file 400; MIME/magic mismatch 400; 5 MiB + 1 byte 413; draft public cover 404; owner draft cover 200; approved public cover 200 with `Content-Type`, `X-Content-Type-Options: nosniff`, and immutable cache; stale version 404; DB failure after install discards only the unreferenced new version and preserves the old cover.
 
-- [ ] **Step 2: Run the focused service/E2E tests and verify RED**
+- [x] **Step 2: Run the focused service/E2E tests and verify RED**
 
 Run: `pnpm --filter api test -- src/game-covers/game-cover.service.spec.ts && pnpm --filter api test:e2e -- --runInBand -t "cover"`
 
 Expected: FAIL because routes, service, repository mutation, and test adapter support are absent.
 
-- [ ] **Step 3: Implement magic-byte validation and serialized upload**
+- [x] **Step 3: Implement magic-byte validation and serialized upload**
 
 Use exact signature checks without a new dependency:
 
@@ -257,13 +257,13 @@ function detectedType(bytes: Buffer): CoverContentType | null {
 
 Serialize uploads per game, check owner before writing, require detected type to equal Multer MIME type, install `coverVersion + 1`, then perform an optimistic database update on `updatedAt` and `coverVersion`. On conflict, reload reconciliation state and discard only the unreferenced next cover version. Do not reset moderation state when a cover changes.
 
-- [ ] **Step 4: Implement guarded delivery and adapter persistence**
+- [x] **Step 4: Implement guarded delivery and adapter persistence**
 
 Owner delivery requires `JwtAuthGuard` plus ownership and an exact current version. Public delivery uses the same `PUBLIC + CLEAR + APPROVED` predicate as `PublicGamesService` and an exact current version. Send bytes directly; never reuse executable artifact CSP or signed capability tokens for covers.
 
 Implement Prisma `updateCover` with `updateMany({ where: { id, ownerId, updatedAt, coverVersion: expectedCoverVersion } })`, then select the row. Extend the browser E2E in-memory game rows/repository with cover fields and `updateCover`.
 
-- [ ] **Step 5: Verify GREEN and commit**
+- [x] **Step 5: Verify GREEN and commit**
 
 Run: `pnpm --filter api test && pnpm --filter api test:e2e -- --runInBand && pnpm --filter api typecheck && pnpm --filter api lint`
 
@@ -295,7 +295,7 @@ git commit -m "feat(api): upload and serve game covers"
 - `SiteNavigation({ session })` renders Vietnamese navigation and role-dependent links.
 - Root HTML uses `data-theme="light" | "dark"` when manually selected; absence means system theme.
 
-- [ ] **Step 1: Write failing app-shell tests**
+- [x] **Step 1: Write failing app-shell tests**
 
 Assert logo/navigation Vietnamese copy, role visibility, theme cycling, storage persistence, blocked-storage fallback, and `aria-label` updates:
 
@@ -308,21 +308,21 @@ expect(localStorage.getItem('tfg-theme')).toBe('light');
 
 Stub `localStorage.setItem` to throw and assert the theme still changes without rendering an error.
 
-- [ ] **Step 2: Run the focused web test and verify RED**
+- [x] **Step 2: Run the focused web test and verify RED**
 
 Run: `pnpm --filter web test -- tests/app-shell.test.tsx`
 
 Expected: FAIL because the TFG shell components do not exist.
 
-- [ ] **Step 3: Implement shell components and pre-paint theme bootstrap**
+- [x] **Step 3: Implement shell components and pre-paint theme bootstrap**
 
 Add an inline bootstrap in `<head>` that accepts only `system`, `light`, or `dark`, catches storage failures, and sets/removes `data-theme` before paint. Keep `optionalSession()` server-side. Replace IndieForge metadata with Vietnamese TFG metadata. Render `ThemeToggle` as a small client island and keep navigation usable without client JavaScript.
 
-- [ ] **Step 4: Introduce semantic tokens and global primitives**
+- [x] **Step 4: Introduce semantic tokens and global primitives**
 
 Replace literal colors with variables including `--page`, `--surface`, `--surface-raised`, `--text`, `--muted`, `--border`, `--primary`, `--secondary`, `--success`, `--warning`, `--danger`, `--radius-sm/md/lg`, and `--shadow-*`. Define both manual `[data-theme]` and `@media (prefers-color-scheme)` values. Add shared button, form, card, badge, alert/status, skeleton, focus-visible, sticky header, container, and reduced-motion rules. Do not style page-specific three-column player layout yet.
 
-- [ ] **Step 5: Verify GREEN and commit**
+- [x] **Step 5: Verify GREEN and commit**
 
 Run: `pnpm --filter web test -- tests/app-shell.test.tsx && pnpm --filter web typecheck && pnpm --filter web lint`
 
@@ -352,7 +352,7 @@ git commit -m "feat(web): introduce TFG design system and themes"
 - `GameCard({ game, compact?: boolean })` keeps the public `/games/:slug` link and uses `GameCover`.
 - Home requests `GET /discover?limit=4` server-side and tolerates API failure by retaining the creator-focused sections without a broken game grid.
 
-- [ ] **Step 1: Extend failing card/page tests**
+- [x] **Step 1: Extend failing card/page tests**
 
 Assert real cover URL encoding, 16:9 fallback, whole-card link, Vietnamese labels, four creation methods, three-step process, and Discover empty/error copy. Include:
 
@@ -362,17 +362,17 @@ expect(screen.getByRole('img', { name: 'Ảnh bìa Tiny Quest' }))
 expect(screen.getByTestId('game-cover-fallback')).toHaveTextContent('TQ');
 ```
 
-- [ ] **Step 2: Run focused tests and verify RED**
+- [x] **Step 2: Run focused tests and verify RED**
 
 Run: `pnpm --filter web test -- tests/game-card.test.tsx tests/home-discover.test.tsx`
 
 Expected: FAIL on absent cover behavior and English/minimal pages.
 
-- [ ] **Step 3: Implement covers, cards, Home, and Discover**
+- [x] **Step 3: Implement covers, cards, Home, and Discover**
 
 Use a deterministic CSS custom-property hue derived from the slug with a pure helper exported for tests. Render an `<img>` only for a positive version, choose the owner or public URL from `ownerGameId`, and preserve `aspect-ratio: 16 / 9`. Translate search, empty, error, developer, and pagination copy. Keep server rendering and no-JavaScript link/search behavior.
 
-- [ ] **Step 4: Verify GREEN and commit**
+- [x] **Step 4: Verify GREEN and commit**
 
 Run: `pnpm --filter web test -- tests/game-card.test.tsx tests/home-discover.test.tsx && pnpm --filter web typecheck && pnpm --filter web lint`
 
@@ -415,7 +415,7 @@ git commit -m "feat(web): redesign TFG home and discovery"
 - Existing editor props and API routes remain unchanged.
 - Review labels become `Bản nháp`, `Chờ duyệt`, `Đã duyệt`, and `Bị từ chối` without changing enum values.
 
-- [ ] **Step 1: Write failing Vietnamese workflow and cover-uploader component tests**
+- [x] **Step 1: Write failing Vietnamese workflow and cover-uploader component tests**
 
 Update assertions to Vietnamese accessible names and add:
 
@@ -431,17 +431,17 @@ expect(onUploaded).toHaveBeenCalledWith(expect.objectContaining({ coverVersion: 
 
 Assert a failed request re-enables the button and retains the existing preview.
 
-- [ ] **Step 2: Run form tests and verify RED**
+- [x] **Step 2: Run form tests and verify RED**
 
 Run: `pnpm --filter web test -- tests/forms.test.tsx`
 
 Expected: FAIL on English copy, absent cover uploader, and old flat workspace structure.
 
-- [ ] **Step 3: Implement translated panels without changing business logic**
+- [x] **Step 3: Implement translated panels without changing business logic**
 
 Translate labels/messages and wrap existing controls in semantic page headers, panels, status badges, and action bars. Add `CoverUploader` to `GameWorkspace`, show `GameCover` with `ownerGameId={game.id}` beside metadata, and keep the returned summary in the same `game` state used by submit/build actions. Add numeric viewport width/height fields (1–4096, default 16×9) to creation and workspace display settings. Keep native form methods, names, and redirect semantics intact.
 
-- [ ] **Step 4: Verify GREEN and commit**
+- [x] **Step 4: Verify GREEN and commit**
 
 Run: `pnpm --filter web test -- tests/forms.test.tsx && pnpm --filter web typecheck && pnpm --filter web lint`
 
@@ -472,21 +472,21 @@ git commit -m "feat(web): redesign creator and moderation workflows"
 - `AdSlot({ slot, label })` renders a stable placeholder in disabled/invalid mode and an `<ins class="adsbygoogle">` only in enabled valid mode.
 - `AdsenseScript` is rendered once in the root layout only for valid enabled configuration.
 
-- [ ] **Step 1: Write failing configuration and component tests**
+- [x] **Step 1: Write failing configuration and component tests**
 
 Cover disabled, incomplete, malformed client, malformed numeric slot, and valid enabled configuration. Assert disabled/invalid states contain `Quảng cáo` and no script/`adsbygoogle`; valid mode uses `data-ad-client`, `data-ad-slot`, and `data-ad-format="auto"`.
 
-- [ ] **Step 2: Run the focused test and verify RED**
+- [x] **Step 2: Run the focused test and verify RED**
 
 Run: `pnpm --filter web test -- tests/ad-slot.test.tsx`
 
 Expected: FAIL because the ad adapter does not exist.
 
-- [ ] **Step 3: Implement guarded build-time configuration**
+- [x] **Step 3: Implement guarded build-time configuration**
 
 Use `NEXT_PUBLIC_ADSENSE_ENABLED`, `NEXT_PUBLIC_ADSENSE_CLIENT`, `NEXT_PUBLIC_ADSENSE_GAME_LEFT_TOP_SLOT`, and `NEXT_PUBLIC_ADSENSE_GAME_LEFT_BOTTOM_SLOT`. Accept enabled only when the flag is exactly `true`, client matches `/^ca-pub-\d+$/`, and both slots match `/^\d+$/`. Pass these as Docker build args; set `NEXT_PUBLIC_ADSENSE_ENABLED=false` in the current production environment example/deployment.
 
-- [ ] **Step 4: Verify GREEN and commit**
+- [x] **Step 4: Verify GREEN and commit**
 
 Run: `pnpm --filter web test -- tests/ad-slot.test.tsx && pnpm --filter web typecheck && pnpm --filter web lint && docker compose -f compose.production.yml config`
 
@@ -514,7 +514,7 @@ git commit -m "feat(web): add guarded AdSense slots"
 - `RelatedGames({ games, currentSlug })` filters current slug and renders at most six compact `GameCard`s.
 - Game page fetches `/games/by-slug/:slug` plus `/discover?limit=7`; related-data failure does not prevent play.
 
-- [ ] **Step 1: Write failing player and related-game tests**
+- [x] **Step 1: Write failing player and related-game tests**
 
 Assert iframe attributes, accessible fullscreen control, `requestFullscreen` target, `exitFullscreen`, `fullscreenchange` state, rejection status, no iframe `src` change, current-game exclusion, and six-item cap:
 
@@ -526,23 +526,23 @@ expect(screen.getByRole('button', { name: 'Thoát toàn màn hình' })).toBeVisi
 expect(screen.getByTitle('Chơi Tiny Quest')).toHaveAttribute('scrolling', 'no');
 ```
 
-- [ ] **Step 2: Run the focused test and verify RED**
+- [x] **Step 2: Run the focused test and verify RED**
 
 Run: `pnpm --filter web test -- tests/game-player.test.tsx tests/game-card.test.tsx`
 
 Expected: FAIL because the player and related list do not exist.
 
-- [ ] **Step 3: Implement `GamePlayer` and `RelatedGames`**
+- [x] **Step 3: Implement `GamePlayer` and `RelatedGames`**
 
 Catch synchronous and rejected fullscreen calls, announce `Không thể mở toàn màn hình trên trình duyệt này.`, and never remount the iframe when fullscreen changes. Use the existing `/api/play/<slug>/` source and sandbox string unchanged.
 
-- [ ] **Step 4: Compose and size the desktop layout**
+- [x] **Step 4: Compose and size the desktop layout**
 
 Use a page class with `grid-template-columns: minmax(180px,220px) minmax(0,1fr) minmax(260px,300px)` and a player height derived from `100dvh - header - page gaps`. Place two `AdSlot`s left, player center, and `RelatedGames` right. Compute a contained inner box from `viewportWidth / viewportHeight`, apply `overflow: hidden` to it and the iframe, and add `:fullscreen` styles that recompute the largest contained box on a dark surface. Put description/developer content below this grid.
 
 At widths below the three-column minimum, collapse sidebars below the player only as a damage-prevention fallback; do not add mobile navigation or touch-specific UI.
 
-- [ ] **Step 5: Verify GREEN and commit**
+- [x] **Step 5: Verify GREEN and commit**
 
 Run: `pnpm --filter web test -- tests/game-player.test.tsx tests/game-card.test.tsx && pnpm --filter web typecheck && pnpm --filter web lint`
 
@@ -566,7 +566,7 @@ git commit -m "feat(web): add immersive desktop game player"
 - The test harness implements cover upload/read persistence in an isolated temporary root while retaining production controllers/services.
 - Browser suite uses Vietnamese accessible names and adds projects or parameterized tests for 1280×720, 1440×900, and 1920×1080.
 
-- [ ] **Step 1: Update existing assertions and add failing end-to-end acceptance tests**
+- [x] **Step 1: Update existing assertions and add failing end-to-end acceptance tests**
 
 Add tests that:
 
@@ -589,17 +589,17 @@ for (const viewport of [
 
 Also cover theme persistence across reload, dark/system behavior, upload and display of a real tiny PNG, fallback cover, fullscreen enter/exit without frame reload, related exclusion, and zero requests whose host contains `googlesyndication.com` or `doubleclick.net`.
 
-- [ ] **Step 2: Run the browser suite and verify RED**
+- [x] **Step 2: Run the browser suite and verify RED**
 
 Run: `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/google-chrome pnpm --filter web e2e`
 
 Expected: FAIL until all translated selectors, harness cover persistence, and visual/player acceptance assertions align.
 
-- [ ] **Step 3: Make only test-infrastructure corrections exposed by the new acceptance suite**
+- [x] **Step 3: Make only test-infrastructure corrections exposed by the new acceptance suite**
 
 Update seeded/in-memory rows with cover metadata, provide an isolated writable `GAME_STORAGE_ROOT`, reset it between runs, and change selectors to the approved Vietnamese labels. Do not weaken production assertions or add time-based sleeps; wait on visible state, response, URL, or fullscreen state.
 
-- [ ] **Step 4: Run full web/API verification and commit**
+- [x] **Step 4: Run full web/API verification and commit**
 
 Run: `pnpm --filter web test && pnpm --filter web typecheck && pnpm --filter web lint && PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/google-chrome pnpm --filter web e2e && pnpm --filter api test && pnpm --filter api test:e2e -- --runInBand`
 
@@ -692,15 +692,15 @@ git commit -m "docs: prepare TFG UI production rollout"
 - Uses the existing `deploy/ip-preview` Compose project and volumes.
 - Public acceptance origin remains `http://161.248.81.59` until a domain/HTTPS change is separately authorized.
 
-- [ ] **Step 1: Capture pre-deploy state and create a consistent verified backup**
+- [x] **Step 1: Capture pre-deploy state and create a consistent verified backup**
 
 Record container/image IDs, migration status, database game/user counts, artifact count, cover count, and the public snake-game HTTP status. Follow the established brief API/web pause backup procedure, create PostgreSQL custom dump plus the entire game-storage archive, chmod backup files owner-only, generate SHA-256, test-list both archives, and restart only the old containers. Abort rollout if old health does not return.
 
-- [ ] **Step 2: Apply migration and replace only application containers**
+- [x] **Step 2: Apply migration and replace only application containers**
 
 Run the new one-shot migration container, then recreate API and web with the verified images while retaining PostgreSQL, game-storage, Caddy data, and Caddy config volumes. Keep `NEXT_PUBLIC_ADSENSE_ENABLED=false`. Do not merge branches or create a PR.
 
-- [ ] **Step 3: Run production smoke and desktop acceptance**
+- [x] **Step 3: Run production smoke and desktop acceptance**
 
 Verify through `http://161.248.81.59`:
 
@@ -715,11 +715,11 @@ Use Playwright at all three approved desktop viewports in light and dark themes.
 
 Create a disposable draft owner, select a non-16:9 viewport, upload a valid cover, reject invalid/oversized covers, build and submit a game, approve it with a temporary moderator, and confirm its cover becomes public. Update Rắn Săn Mồi Neon to a 1×1 viewport through the owner workflow, resubmit/reapprove it if the metadata update resets its review state, and verify its square fit. Remove or demote only disposable credentials using the established cleanup procedure.
 
-- [ ] **Step 4: Prove persistence and capture final evidence**
+- [x] **Step 4: Prove persistence and capture final evidence**
 
 Record artifact and cover checksums, restart only API, then confirm checksums/counts are unchanged and both snake-game play plus the newly approved public cover return 200. Confirm all containers are healthy and only Caddy publishes host ports.
 
-- [ ] **Step 5: Mark the plan complete without changing branch topology**
+- [x] **Step 5: Mark the plan complete without changing branch topology**
 
 Check completed boxes in this plan, commit the execution record, and retain branch `deploy/ip-preview` without merge or PR:
 
@@ -727,3 +727,16 @@ Check completed boxes in this plan, commit the execution record, and retain bran
 git add docs/superpowers/plans/2026-09-07-tfg-desktop-ui-redesign.md
 git commit -m "docs: record TFG desktop UI release"
 ```
+
+
+## Release execution record — 2026-09-08
+
+All task checkboxes reflect the accepted Task 1–10 execution reports and release gate, plus the production verification below. The branch remains `deploy/ip-preview`; no merge or PR was created.
+
+Production uses the existing `deploy-ip-preview` Compose project and volumes at `http://161.248.81.59`. Verified PostgreSQL and complete-storage backup: `backups/20260908T001552-1590330` with owner-only archives and SHA-256 manifest. The cover migration applied once; the verified API/web release images are healthy; only Caddy publishes ports and AdSense remains disabled.
+
+Public acceptance passed cover upload/privacy/invalid-file/oversize checks, build/submission/approval, real and fallback cards, themes, all three desktop viewports, real-click fullscreen without iframe reload, input, and zero Google ad requests. The owner set Rắn Săn Mồi Neon to 1×1 and resubmitted it. A later explicit user authorization allowed a CSS-only responsive correction to this game's artifact: version 3 preserves its original HTML and JavaScript byte-for-byte and fits the complete board/controls at 1280×720, 1440×900, and 1920×1080 in both themes, normal/fullscreen. The intrinsic-fit check failed before this correction and passed afterward.
+
+Final API-only restart preserved all 36 current files and sealed modes: 16 artifacts, 2 covers; SHA-256 of the path/hash/mode manifest is `ee18e885a9db99b943e64da214926d16d4df5b04e578e4db13cb894c9dae7c24`. All 18 original artifact files still match the pre-deploy backup. Health, snake play, and the approved cover return 200. Disposable moderator roles were revoked; credentials were never persisted.
+
+Deferred review items remain explicit: the existing source-generated `Unknown developer` fallback is a localization Minor, and native Escape fullscreen exit is unverified in headless Chrome; real-click entry/exit and state preservation passed. Detailed checkpoints, hashes, screenshots, and selector-debugging evidence are retained in the ignored Task 11 execution report.
