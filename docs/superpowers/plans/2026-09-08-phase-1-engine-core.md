@@ -39,8 +39,10 @@
 - Create: `packages/engine-core/src/project-schema.test.ts`
 - Create: `packages/engine-core/src/stable-id.test.ts`
 - Modify: `pnpm-lock.yaml`
-- Modify: `apps/api/Dockerfile`
-- Modify: `apps/web/Dockerfile`
+
+Do not modify either Dockerfile by default. Add an engine-core manifest-copy
+line only if an actual clean image build fails to resolve the new workspace
+package, and retain the failing/passing build evidence in the Task 1 report.
 
 **Database/API impact:** None. Adds a workspace package consumed later by contracts/API.
 
@@ -55,7 +57,7 @@
 
 **Acceptance criteria:** Valid v1 round-trips; invalid/future documents cannot become writable values; every component owns defaults/schema/version/runtime-handler key; no React/Nest/Prisma/runtime-engine dependency enters engine-core.
 
-**Rollback/risk:** Remove the unused package and manifest-copy lines. Main risks are schema overreach and browser-incompatible crypto APIs; stable-ID APIs must be usable in Node and modern browsers.
+**Rollback/risk:** Remove the unused package and lockfile entry. Main risks are schema overreach and browser-incompatible crypto APIs; stable-ID APIs must be usable in Node and modern browsers. Dockerfiles remain unchanged unless a clean container build proves a resolution change is necessary.
 
 ---
 
@@ -108,18 +110,18 @@ Review package boundaries, schema limits, future-schema behavior, event semantic
 
 **Database/API impact:** None; pure adapters only.
 
-**Tests first:** RFC UUIDv5 golden vector; repeated conversion byte identity; distinct games produce distinct IDs; Story choices map to stable events; Platformer player/goal/platform mapping; invalid legacy diagnostics; explicit CODE/UPLOAD rejection.
+**Tests first:** RFC UUIDv5 golden vector; repeated conversion byte identity; distinct games produce distinct IDs; Story choices map to stable events; Platformer player/goal/platform mapping; invalid legacy diagnostics; explicit CODE/UPLOAD rejection. Identity derivation prefers immutable legacy identifiers. Where none exist, it uses a stable content fingerprint scoped by the deterministic parent identity; array index is the final fallback only when identical siblings cannot otherwise be distinguished.
 
 - [ ] Write failing adapter/golden tests with the permanent namespace UUID asserted literally.
 - [ ] Run adapter tests and verify RED.
-- [ ] Implement deterministic UUIDv5 identities and minimal STORY/PLATFORMER adapters.
+- [ ] Implement deterministic UUIDv5 identities and minimal STORY/PLATFORMER adapters using immutable legacy identity first, stable content fingerprint plus parent identity second, and index only as the last fallback.
 - [ ] Generate expected fixtures through reviewed deterministic serialization, then inspect the complete fixture diff.
 - [ ] Run all engine-core tests/typecheck twice and assert identical outputs.
 - [ ] Commit only Task 3 files.
 
-**Acceptance criteria:** The same `gameId + legacy source` always yields byte-identical canonical JSON; no random identity occurs in adapters; invalid/future data remains unmodified; CODE/UPLOAD never enter conversion.
+**Acceptance criteria:** The same `gameId + legacy source` always yields byte-identical canonical JSON; no random identity occurs in adapters; immutable identity or parent-scoped content fingerprints prevent unrelated reorder from changing IDs wherever legacy data permits; index is used only for otherwise indistinguishable siblings; invalid/future data remains unmodified; CODE/UPLOAD never enter conversion. Once materialized and persisted, canonical IDs are frozen and are never regenerated from later legacy reorder.
 
-**Rollback/risk:** Pure package revert. Choice/platform index identity applies only during first materialization; document this invariant in tests to prevent later remapping.
+**Rollback/risk:** Pure package revert. Truly indistinguishable duplicate legacy siblings may require index as the final tie-breaker during first materialization; tests must prove persisted canonical IDs are never regenerated or remapped afterward.
 
 ---
 
@@ -250,7 +252,7 @@ Review CAS behavior, retention SQL, ownership, storage recovery, tombstone/GC pr
 
 **Database/API impact:** Adds owner-only create/status endpoints; state transitions QUEUED/BUILDING/READY/FAILED/CANCELLED; build manifest includes source revision and asset ID/hash/path.
 
-**Tests first:** Owner-only build; source revision immutable; exact GameBuildAsset snapshots; invalid/non-ready/tombstoned asset denial; legal/illegal transitions; artifact/storage failure; lost commit reconciliation; parallel build IDs; published pointer unchanged.
+**Tests first:** Owner-only build; source revision is immutable; every GameBuildAsset records the exact asset ID and content hash selected by that revision; assets that are missing, non-ready, tombstoned, cross-project, or whose hash no longer matches are rejected; legal and illegal build transitions; artifact/storage failure; lost-commit reconciliation; parallel builds receive distinct IDs; the published release pointer remains unchanged.
 
 - [ ] Write failing build contract and state-machine tests.
 - [ ] Write failing storage/provenance and real-DB transition tests.
