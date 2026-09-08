@@ -30,3 +30,11 @@ export {
   type GameEventV1 as GameEventV1Type,
   type VariableReferenceV1,
 } from './event-schema.js';
+export {
+  LEGACY_ID_NAMESPACE,
+  adaptLegacyProject,
+  uuidV5,
+  type LegacyAdapterResult,
+} from './adapters/index.js';
+export { adaptStoryV0 } from './adapters/story-v0.js';
+export { adaptPlatformerV0 } from './adapters/platformer-v0.js';

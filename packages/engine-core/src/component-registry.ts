@@ -50,6 +50,7 @@ export const COMPONENT_TYPES = [
   'Dialogue',
   'Audio',
   'Text',
+  'Shape',
 ] as const;
 
 export type ComponentType = (typeof COMPONENT_TYPES)[number];
@@ -143,6 +144,13 @@ const TextProperties = z.object({
   color,
 }).strict();
 
+const ShapeProperties = z.object({
+  kind: z.literal('RECTANGLE'),
+  width: positiveFinite,
+  height: positiveFinite,
+  color,
+}).strict();
+
 function assetReference(
   properties: unknown,
   context: ComponentContext,
@@ -222,6 +230,12 @@ export const componentRegistry: Readonly<Record<ComponentType, ComponentDefiniti
   Text: definition('Text', TextProperties, () => ({
     text: '',
     fontSize: 16,
+    color: '#ffffff',
+  })),
+  Shape: definition('Shape', ShapeProperties, () => ({
+    kind: 'RECTANGLE',
+    width: 1,
+    height: 1,
     color: '#ffffff',
   })),
 };

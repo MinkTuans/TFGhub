@@ -57,6 +57,7 @@ const ObjectShape = orderedName.extend({
 
 const SceneShape = orderedName.extend({
   order: z.number().int().nonnegative(),
+  backgroundColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
   objects: z.array(ObjectShape).max(ENGINE_LIMITS.objectsPerScene),
 }).strict();
 

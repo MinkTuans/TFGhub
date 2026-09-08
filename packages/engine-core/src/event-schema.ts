@@ -31,6 +31,7 @@ export const ACTION_TYPES = [
   'ADD_SCORE',
   'CHANGE_HEALTH',
   'SHOW_DIALOGUE',
+  'COMPLETE_GAME',
 ] as const;
 
 export const EVENT_LIMITS = Object.freeze({
@@ -173,6 +174,7 @@ export const EventActionV1 = z.discriminatedUnion('type', [
   z.object({ ...versionedId, type: z.literal('ADD_SCORE'), amount: finite }).strict(),
   z.object({ ...versionedId, type: z.literal('CHANGE_HEALTH'), objectId: StableId, componentId: StableId, amount: finite }).strict(),
   z.object({ ...versionedId, type: z.literal('SHOW_DIALOGUE'), objectId: StableId, componentId: StableId }).strict(),
+  z.object({ ...versionedId, type: z.literal('COMPLETE_GAME') }).strict(),
 ]);
 
 export const GameEventV1 = z.object({

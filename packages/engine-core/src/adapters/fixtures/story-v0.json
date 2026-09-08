@@ -1,0 +1,23 @@
+{
+  "sourceType": "STORY",
+  "startSceneId": "intro",
+  "scenes": [
+    {
+      "id": "intro",
+      "speaker": "Guide",
+      "dialogue": "Choose a path.",
+      "backgroundColor": "#102030",
+      "choices": [
+        { "text": "Enter the forest", "targetSceneId": "forest" },
+        { "text": "Stay here", "targetSceneId": "intro" }
+      ]
+    },
+    {
+      "id": "forest",
+      "speaker": "Ranger",
+      "dialogue": "Welcome to the forest.",
+      "backgroundColor": "#204020",
+      "choices": []
+    }
+  ]
+}

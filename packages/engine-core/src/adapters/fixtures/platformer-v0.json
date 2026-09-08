@@ -1,0 +1,11 @@
+{
+  "sourceType": "PLATFORMER",
+  "canvas": { "width": 640, "height": 480 },
+  "backgroundColor": "#101820",
+  "player": { "x": 24, "y": 32, "color": "#2563eb" },
+  "goal": { "x": 576, "y": 400, "color": "#16a34a" },
+  "platforms": [
+    { "x": 0, "y": 440, "width": 640, "height": 40, "color": "#6b7280" },
+    { "x": 240, "y": 320, "width": 160, "height": 24, "color": "#94a3b8" }
+  ]
+}

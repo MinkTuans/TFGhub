@@ -130,6 +130,7 @@ describe('GameEventV1 structural schema', () => {
       'CHANGE_SCENE', 'MOVE_OBJECT', 'CREATE_OBJECT', 'DESTROY_OBJECT',
       'PLAY_ANIMATION', 'PLAY_AUDIO', 'CHANGE_VARIABLE', 'ADD_SCORE',
       'CHANGE_HEALTH', 'SHOW_DIALOGUE',
+      'COMPLETE_GAME',
     ]);
     const actions = [
       { type: 'CHANGE_SCENE', sceneId: ids.secondScene },
@@ -142,6 +143,7 @@ describe('GameEventV1 structural schema', () => {
       { type: 'ADD_SCORE', amount: 10 },
       { type: 'CHANGE_HEALTH', objectId: ids.object, componentId: ids.health, amount: -5 },
       { type: 'SHOW_DIALOGUE', objectId: ids.object, componentId: ids.dialogue },
+      { type: 'COMPLETE_GAME' },
     ];
     actions.forEach((action, index) => {
       expect(GameEventV1.safeParse(event({

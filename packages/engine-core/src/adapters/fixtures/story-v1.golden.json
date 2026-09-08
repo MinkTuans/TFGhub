@@ -1,0 +1,130 @@
+{
+  "schemaVersion": 1,
+  "projectId": "6ac1d8e8-09a8-58d6-88a4-f66494e21c14",
+  "engineFamily": "TFG_ENGINE",
+  "entrySceneId": "0f92d28a-2933-5faf-8b3b-94bda9f67023",
+  "settings": {
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    }
+  },
+  "assetIds": [],
+  "scenes": [
+    {
+      "id": "0f92d28a-2933-5faf-8b3b-94bda9f67023",
+      "name": "intro",
+      "order": 0,
+      "backgroundColor": "#102030",
+      "objects": [
+        {
+          "id": "4f3cad63-7850-53b8-ad4f-56e1cf8752b7",
+          "name": "Guide",
+          "parentId": null,
+          "enabled": true,
+          "order": 0,
+          "components": [
+            {
+              "id": "7cf94674-7050-5146-a145-0fb8e7e95124",
+              "type": "Dialogue",
+              "version": 1,
+              "properties": {
+                "speaker": "Guide",
+                "text": "Choose a path.",
+                "choices": [
+                  {
+                    "id": "094decb4-6c51-5e40-b223-39e5e6e075fb",
+                    "text": "Enter the forest"
+                  },
+                  {
+                    "id": "3b1928bd-2b20-553c-84d7-6f5f5f252f55",
+                    "text": "Stay here"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "2eaa96d6-4a5d-5796-b58e-e7a34788c11d",
+      "name": "forest",
+      "order": 1,
+      "backgroundColor": "#204020",
+      "objects": [
+        {
+          "id": "d3a25134-9349-58a8-b97d-b17833ed9819",
+          "name": "Ranger",
+          "parentId": null,
+          "enabled": true,
+          "order": 0,
+          "components": [
+            {
+              "id": "79fdf9a8-a181-504a-8e7b-d7d5269d7b79",
+              "type": "Dialogue",
+              "version": 1,
+              "properties": {
+                "speaker": "Ranger",
+                "text": "Welcome to the forest.",
+                "choices": []
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "variables": {
+    "global": [],
+    "player": [],
+    "scene": {}
+  },
+  "events": [
+    {
+      "id": "541ef86c-7ee1-59b1-ba88-bed173bd4174",
+      "version": 1,
+      "name": "Choice: Enter the forest",
+      "enabled": true,
+      "order": 0,
+      "trigger": {
+        "type": "CHOICE_SELECTED",
+        "objectId": "4f3cad63-7850-53b8-ad4f-56e1cf8752b7",
+        "componentId": "7cf94674-7050-5146-a145-0fb8e7e95124",
+        "choiceId": "094decb4-6c51-5e40-b223-39e5e6e075fb"
+      },
+      "condition": null,
+      "actions": [
+        {
+          "id": "1233c430-8850-5c8a-b1f3-11b9cbddea5f",
+          "version": 1,
+          "type": "CHANGE_SCENE",
+          "sceneId": "2eaa96d6-4a5d-5796-b58e-e7a34788c11d"
+        }
+      ]
+    },
+    {
+      "id": "4c0977b2-0408-5f6e-b18b-50ebc54565d7",
+      "version": 1,
+      "name": "Choice: Stay here",
+      "enabled": true,
+      "order": 1,
+      "trigger": {
+        "type": "CHOICE_SELECTED",
+        "objectId": "4f3cad63-7850-53b8-ad4f-56e1cf8752b7",
+        "componentId": "7cf94674-7050-5146-a145-0fb8e7e95124",
+        "choiceId": "3b1928bd-2b20-553c-84d7-6f5f5f252f55"
+      },
+      "condition": null,
+      "actions": [
+        {
+          "id": "e5ebb63d-bd4d-5a68-b23b-6fd5d5dc3554",
+          "version": 1,
+          "type": "CHANGE_SCENE",
+          "sceneId": "0f92d28a-2933-5faf-8b3b-94bda9f67023"
+        }
+      ]
+    }
+  ],
+  "prefabs": []
+}

@@ -87,6 +87,7 @@ describe('EngineProjectV1', () => {
       'Dialogue',
       'Audio',
       'Text',
+      'Shape',
     ]);
     for (const type of COMPONENT_TYPES) {
       const definition = componentRegistry[type];

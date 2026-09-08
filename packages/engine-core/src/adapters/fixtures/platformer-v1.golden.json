@@ -1,0 +1,230 @@
+{
+  "schemaVersion": 1,
+  "projectId": "6ac1d8e8-09a8-58d6-88a4-f66494e21c14",
+  "engineFamily": "TFG_ENGINE",
+  "entrySceneId": "3842a1e9-74d4-5b98-b689-68c3bad25d7c",
+  "settings": {
+    "viewport": {
+      "width": 640,
+      "height": 480
+    }
+  },
+  "assetIds": [],
+  "scenes": [
+    {
+      "id": "3842a1e9-74d4-5b98-b689-68c3bad25d7c",
+      "name": "Platformer",
+      "order": 0,
+      "backgroundColor": "#101820",
+      "objects": [
+        {
+          "id": "41244f8f-dee0-5f90-a20c-8c196fd18624",
+          "name": "Player",
+          "parentId": null,
+          "enabled": true,
+          "order": 0,
+          "components": [
+            {
+              "id": "c4e270c7-ac74-55b4-8793-204990f5dec9",
+              "type": "Transform",
+              "version": 1,
+              "properties": {
+                "x": 24,
+                "y": 32,
+                "rotation": 0,
+                "scaleX": 1,
+                "scaleY": 1
+              }
+            },
+            {
+              "id": "39328599-f357-5e5e-b614-b7e4752ecd8d",
+              "type": "Shape",
+              "version": 1,
+              "properties": {
+                "kind": "RECTANGLE",
+                "width": 24,
+                "height": 24,
+                "color": "#2563eb"
+              }
+            },
+            {
+              "id": "4b8718fd-b700-5569-b758-d2fb42fb90db",
+              "type": "Physics",
+              "version": 1,
+              "properties": {
+                "enabled": true,
+                "bodyType": "DYNAMIC",
+                "gravityScale": 1,
+                "isSensor": false
+              }
+            },
+            {
+              "id": "f4b447eb-6d16-5186-88ff-04cab6341deb",
+              "type": "Movement",
+              "version": 1,
+              "properties": {
+                "speed": 200,
+                "jumpStrength": 400
+              }
+            }
+          ]
+        },
+        {
+          "id": "756592fd-a984-5143-b7a4-8597ce14db34",
+          "name": "Goal",
+          "parentId": null,
+          "enabled": true,
+          "order": 1,
+          "components": [
+            {
+              "id": "5760cb72-c666-5d03-8c87-93b3cb4cc24e",
+              "type": "Transform",
+              "version": 1,
+              "properties": {
+                "x": 576,
+                "y": 400,
+                "rotation": 0,
+                "scaleX": 1,
+                "scaleY": 1
+              }
+            },
+            {
+              "id": "37bc5a87-5320-5b09-a97c-5bbf238a2dbf",
+              "type": "Shape",
+              "version": 1,
+              "properties": {
+                "kind": "RECTANGLE",
+                "width": 24,
+                "height": 24,
+                "color": "#16a34a"
+              }
+            },
+            {
+              "id": "bf238426-30b0-50b2-95e6-116e60b416b6",
+              "type": "Collectible",
+              "version": 1,
+              "properties": {
+                "scoreValue": 0,
+                "destroyOnCollect": false
+              }
+            }
+          ]
+        },
+        {
+          "id": "352a9e8f-38a8-5601-a7e9-bbbceb76d74a",
+          "name": "Platform 1",
+          "parentId": null,
+          "enabled": true,
+          "order": 2,
+          "components": [
+            {
+              "id": "f1dd6886-959b-5ebb-ad11-fcc1706db6b8",
+              "type": "Transform",
+              "version": 1,
+              "properties": {
+                "x": 0,
+                "y": 440,
+                "rotation": 0,
+                "scaleX": 1,
+                "scaleY": 1
+              }
+            },
+            {
+              "id": "18c38032-3800-595b-ad6b-a22e16b3dfe6",
+              "type": "Shape",
+              "version": 1,
+              "properties": {
+                "kind": "RECTANGLE",
+                "width": 640,
+                "height": 40,
+                "color": "#6b7280"
+              }
+            },
+            {
+              "id": "950aaa62-bffb-5d4e-bf18-030feb301477",
+              "type": "Physics",
+              "version": 1,
+              "properties": {
+                "enabled": true,
+                "bodyType": "STATIC",
+                "gravityScale": 1,
+                "isSensor": false
+              }
+            }
+          ]
+        },
+        {
+          "id": "315cb286-5554-553c-8541-996316d2b633",
+          "name": "Platform 2",
+          "parentId": null,
+          "enabled": true,
+          "order": 3,
+          "components": [
+            {
+              "id": "3358a672-411d-5ee7-9c0e-6aa3ba247d51",
+              "type": "Transform",
+              "version": 1,
+              "properties": {
+                "x": 240,
+                "y": 320,
+                "rotation": 0,
+                "scaleX": 1,
+                "scaleY": 1
+              }
+            },
+            {
+              "id": "4dc6acc7-a190-5da3-99dc-751651b3c3e4",
+              "type": "Shape",
+              "version": 1,
+              "properties": {
+                "kind": "RECTANGLE",
+                "width": 160,
+                "height": 24,
+                "color": "#94a3b8"
+              }
+            },
+            {
+              "id": "2470480c-0641-5a33-825a-c8357f657b50",
+              "type": "Physics",
+              "version": 1,
+              "properties": {
+                "enabled": true,
+                "bodyType": "STATIC",
+                "gravityScale": 1,
+                "isSensor": false
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "variables": {
+    "global": [],
+    "player": [],
+    "scene": {}
+  },
+  "events": [
+    {
+      "id": "affecb66-183d-5acc-a475-70dcac3c90db",
+      "version": 1,
+      "name": "Reach the goal",
+      "enabled": true,
+      "order": 0,
+      "trigger": {
+        "type": "COLLISION",
+        "firstObjectId": "41244f8f-dee0-5f90-a20c-8c196fd18624",
+        "secondObjectId": "756592fd-a984-5143-b7a4-8597ce14db34"
+      },
+      "condition": null,
+      "actions": [
+        {
+          "id": "f03544f6-484d-5a6f-be14-ec0b4b6579ec",
+          "version": 1,
+          "type": "COMPLETE_GAME"
+        }
+      ]
+    }
+  ],
+  "prefabs": []
+}

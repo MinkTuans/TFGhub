@@ -150,6 +150,7 @@ export function validateEventSemantics(
         ownComponent(action.objectId, action.componentId, 'Dialogue', [...path, 'componentId']);
         break;
       case 'ADD_SCORE':
+      case 'COMPLETE_GAME':
         break;
     }
   };
