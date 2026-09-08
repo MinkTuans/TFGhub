@@ -649,7 +649,7 @@ GET  /covers/:slug/:version       approved public cover
 
 Document `NEXT_PUBLIC_ADSENSE_ENABLED=false` as the safe default and state that CSP must be deliberately expanded before enabling real AdSense. Update the backup drill to archive and restore the entire game-storage root, including `covers/`, with checksum comparison.
 
-- [ ] **Step 4: Run the complete release gate**
+- [x] **Step 4: Run the complete release gate**
 
 Run all commands from a clean shell:
 
