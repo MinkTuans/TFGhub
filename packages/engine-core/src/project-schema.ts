@@ -5,6 +5,8 @@ import {
   type ComponentType,
 } from './component-registry.js';
 import { StableId } from './stable-id.js';
+import { EVENT_LIMITS, GameEventV1 } from './event-schema.js';
+import { validateEventSemantics } from './validation.js';
 
 export const ENGINE_PROJECT_SCHEMA_VERSION = 1 as const;
 
@@ -100,8 +102,7 @@ const ProjectShape = z.object({
       z.array(VariableDefinition).max(ENGINE_LIMITS.variablesPerScope),
     ),
   }).strict(),
-  // Task 2 replaces this deliberately empty boundary with GameEventV1.
-  events: z.array(z.never()).max(0),
+  events: z.array(GameEventV1).max(EVENT_LIMITS.events),
   prefabs: z.array(PrefabShape).max(ENGINE_LIMITS.prefabs),
 }).strict();
 
@@ -151,6 +152,15 @@ export const EngineProjectV1 = ProjectShape.superRefine((project, context) => {
           context,
           ['scenes', sceneIndex, 'objects', objectIndex, 'components', componentIndex, 'id'],
         );
+        if (component.type === 'Dialogue') {
+          const dialogue = component.properties as { choices: Array<{ id: string }> };
+          dialogue.choices.forEach((choice, choiceIndex) => duplicateIssue(
+            stableIds,
+            choice.id,
+            context,
+            ['scenes', sceneIndex, 'objects', objectIndex, 'components', componentIndex, 'properties', 'choices', choiceIndex, 'id'],
+          ));
+        }
       });
     });
   });
@@ -164,6 +174,15 @@ export const EngineProjectV1 = ProjectShape.superRefine((project, context) => {
         context,
         ['prefabs', prefabIndex, 'components', componentIndex, 'id'],
       );
+      if (component.type === 'Dialogue') {
+        const dialogue = component.properties as { choices: Array<{ id: string }> };
+        dialogue.choices.forEach((choice, choiceIndex) => duplicateIssue(
+          stableIds,
+          choice.id,
+          context,
+          ['prefabs', prefabIndex, 'components', componentIndex, 'properties', 'choices', choiceIndex, 'id'],
+        ));
+      }
     });
   });
 
@@ -263,6 +282,8 @@ export const EngineProjectV1 = ProjectShape.superRefine((project, context) => {
   project.prefabs.forEach((prefab, prefabIndex) => {
     validateComponents(prefab.components, ['prefabs', prefabIndex, 'components']);
   });
+
+  validateEventSemantics(project, context, stableIds);
 });
 
 export type EngineProjectV1 = z.infer<typeof EngineProjectV1>;
