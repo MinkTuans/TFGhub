@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from "react";
 import type { GameSummary } from "@indieforge/contracts";
 import { GameCover } from "./game-cover";
+import { resolvePublicApiBaseUrl } from "../lib/api-client";
 
 function uploadErrorMessage(status: number): string {
   switch (status) {
@@ -42,7 +43,7 @@ export function CoverUploader({
     setPending(true);
     try {
       const response = await fetch(
-        `/api/games/${encodeURIComponent(game.id)}/cover`,
+        `${resolvePublicApiBaseUrl()}/games/${encodeURIComponent(game.id)}/cover`,
         {
           method: "POST",
           credentials: "include",

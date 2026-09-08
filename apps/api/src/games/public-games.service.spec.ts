@@ -7,6 +7,19 @@ import {
 const createdAt = new Date('2026-09-05T12:00:00.000Z');
 
 describe('PublicGamesService', () => {
+  it('localizes the developer fallback for discover and detail without a profile', async () => {
+    const game = {
+      id: 'game-1', slug: 'demo-game', title: 'Demo game', description: '', createdAt,
+      artifactVersion: 1, artifactReady: true, coverVersion: 0, coverContentType: null,
+      viewportWidth: 16, viewportHeight: 9, owner: { profile: null },
+    };
+    const service = new PublicGamesService({
+      findMany: vi.fn().mockResolvedValue([game]),
+      findBySlug: vi.fn().mockResolvedValue(game),
+    });
+    expect((await service.discover()).games[0]!.developer.displayName).toBe('Nhà phát triển ẩn danh');
+    expect((await service.findBySlug('demo-game'))!.developer.displayName).toBe('Nhà phát triển ẩn danh');
+  });
   it('lists only clear public games with a capped page and safe summary', async () => {
     const games: PublicGamesRepository = {
       findMany: vi.fn().mockResolvedValue([

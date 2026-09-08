@@ -747,7 +747,11 @@ test("creation sends explicit viewport dimensions and defaults to 16 by 9", asyn
   });
 });
 
-test("workspace cover upload replaces owner preview and review state from the response", async () => {
+test.each([
+  ["/api/", "/api"],
+  ["https://public.example/api/", "https://public.example/api"],
+])("workspace cover upload uses %s and replaces owner preview and review state", async (configured, base) => {
+  vi.stubEnv("NEXT_PUBLIC_API_URL", configured);
   const fetch = vi.fn().mockResolvedValue(
     new Response(
       JSON.stringify(
@@ -774,10 +778,10 @@ test("workspace cover upload replaces owner preview and review state from the re
   );
   expect(
     await screen.findByRole("img", { name: "Ảnh bìa Code quest" }),
-  ).toHaveAttribute("src", "/api/games/game-1/cover/1");
+  ).toHaveAttribute("src", `${base}/games/game-1/cover/1`);
   expect(fetch).toHaveBeenCalledWith(
-    "/api/games/game-1/cover",
-    expect.objectContaining({ method: "POST", body: expect.any(FormData) }),
+    `${base}/games/game-1/cover`,
+    expect.objectContaining({ method: "POST", credentials: "include", body: expect.any(FormData) }),
   );
   expect(fetch.mock.calls[0][1].body.get("cover")).toBe(file);
   expect(screen.getByRole("status")).toHaveTextContent("Chờ duyệt");
@@ -794,6 +798,7 @@ test.each([
 ] as const)(
   "cover upload %s failure retains existing preview and enables retry",
   async (failure, expected) => {
+    vi.stubEnv("NEXT_PUBLIC_API_URL", "/api");
     vi.stubGlobal(
       "fetch",
       failure === 0

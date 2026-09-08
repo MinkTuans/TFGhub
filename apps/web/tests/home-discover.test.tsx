@@ -15,6 +15,16 @@ afterEach(() => {
   getGames.mockReset();
 });
 
+test.each(["home", "discover"])("uses contextual game headings on %s", async (page) => {
+  getGames.mockResolvedValue({ games: [{
+    slug: "tiny-quest", title: "Tiny Quest", description: "Demo", developer: { displayName: "Minh" },
+    artifactVersion: 1, artifactReady: true, coverVersion: 0, coverContentType: null,
+    viewportWidth: 16, viewportHeight: 9, createdAt: "2026-09-07T07:00:00Z",
+  }], nextCursor: null });
+  render(page === "home" ? await Home() : await DiscoverPage({ searchParams: Promise.resolve({}) }));
+  expect(screen.getByRole("heading", { level: page === "home" ? 3 : 2, name: "Tiny Quest" })).toBeVisible();
+});
+
 test("puts creators first with four game-making methods and a three-step process", async () => {
   getGames.mockResolvedValue({ games: [], nextCursor: null });
 

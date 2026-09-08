@@ -98,7 +98,7 @@ export default async function Home() {
           </div>
           <div className="grid">
             {featuredGames.map((game) => (
-              <GameCard key={game.slug} game={game} />
+              <GameCard key={game.slug} game={game} headingLevel={3} />
             ))}
           </div>
         </section>

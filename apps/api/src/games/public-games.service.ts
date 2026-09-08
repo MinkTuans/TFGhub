@@ -71,7 +71,7 @@ function summary(game: PublicGame) {
     title: game.title,
     description: game.description,
     developer: {
-      displayName: game.owner.profile?.displayName ?? 'Unknown developer',
+      displayName: game.owner.profile?.displayName ?? 'Nhà phát triển ẩn danh',
     },
     createdAt: game.createdAt.toISOString(),
     artifactVersion: game.artifactVersion,

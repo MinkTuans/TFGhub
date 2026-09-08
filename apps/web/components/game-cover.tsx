@@ -1,5 +1,6 @@
 import type { PublicGameSummary } from "@indieforge/contracts";
 import type { CSSProperties } from "react";
+import { resolvePublicApiBaseUrl } from "../lib/api-client";
 
 /* eslint-disable @next/next/no-img-element -- Cover URLs are versioned API resources. */
 
@@ -39,9 +40,10 @@ export function GameCover({
   ownerGameId?: string;
 }) {
   const hasCover = game.coverVersion > 0;
+  const base = resolvePublicApiBaseUrl();
   const source = ownerGameId
-    ? `/api/games/${encodeURIComponent(ownerGameId)}/cover/${game.coverVersion}`
-    : `/api/covers/${encodeURIComponent(game.slug)}/${game.coverVersion}`;
+    ? `${base}/games/${encodeURIComponent(ownerGameId)}/cover/${game.coverVersion}`
+    : `${base}/covers/${encodeURIComponent(game.slug)}/${game.coverVersion}`;
   const style = {
     aspectRatio: "16 / 9",
     "--game-cover-hue": coverHue(game.slug),

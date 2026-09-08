@@ -1,12 +1,15 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render, screen } from "@testing-library/react";
-import { expect, test } from "vitest";
+import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { GameCover, coverHue } from "../components/game-cover";
 import { GameCard } from "../components/game-card";
 import { RelatedGames } from "../components/related-games";
 
 const globalStyles = readFileSync(resolve(process.cwd(), "app/globals.css"), "utf8");
+
+beforeEach(() => vi.stubEnv("NEXT_PUBLIC_API_URL", "/api"));
+afterEach(() => vi.unstubAllEnvs());
 
 const tinyQuest = {
   slug: "tiny-quest",
@@ -29,6 +32,8 @@ test("excludes the current game before limiting related games to six compact car
   expect(screen.getByRole("link", { name: /Related 5/ })).toBeVisible();
   expect(screen.queryByRole("link", { name: /Related 6/ })).not.toBeInTheDocument();
   expect(screen.queryByText("A demo")).not.toBeInTheDocument();
+  expect(screen.getByRole("heading", { level: 2, name: "Game liên quan" })).toBeVisible();
+  expect(screen.getAllByRole("heading", { level: 3 })).toHaveLength(6);
 });
 
 test("omits the related heading when there are no other games", () => {
@@ -70,6 +75,18 @@ test("encodes public cover slugs and uses the owner route when supplied", () => 
     "src",
     expect.stringContaining("/api/games/game%2F42/cover/2"),
   );
+});
+
+test.each([
+  ["/api/", "/api"],
+  ["https://public.example/api/", "https://public.example/api"],
+])("cover display honors public API base %s for public and owner routes", (configured, base) => {
+  vi.stubEnv("NEXT_PUBLIC_API_URL", configured);
+  vi.stubEnv("API_INTERNAL_URL", "http://private-api:3001");
+  const { rerender } = render(<GameCover game={tinyQuest} />);
+  expect(screen.getByRole("img")).toHaveAttribute("src", `${base}/covers/tiny-quest/2`);
+  rerender(<GameCover game={tinyQuest} ownerGameId="game/42" />);
+  expect(screen.getByRole("img")).toHaveAttribute("src", `${base}/games/game%2F42/cover/2`);
 });
 
 test("keeps a 16:9 TFG fallback for games without a cover", () => {

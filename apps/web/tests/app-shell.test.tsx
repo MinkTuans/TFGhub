@@ -7,8 +7,10 @@ import { TfgLogo } from "../components/tfg-logo";
 import { SiteNavigation } from "../components/site-navigation";
 import { ThemeToggle } from "../components/theme-toggle";
 
+const route = vi.hoisted(() => ({ pathname: "/" }));
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace: vi.fn(), refresh: vi.fn() }),
+  usePathname: () => route.pathname,
 }));
 
 vi.mock("../lib/session", () => ({
@@ -18,9 +20,46 @@ vi.mock("../lib/session", () => ({
 const globalStyles = readFileSync(resolve(process.cwd(), "app/globals.css"), "utf8");
 
 afterEach(() => {
+  route.pathname = "/";
   document.documentElement.removeAttribute("data-theme");
   localStorage.clear();
   vi.restoreAllMocks();
+});
+
+test.each([
+  ["/", "Trang chủ"],
+  ["/discover", "Khám phá"],
+  ["/studio", "Xưởng sáng tạo"],
+  ["/studio/games/new", "Xưởng sáng tạo"],
+  ["/studio/games/game-1", "Xưởng sáng tạo"],
+  ["/profile", "Hồ sơ"],
+  ["/moderation", "Kiểm duyệt"],
+])("marks the current navigation page at %s", (pathname, label) => {
+  route.pathname = pathname;
+  render(<SiteNavigation session={{ id: "admin", email: "admin@example.test", role: "ADMIN" }} />);
+  expect(screen.getByRole("link", { name: label })).toHaveAttribute("aria-current", "page");
+  expect(screen.getAllByRole("link", { current: "page" })).toHaveLength(1);
+});
+
+test("updates current navigation on route changes without matching partial prefixes", () => {
+  route.pathname = "/";
+  const { rerender } = render(<SiteNavigation session={null} />);
+  route.pathname = "/discover";
+  rerender(<SiteNavigation session={null} />);
+  expect(screen.getByRole("link", { name: "Khám phá" })).toHaveAttribute("aria-current", "page");
+  expect(screen.getByRole("link", { name: "Trang chủ" })).not.toHaveAttribute("aria-current");
+  route.pathname = "/discovery";
+  rerender(<SiteNavigation session={null} />);
+  expect(screen.queryByRole("link", { current: "page" })).not.toBeInTheDocument();
+});
+
+test.each([null, "USER", "MODERATOR", "ADMIN"] as const)("preserves navigation authorization for %s", (role) => {
+  route.pathname = "/moderation";
+  render(<SiteNavigation session={role ? { id: "user", email: "user@example.test", role } : null} />);
+  expect(screen.queryByRole("link", { name: "Xưởng sáng tạo" }) !== null).toBe(role !== null);
+  expect(screen.queryByRole("link", { name: "Hồ sơ" }) !== null).toBe(role !== null);
+  expect(screen.queryByRole("link", { name: "Kiểm duyệt" }) !== null).toBe(role === "MODERATOR" || role === "ADMIN");
+  expect(screen.queryByRole("link", { current: "page" }) !== null).toBe(role === "MODERATOR" || role === "ADMIN");
 });
 
 test("renders the accessible TFG monogram and Vietnamese guest navigation", () => {

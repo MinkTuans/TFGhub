@@ -326,7 +326,7 @@ test("register, save a profile, create a private draft, and sign back in", async
   await expect(page.getByLabel("Tên hiển thị")).toHaveValue("New developer");
   await navigation.getByRole("link", { name: "Xưởng sáng tạo" }).click();
   await expect(page).toHaveURL("/studio");
-  await page.getByRole("link", { name: "Tạo bản nháp" }).click();
+  await page.getByRole("link", { name: "Tạo game", exact: true }).click();
   await page.getByLabel("Tên game").fill(title);
   await page.getByLabel("Đường dẫn").fill(`first-game-${suffix}`);
   await page.getByLabel("Mô tả").fill("A game in progress.");
@@ -413,7 +413,7 @@ test("an HTML5 upload can be retried, previewed, and submitted for review", asyn
   await page.getByLabel("Email").fill(`upload-${suffix}@example.com`);
   await page.getByLabel("Mật khẩu").fill("password123");
   await page.getByRole("button", { name: "Tạo tài khoản" }).click();
-  await page.getByRole("link", { name: "Tạo bản nháp" }).click();
+  await page.getByRole("link", { name: "Tạo game", exact: true }).click();
   await page.getByLabel("Tên game").fill(title);
   await page.getByLabel("Đường dẫn").fill(`html5-upload-${suffix}`);
   await page.getByLabel("Cách tạo game").selectOption("UPLOAD");
@@ -598,7 +598,7 @@ test("a code game saves source, rebuilds its sandboxed preview, and submits the 
   await page.getByLabel("Email").fill(`code-${suffix}@example.com`);
   await page.getByLabel("Mật khẩu").fill("password123");
   await page.getByRole("button", { name: "Tạo tài khoản" }).click();
-  await page.getByRole("link", { name: "Tạo bản nháp" }).click();
+  await page.getByRole("link", { name: "Tạo game", exact: true }).click();
   await page.getByLabel("Tên game").fill(title);
   await page.getByLabel("Đường dẫn").fill(`code-game-${suffix}`);
   await page.getByLabel("Cách tạo game").selectOption("CODE");
@@ -638,7 +638,7 @@ test("a story game builds a sandboxed branching preview that reaches the selecte
   await page.getByLabel("Email").fill(`story-${suffix}@example.com`);
   await page.getByLabel("Mật khẩu").fill("password123");
   await page.getByRole("button", { name: "Tạo tài khoản" }).click();
-  await page.getByRole("link", { name: "Tạo bản nháp" }).click();
+  await page.getByRole("link", { name: "Tạo game", exact: true }).click();
   await page.getByLabel("Tên game").fill(title);
   await page.getByLabel("Đường dẫn").fill(`story-game-${suffix}`);
   await page.getByLabel("Cách tạo game").selectOption("STORY");
@@ -679,7 +679,7 @@ test("a platformer game builds a collision-safe preview that reaches its goal by
   await page.getByLabel("Email").fill(`platformer-${suffix}@example.com`);
   await page.getByLabel("Mật khẩu").fill("password123");
   await page.getByRole("button", { name: "Tạo tài khoản" }).click();
-  await page.getByRole("link", { name: "Tạo bản nháp" }).click();
+  await page.getByRole("link", { name: "Tạo game", exact: true }).click();
   await page.getByLabel("Tên game").fill(title);
   await page.getByLabel("Đường dẫn").fill(`platformer-game-${suffix}`);
   await page.getByLabel("Cách tạo game").selectOption("PLATFORMER");
