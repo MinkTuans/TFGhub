@@ -1,7 +1,12 @@
 import { z } from "zod";
 import { StableId } from "../stable-id.js";
 import { EngineProjectV2 } from "./project-schema.js";
-import { GameObjectV2, LayerV2, SceneV2 } from "./scene-schema.js";
+import {
+  GameObjectV2,
+  LayerV2,
+  SceneV2,
+  V2_SCENE_LIMITS,
+} from "./scene-schema.js";
 import { uuidV5 } from "../adapters/identity.js";
 
 const name = z.string().trim().min(1).max(80);
@@ -15,6 +20,19 @@ const sceneChanges = SceneV2.innerType()
   .partial();
 const sceneVariables =
   EngineProjectV2.innerType().shape.variables.shape.scene.valueSchema;
+
+export const PROJECT_MUTATION_BATCH_LIMIT = 100;
+// A canonical scene plus 99 additions, followed by deletion in command 100.
+// Create payloads carry atomic transitions, not independently valid documents.
+// Peak checks below close these resource bounds under composed carrier replay.
+const transitionLimits = {
+  layers: V2_SCENE_LIMITS.layers + PROJECT_MUTATION_BATCH_LIMIT - 1,
+  objects: V2_SCENE_LIMITS.objects * PROJECT_MUTATION_BATCH_LIMIT,
+};
+const transitionScene = SceneV2.innerType().extend({
+  layers: z.array(LayerV2).min(1).max(transitionLimits.layers),
+  objects: z.array(GameObjectV2).max(transitionLimits.objects),
+});
 
 export const SceneMutation = z
   .object({
@@ -30,9 +48,8 @@ export const ProjectMutation = z.discriminatedUnion("type", [
   z
     .object({
       type: z.literal("scene.create"),
-      // Scene-local references are checked with the final project. An inverse
-      // may restore the scene before a later command restores its parent layer.
-      scene: SceneV2.innerType(),
+      // Canonical cardinality and references are checked with the final project.
+      scene: transitionScene,
       variables: sceneVariables.nullable(),
       beforeSceneId: StableId.nullable(),
       entry: z.boolean(),
@@ -78,7 +95,7 @@ export const ProjectMutation = z.discriminatedUnion("type", [
             })
             .strict(),
         )
-        .max(1_000),
+        .max(transitionLimits.objects),
       beforeLayerId: StableId.nullable(),
     })
     .strict(),
@@ -155,6 +172,39 @@ function reorder(
   values.forEach((value) => {
     value.order = byId.get(value.id)!;
   });
+}
+
+// Restore in reverse anchor order, as with insert(), without quadratic scans
+// and splices for large transitional snapshots. Existing duplicate IDs may be
+// temporary: anchors keep first-match semantics; final validation owns IDs.
+function insertObjects(
+  scene: SceneV2,
+  command: Extract<ProjectMutation, { type: "layer.create" }>,
+) {
+  if (!command.objects.length) return;
+  type Link = { value: GameObjectV2 | null; previous: Link; next: Link };
+  const root = { value: null } as Link;
+  root.previous = root.next = root;
+  const byId = new Map<string, Link>();
+  const add = (value: GameObjectV2, before: Link) => {
+    const link = { value, previous: before.previous, next: before };
+    before.previous.next = link;
+    before.previous = link;
+    if (!byId.has(value.id)) byId.set(value.id, link);
+  };
+  scene.objects.forEach((object) => add(object, root));
+  for (let index = command.objects.length - 1; index >= 0; index -= 1) {
+    const { object, beforeObjectId } = command.objects[index]!;
+    if (object.layerId !== command.layer.id)
+      throw new Error("Restored object must belong to the created layer");
+    if (byId.has(object.id)) throw new Error("Stable ID already exists");
+    const anchor = beforeObjectId ? byId.get(beforeObjectId) : root;
+    if (!anchor) throw new ProjectMutationTargetError(beforeObjectId!);
+    add(object, anchor);
+  }
+  scene.objects = [];
+  for (let link = root.next; link !== root; link = link.next)
+    scene.objects.push(link.value!);
 }
 
 const nextOrder = (values: Array<{ order: number }>) =>
@@ -336,14 +386,7 @@ function applyBatch(
       case "layer.create": {
         const scene = target(next.scenes, command.sceneId);
         insert(scene.layers, command.layer, command.beforeLayerId);
-        // Reverse restores even adjacent removed objects using stable anchors.
-        for (const { object, beforeObjectId } of [
-          ...command.objects,
-        ].reverse()) {
-          if (object.layerId !== command.layer.id)
-            throw new Error("Restored object must belong to the created layer");
-          insert(scene.objects, object, beforeObjectId);
-        }
+        insertObjects(scene, command);
         break;
       }
       case "layer.update":
@@ -388,6 +431,20 @@ function applyBatch(
         );
         break;
       }
+    }
+    // Resource safety only, never intermediate semantic validation. Every
+    // captured inverse must fit the same bounded transition carrier schema.
+    const touched =
+      command.type === "scene.create"
+        ? command.scene
+        : "sceneId" in command
+          ? next.scenes.find((scene) => scene.id === command.sceneId)
+          : null;
+    if (touched) {
+      if (touched.layers.length > transitionLimits.layers)
+        throw new Error("Atomic scene layers limit exceeded");
+      if (touched.objects.length > transitionLimits.objects)
+        throw new Error("Atomic scene objects limit exceeded");
     }
   }
   return { document: EngineProjectV2.parse(next), undo, redo };
@@ -493,12 +550,16 @@ function inverse(
         sceneId: command.sceneId,
         layer: target(scene!.layers, command.layerId),
         beforeLayerId: nextId(scene!.layers, command.layerId),
-        objects: scene!.objects
-          .filter((object) => object.layerId === command.layerId)
-          .map((object) => ({
-            object,
-            beforeObjectId: nextId(scene!.objects, object.id),
-          })),
+        objects: scene!.objects.flatMap((object, index) =>
+          object.layerId === command.layerId
+            ? [
+                {
+                  object,
+                  beforeObjectId: scene!.objects[index + 1]?.id ?? null,
+                },
+              ]
+            : [],
+        ),
       };
   }
 }

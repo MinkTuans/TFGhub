@@ -3,11 +3,11 @@
 import { useState, type FormEvent } from "react";
 import {
   ApplyMutationBatchInput,
-  applyProjectMutations,
   type EngineProjectV2Type,
 } from "@indieforge/contracts";
 import { createStudioId, useStudio } from "./studio-provider";
 import { StudioConfirmation } from "./studio-confirmation";
+import { prepareStudioCommit, StudioMutationSizeError } from "./studio-history";
 
 type Scene = EngineProjectV2Type["scenes"][number];
 
@@ -32,13 +32,15 @@ export function SceneManager({
       const mutations = ApplyMutationBatchInput.shape.mutations.parse([
         mutation,
       ]);
-      applyProjectMutations(state.document, mutations);
+      prepareStudioCommit(state, mutations);
       dispatch({ type: "commit", mutations });
       setError("");
       return true;
-    } catch {
+    } catch (error) {
       setError(
-        "Không thể thay đổi Scene: kiểm tra thông tin, giới hạn và các tham chiếu từ đối tượng, sự kiện hoặc mã nguồn.",
+        error instanceof StudioMutationSizeError
+          ? error.message
+          : "Không thể thay đổi Scene: kiểm tra thông tin, giới hạn và các tham chiếu từ đối tượng, sự kiện hoặc mã nguồn.",
       );
       return false;
     }

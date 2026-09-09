@@ -1,12 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import {
-  ApplyMutationBatchInput,
-  applyProjectMutations,
-} from "@indieforge/contracts";
+import { ApplyMutationBatchInput } from "@indieforge/contracts";
 import { createStudioId, useStudio } from "./studio-provider";
 import { StudioConfirmation } from "./studio-confirmation";
+import { prepareStudioCommit, StudioMutationSizeError } from "./studio-history";
 
 export function LayerList({ sceneId }: { sceneId: string }) {
   const { state, dispatch } = useStudio();
@@ -21,13 +19,15 @@ export function LayerList({ sceneId }: { sceneId: string }) {
       const mutations = ApplyMutationBatchInput.shape.mutations.parse([
         mutation,
       ]);
-      applyProjectMutations(state.document, mutations);
+      prepareStudioCommit(state, mutations);
       dispatch({ type: "commit", mutations });
       setError("");
       return true;
-    } catch {
+    } catch (error) {
       setError(
-        "Không thể thay đổi lớp: kiểm tra loại lớp, giới hạn và các tham chiếu từ đối tượng, sự kiện hoặc mã nguồn.",
+        error instanceof StudioMutationSizeError
+          ? error.message
+          : "Không thể thay đổi lớp: kiểm tra loại lớp, giới hạn và các tham chiếu từ đối tượng, sự kiện hoặc mã nguồn.",
       );
       return false;
     }

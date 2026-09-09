@@ -10,8 +10,9 @@ import { useEffect } from "react";
 import { afterEach, expect, test, vi } from "vitest";
 import {
   applyProjectMutations,
+  applyProjectMutationsWithHistory,
   EngineProjectV2,
-  type ApplyMutationBatchInput,
+  ApplyMutationBatchInput,
   type EngineProjectV2Type,
   type GameSummary,
 } from "@indieforge/contracts";
@@ -105,6 +106,348 @@ function project(): EngineProjectV2Type {
   });
 }
 const metadata = { mutationId: "edit", timestamp: 1 };
+
+function customLayer(p: EngineProjectV2Type) {
+  const config = { nested: { value: "original" } };
+  const mutation: ApplyMutationBatchInput["mutations"][number] = {
+    type: "layer.create",
+    sceneId: id(2),
+    layer: { ...p.scenes[0].layers[0], id: id(50), order: 50 },
+    beforeLayerId: null,
+    objects: [
+      {
+        object: {
+          ...p.scenes[0].objects[0],
+          id: id(500),
+          layerId: id(50),
+          components: [
+            { ...p.scenes[0].objects[0].components[0], id: id(501) },
+            {
+              id: id(502),
+              type: "Custom",
+              version: 1,
+              properties: { definitionKey: "custom.payload", config },
+            },
+          ],
+        },
+        beforeObjectId: null,
+      },
+    ],
+  };
+  return { mutation, config };
+}
+
+test.each([false, true])(
+  "detaches nested command payloads from %s queued state through attempts, retry and recovery",
+  (queued) => {
+    const before = project();
+    const initial = createStudioState(identity, {
+      revision: 4,
+      document: before,
+    });
+    let state = initial;
+    if (queued) {
+      state = studioReducer(state, {
+        type: "commit",
+        mutations: [{ type: "scene.rename", sceneId: id(3), name: "First" }],
+        ...metadata,
+      });
+      state = studioReducer(state, {
+        type: "persisted",
+        version: state.version,
+      });
+      state = studioReducer(state, {
+        type: "save-started",
+        version: state.version,
+      });
+    }
+    const { mutation, config } = customLayer(before);
+    state = studioReducer(state, {
+      type: "commit",
+      mutations: [mutation],
+      ...metadata,
+    });
+    const committed = structuredClone(state);
+    config.nested.value = "caller changed after commit";
+    expect(state).toEqual(committed);
+    if (queued) {
+      state = studioReducer(state, {
+        type: "acknowledged",
+        savedMutationId: state.pending!.mutationId,
+        acknowledged: {
+          revision: 5,
+          document: applyProjectMutations(before, state.pending!.mutations),
+        },
+        mutationId: "promoted",
+        timestamp: 2,
+      });
+    }
+    state = studioReducer(state, { type: "persisted", version: state.version });
+    state = studioReducer(state, {
+      type: "save-started",
+      version: state.version,
+    });
+    const attempted = structuredClone(state.pending);
+    config.nested.value = "caller changed after attempt";
+    state = studioReducer(state, {
+      type: "save-failed",
+      savedMutationId: state.pending!.mutationId,
+      conflict: false,
+      currentRevision: null,
+      timestamp: 3,
+    });
+    state = studioReducer(state, { type: "retry", ...metadata });
+    expect(state.pending).toEqual(attempted);
+    const envelope = recoveryEnvelope(state);
+    const recovered = restoreRecovery(initial, envelope);
+    expect(recovered.document).toEqual(committed.document);
+    const snapshot = structuredClone(recovered);
+    const restorePayload = envelope.pending!.mutations[0];
+    if (restorePayload.type !== "layer.create")
+      throw new Error("Expected custom layer");
+    const properties = restorePayload.objects[0].object.components[1]
+      .properties as { config: { nested: { value: string } } };
+    properties.config.nested.value = "storage changed after restore";
+    expect(recovered).toEqual(snapshot);
+    const undo = studioReducer(state, { type: "undo", ...metadata });
+    const redo = studioReducer(undo, { type: "redo", ...metadata });
+    expect(redo.document).toEqual(committed.document);
+    expect(state.pending).toEqual(attempted);
+  },
+);
+
+test("detaches preview command payloads before a later commit-preview", () => {
+  const before = project();
+  const initial = createStudioState(identity, {
+    revision: 4,
+    document: before,
+  });
+  const { mutation, config } = customLayer(before);
+  const preview = studioReducer(initial, {
+    type: "preview",
+    mutations: [mutation],
+  });
+  const expected = structuredClone(preview.preview!.document);
+  config.nested.value = "caller changed preview";
+  const committed = studioReducer(preview, {
+    type: "commit-preview",
+    ...metadata,
+  });
+  expect(committed.document).toEqual(expected);
+});
+
+test("detaches opaque queued recovery payloads from the storage envelope", () => {
+  const initial = createStudioState(identity, {
+    revision: 4,
+    document: project(),
+  });
+  const { mutation, config } = customLayer(initial.document);
+  const envelope = {
+    ...recoveryEnvelope(initial),
+    pending: {
+      baseRevision: 4,
+      mutationId: "attempted",
+      mutations: [
+        { type: "scene.rename" as const, sceneId: id(3), name: "First" },
+      ],
+    },
+    queued: [mutation],
+  };
+  const recovered = restoreRecovery(initial, envelope);
+  const snapshot = structuredClone(recovered);
+  config.nested.value = "storage changed queued payload";
+  expect(recovered).toEqual(snapshot);
+});
+
+test.each(["layers", "objects"] as const)(
+  "sends replayable inverse snapshots through the API schema at a temporary %s overflow",
+  (collection) => {
+    const before = project();
+    const scene = before.scenes[0];
+    if (collection === "layers") {
+      scene.layers.push(
+        ...Array.from({ length: 98 }, (_, order) => ({
+          ...scene.layers[0],
+          id: id(1000 + order),
+          order: 100 + order,
+        })),
+      );
+    } else {
+      scene.objects = Array.from({ length: 1000 }, (_, order) => ({
+        ...scene.objects[0],
+        id: id(5000 + order),
+        order,
+        parentId: null,
+        components: [
+          { ...scene.objects[0].components[0], id: id(7000 + order) },
+        ],
+      }));
+    }
+    const { mutation } = customLayer(before);
+    const commands: ApplyMutationBatchInput["mutations"] = [
+      mutation,
+      {
+        type: "scene.delete",
+        sceneId: id(2),
+        replacementSceneId: id(3),
+        confirmed: true,
+      },
+      { type: "scene.rename", sceneId: id(3), name: "Kept" },
+    ];
+    const result = applyProjectMutationsWithHistory(before, commands);
+    const wire = ApplyMutationBatchInput.parse({
+      baseRevision: 5,
+      mutationId: "undo",
+      mutations: result.undo,
+    });
+    expect(applyProjectMutations(result.document, wire.mutations)).toEqual(
+      before,
+    );
+    const initial = createStudioState(identity, {
+      revision: 4,
+      document: before,
+    });
+    const state = studioReducer(initial, {
+      type: "commit",
+      mutations: commands,
+      ...metadata,
+    });
+    const undone = studioReducer(state, { type: "undo", ...metadata });
+    expect(undone.document).toEqual(before);
+    const redone = studioReducer(undone, { type: "redo", ...metadata });
+    expect(redone.document).toEqual(result.document);
+    expect(() => applyProjectMutations(before, [mutation])).toThrow();
+  },
+);
+
+test.each([-1, 0, 1])(
+  "preflights actual command bytes at the 4 MiB envelope boundary delta %i",
+  (delta) => {
+    const before = project();
+    const initial = createStudioState(identity, {
+      revision: 4,
+      document: before,
+    });
+    const { mutation, config } = customLayer(before);
+    config.nested.value = "界".repeat(128);
+    // Worst legal id consists of 128 JSON-escaped non-whitespace control chars.
+    // Buffer measures the actual UTF-8 wire independently of Studio's helper.
+    const overhead = Buffer.byteLength(
+      JSON.stringify({
+        baseRevision: 2_147_483_646,
+        mutationId: "\0".repeat(128),
+        mutations: [mutation],
+      }),
+    );
+    config.nested.value += "x".repeat(4 * 1024 * 1024 - overhead + delta);
+    const result = studioReducer(initial, {
+      type: "commit",
+      mutations: [mutation],
+      ...metadata,
+    });
+    if (delta <= 0) {
+      expect(result.document.scenes[0].objects).toHaveLength(4);
+      expect(result.history.past).toHaveLength(1);
+    } else {
+      expect(result.document === initial.document).toBe(true);
+      expect(result.history).toBe(initial.history);
+      expect(result.pending).toBeNull();
+      expect(result.queued).toEqual([]);
+      expect(result.version).toBe(initial.version);
+    }
+  },
+  20_000,
+);
+
+test("rejects a compact gesture with an oversized inverse visibly without changing durable state", async () => {
+  const before = project();
+  before.scenes[0].objects[0].components.push({
+    id: id(900),
+    type: "Custom",
+    version: 1,
+    properties: {
+      definitionKey: "custom.large",
+      config: { text: "x".repeat(1_500_000) },
+    },
+  });
+  const h = await shell(before);
+  const snapshot = h.studio.state;
+  const mutations: ApplyMutationBatchInput["mutations"] = [
+    {
+      type: "layer.duplicate",
+      sceneId: id(2),
+      layerId: id(24),
+      newId: id(50),
+      name: "Copy1",
+    },
+    {
+      type: "layer.duplicate",
+      sceneId: id(2),
+      layerId: id(24),
+      newId: id(51),
+      name: "Copy2",
+    },
+    {
+      type: "scene.delete",
+      sceneId: id(2),
+      replacementSceneId: id(3),
+      confirmed: true,
+    },
+  ];
+  expect(Buffer.byteLength(JSON.stringify(mutations))).toBeLessThan(1024);
+  await act(async () => h.studio.dispatch({ type: "commit", mutations }));
+  expect(h.studio.state.document === snapshot.document).toBe(true);
+  expect(h.studio.state.history).toBe(snapshot.history);
+  expect(h.studio.state.pending).toBe(snapshot.pending);
+  expect(h.studio.state.queued).toBe(snapshot.queued);
+  expect(h.studio.state.version).toBe(snapshot.version);
+  expect(screen.getByRole("alert")).toHaveTextContent(/4 MiB/);
+  expect(h.batches).toEqual([]);
+}, 20_000);
+
+test("does not combine separately transportable gestures into an oversized outgoing batch", () => {
+  const before = project();
+  const initial = createStudioState(identity, {
+    revision: 4,
+    document: before,
+  });
+  const first = customLayer(before);
+  first.config.nested.value = "x".repeat(2_100_000);
+  let state = studioReducer(initial, {
+    type: "commit",
+    mutations: [first.mutation],
+    ...metadata,
+  });
+  const second = structuredClone(first.mutation);
+  if (second.type !== "layer.create") throw new Error("Expected layer");
+  second.layer.id = id(60);
+  second.layer.order = 60;
+  second.objects[0].object.id = id(600);
+  second.objects[0].object.layerId = id(60);
+  second.objects[0].object.components.forEach((component, n) => {
+    component.id = id(601 + n);
+  });
+  state = studioReducer(state, {
+    type: "commit",
+    mutations: [second],
+    ...metadata,
+  });
+  expect(state.pending!.mutations).toHaveLength(1);
+  expect(state.queued).toEqual([second]);
+  const saved = applyProjectMutations(before, state.pending!.mutations);
+  const next = studioReducer(state, {
+    type: "acknowledged",
+    savedMutationId: state.pending!.mutationId,
+    acknowledged: { revision: 5, document: saved },
+    mutationId: "promoted",
+    timestamp: 2,
+  });
+  expect(next.pending!.mutations).toEqual([second]);
+  expect(applyProjectMutations(saved, next.pending!.mutations)).toEqual(
+    state.document,
+  );
+}, 20_000);
+
 const commands: Array<{
   name: string;
   build: (p: EngineProjectV2Type) => unknown;
@@ -545,8 +888,7 @@ async function shell(initial = project(), persist = false) {
     },
   };
 }
-const button = (name: string) =>
-  screen.getByRole("button", { name });
+const button = (name: string) => screen.getByRole("button", { name });
 
 test("shell exposes scene creation, settings, rename, duplicate, order and entry controls through canonical history", async () => {
   const h = await shell();

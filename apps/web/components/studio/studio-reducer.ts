@@ -1,9 +1,10 @@
 import {
   ApplyMutationBatchInput,
   applyProjectMutations,
-  applyProjectMutationsWithHistory,
+  JSON_REQUEST_BYTE_LIMIT,
+  mutationBatchRequestBytes,
 } from "@indieforge/contracts";
-import { appendHistory } from "./studio-history";
+import { prepareStudioCommit, StudioMutationSizeError } from "./studio-history";
 import { restoreRecovery } from "./studio-recovery";
 import type {
   StudioAcknowledgement,
@@ -40,8 +41,23 @@ function validPrefix(
   base: StudioAcknowledgement["document"],
   commands: StudioMutation[],
   limit: number,
+  prefix: StudioMutation[] = [],
 ) {
-  for (let count = Math.min(commands.length, limit); count > 0; count -= 1) {
+  // JSON array growth is additive. Size each candidate once, then apply the
+  // existing semantic-prefix search only inside the transportable prefix.
+  const envelopeBytes = mutationBatchRequestBytes([]);
+  let bytes = mutationBatchRequestBytes(prefix);
+  let count = 0;
+  while (count < Math.min(commands.length, limit)) {
+    const added =
+      mutationBatchRequestBytes([commands[count]]) -
+      envelopeBytes +
+      (prefix.length + count > 0 ? 1 : 0);
+    if (bytes + added > JSON_REQUEST_BYTE_LIMIT) break;
+    bytes += added;
+    count += 1;
+  }
+  for (; count > 0; count -= 1) {
     try {
       applyProjectMutations(base, commands.slice(0, count));
       return count;
@@ -58,7 +74,9 @@ function enqueue(
   meta: Metadata,
 ): StudioState {
   let pending = state.pending;
-  let queued = [...state.queued, ...commands];
+  // Zod's opaque Custom config retains nested references. Queue ownership must
+  // be separate from caller/preview/history payloads, including undo and redo.
+  let queued = [...state.queued, ...structuredClone(commands)];
   if (!pending) {
     const count = validPrefix(state.acknowledged.document, queued, 100);
     if (count) {
@@ -75,7 +93,7 @@ function enqueue(
       state.acknowledged.document,
       pending.mutations,
     );
-    const count = validPrefix(base, queued, available);
+    const count = validPrefix(base, queued, available, pending.mutations);
     pending = {
       ...pending,
       mutations: [...pending.mutations, ...queued.slice(0, count)],
@@ -150,8 +168,8 @@ export function studioReducer(
       };
     case "preview": {
       if (!state.ready) return state;
-      const mutations = ApplyMutationBatchInput.shape.mutations.parse(
-        action.mutations,
+      const mutations = structuredClone(
+        ApplyMutationBatchInput.shape.mutations.parse(action.mutations),
       );
       return {
         ...state,
@@ -178,17 +196,21 @@ export function studioReducer(
       const mutations = ApplyMutationBatchInput.shape.mutations.parse(
         action.mutations,
       );
-      const { document, undo, redo } = applyProjectMutationsWithHistory(
-        state.document,
-        mutations,
-      );
+      let prepared;
+      try {
+        prepared = prepareStudioCommit(state, mutations, action.gestureId);
+      } catch (error) {
+        if (!(error instanceof StudioMutationSizeError)) throw error;
+        return { ...state, preview: null, commandError: error.message };
+      }
+      const { document, history } = prepared;
       if (JSON.stringify(document) === JSON.stringify(state.document))
         return { ...state, preview: null };
-      const entry = { undo, redo, gestureId: action.gestureId };
       return {
         ...enqueue(state, mutations, action),
         document,
-        history: appendHistory(state.history, entry),
+        history,
+        commandError: null,
       };
     }
     case "undo":
@@ -201,6 +223,7 @@ export function studioReducer(
       const commands = undo ? entry.undo : entry.redo;
       return {
         ...enqueue(state, commands, action),
+        commandError: null,
         document: applyProjectMutations(state.document, commands),
         history: {
           ...state.history,

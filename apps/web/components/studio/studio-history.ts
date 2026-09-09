@@ -1,4 +1,9 @@
-import type { StudioMutation } from "./studio-state";
+import {
+  applyProjectMutationsWithHistory,
+  JSON_REQUEST_BYTE_LIMIT,
+  mutationBatchRequestBytes,
+} from "@indieforge/contracts";
+import type { StudioMutation, StudioState } from "./studio-state";
 
 export type HistoryEntry = {
   undo: StudioMutation[];
@@ -10,6 +15,36 @@ export type StudioHistory = {
   future: HistoryEntry[];
   limit: number;
 };
+
+export class StudioMutationSizeError extends Error {
+  constructor() {
+    super(
+      "Không thể áp dụng thay đổi: dữ liệu lưu hoặc hoàn tác vượt giới hạn 4 MiB. Hãy chia nhỏ thao tác; dự án chưa bị thay đổi.",
+    );
+  }
+}
+
+export function prepareStudioCommit(
+  state: Pick<StudioState, "document" | "history">,
+  mutations: StudioMutation[],
+  gestureId?: string,
+) {
+  const result = applyProjectMutationsWithHistory(state.document, mutations);
+  const history = appendHistory(state.history, {
+    undo: result.undo,
+    redo: result.redo,
+    gestureId,
+  });
+  const entry = history.past.at(-1)!;
+  if (
+    ![result.redo, entry.undo, entry.redo].every(
+      (commands) =>
+        mutationBatchRequestBytes(commands) <= JSON_REQUEST_BYTE_LIMIT,
+    )
+  )
+    throw new StudioMutationSizeError();
+  return { ...result, history };
+}
 
 function lastRenames(commands: StudioMutation[]): StudioMutation[] {
   // Only pure rename gestures can collapse by scene ID. Mixed commands must

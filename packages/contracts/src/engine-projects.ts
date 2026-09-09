@@ -1,16 +1,37 @@
 import { z } from 'zod';
-import { ProjectMutation } from '@indieforge/engine-core';
+import {
+  ProjectMutation,
+  PROJECT_MUTATION_BATCH_LIMIT,
+} from '@indieforge/engine-core';
 
 export const ApplyMutationBatchInput = z
   .object({
     // Leave room for the next PostgreSQL Int revision number.
     baseRevision: z.number().int().nonnegative().max(2_147_483_646),
     mutationId: z.string().min(1).max(128).regex(/^\S+$/),
-    mutations: z.array(ProjectMutation).min(1).max(100),
+    mutations: z
+      .array(ProjectMutation)
+      .min(1)
+      .max(PROJECT_MUTATION_BATCH_LIMIT),
   })
   .strict();
 
 export type ApplyMutationBatchInput = z.infer<typeof ApplyMutationBatchInput>;
+
+// Matches the API JSON parser for all JSON endpoints; Studio reserves the
+// largest legal mutation envelope so generated undo/redo can always be sent.
+export const JSON_REQUEST_BYTE_LIMIT = 4 * 1024 * 1024;
+export function mutationBatchRequestBytes(
+  mutations: ProjectMutation[],
+): number {
+  const body = JSON.stringify({
+    baseRevision: 2_147_483_646,
+    // Each non-whitespace control character occupies six escaped JSON bytes.
+    mutationId: '\0'.repeat(128),
+    mutations,
+  });
+  return new TextEncoder().encode(body).byteLength;
+}
 
 const RequiredUnknown = z.unknown().refine((value) => value !== undefined, {
   message: 'A project document is required',

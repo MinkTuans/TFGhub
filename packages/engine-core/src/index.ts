@@ -124,6 +124,7 @@ export {
   SceneMutation,
   ProjectMutation,
   ProjectMutationTargetError,
+  PROJECT_MUTATION_BATCH_LIMIT,
   applyProjectMutations,
   applyProjectMutationsWithHistory,
 } from "./v2/mutations.js";

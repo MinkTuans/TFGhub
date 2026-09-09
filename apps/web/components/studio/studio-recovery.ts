@@ -103,10 +103,12 @@ export function restoreRecovery(
   const pending =
     record.pending === null
       ? null
-      : ApplyMutationBatchInput.parse(record.pending);
-  const queued = ApplyMutationBatchInput.shape.mutations.element
-    .array()
-    .parse(record.queued);
+      : structuredClone(ApplyMutationBatchInput.parse(record.pending));
+  const queued = structuredClone(
+    ApplyMutationBatchInput.shape.mutations.element
+      .array()
+      .parse(record.queued),
+  );
   if (
     (!pending && record.conflict) ||
     (!record.conflict && record.conflictRevision !== null) ||

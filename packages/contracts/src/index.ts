@@ -11,6 +11,8 @@ export { CreateEngineGameInput } from './studio-projects.js';
 export type { CreateEngineGameResponse } from './studio-projects.js';
 export {
   ApplyMutationBatchInput,
+  JSON_REQUEST_BYTE_LIMIT,
+  mutationBatchRequestBytes,
   EngineProjectReadResponse,
   EngineProjectRevisionSummary,
   ProjectRevisionConflictResponse,

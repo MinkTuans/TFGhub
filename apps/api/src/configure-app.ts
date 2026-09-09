@@ -2,6 +2,7 @@ import type { INestApplication } from '@nestjs/common';
 import type { ExpressAdapter } from '@nestjs/platform-express';
 import cookieParser from 'cookie-parser';
 import type { NextFunction, Request, Response } from 'express';
+import { JSON_REQUEST_BYTE_LIMIT } from '@indieforge/contracts';
 
 export function configureApp(app: INestApplication): void {
   const webOrigin = process.env.WEB_ORIGIN ?? 'http://localhost:3000';
@@ -48,5 +49,5 @@ export function configureApp(app: INestApplication): void {
   });
   // Bounded story/code schemas can exceed Express's default 100 KiB JSON limit.
   const adapter = app.getHttpAdapter() as ExpressAdapter;
-  adapter.useBodyParser('json', false, { limit: '4mb' });
+  adapter.useBodyParser('json', false, { limit: JSON_REQUEST_BYTE_LIMIT });
 }

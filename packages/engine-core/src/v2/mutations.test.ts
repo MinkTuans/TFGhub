@@ -795,4 +795,309 @@ describe("scene and layer authoring", () => {
     ]);
     expect(apply(result.document, result.undo)).toEqual(input);
   });
+
+  it.each(["layers", "objects"] as const)(
+    "replays canonical mixed undo/redo when a deleted scene temporarily exceeds its %s limit",
+    (collection) => {
+      const input = project();
+      const scene = input.scenes[0]!;
+      if (collection === "layers") {
+        scene.layers = Array.from({ length: 100 }, (_, order) => ({
+          ...scene.layers[0]!,
+          id: id(String(1000 + order)),
+          order,
+        }));
+      }
+      const object = (
+        suffix: number,
+        layerId: string,
+        order: number,
+      ): engine.GameObjectV2Type => ({
+        id: id(String(suffix)),
+        name: "Object",
+        objectType: "CUSTOM",
+        parentId: null,
+        layerId,
+        enabled: true,
+        visible: true,
+        locked: false,
+        order,
+        renderOrder: 0,
+        components: [
+          {
+            id: id(String(suffix + 2000)),
+            type: "Transform",
+            version: 1,
+            properties: engine.v2ComponentRegistry.Transform.defaults(),
+          },
+        ],
+      });
+      if (collection === "objects") {
+        scene.objects = Array.from({ length: 1000 }, (_, order) =>
+          object(2000 + order, scene.layers[0]!.id, order),
+        );
+      }
+      const before = engine.EngineProjectV2.parse(input);
+      const layer = { ...scene.layers[0]!, id: id("7000"), order: 100 };
+      const commands: engine.ProjectMutation[] = [
+        {
+          type: "layer.create",
+          sceneId,
+          layer,
+          beforeLayerId: null,
+          objects:
+            collection === "objects"
+              ? [{ object: object(6000, layer.id, 0), beforeObjectId: null }]
+              : [],
+        },
+        {
+          type: "layer.update",
+          sceneId,
+          layerId: layer.id,
+          changes: { name: "Temporary" },
+        },
+        {
+          type: "scene.delete",
+          sceneId,
+          replacementSceneId: id("0003"),
+          confirmed: true,
+        },
+        { type: "scene.rename", sceneId: id("0003"), name: "Kept" },
+      ];
+      const result = engine.applyProjectMutationsWithHistory(before, commands);
+      expect(result.document.scenes).toHaveLength(1);
+      expect(result.document.scenes[0]!.name).toBe("Kept");
+      const inverse = engine.ProjectMutation.array().parse(result.undo);
+      const restored = engine.applyProjectMutationsWithHistory(
+        result.document,
+        inverse,
+      );
+      expect(restored.document).toEqual(before);
+      expect(
+        apply(before, engine.ProjectMutation.array().parse(result.redo)),
+      ).toEqual(result.document);
+      expect(
+        apply(before, engine.ProjectMutation.array().parse(restored.undo)),
+      ).toEqual(result.document);
+    },
+  );
+
+  it.each(["scene layers", "scene objects", "layer objects"])(
+    "bounds the %s transition carrier at the reachable atomic capacity",
+    (collection) => {
+      const scene = project().scenes[0]!;
+      // Structural carriers may be temporarily non-canonical. Element shapes
+      // stay strict; the complete batch still validates transforms/IDs/references.
+      const object: engine.GameObjectV2Type = {
+        id: id("0010"),
+        name: "Object",
+        objectType: "CUSTOM",
+        parentId: null,
+        layerId: scene.layers[0]!.id,
+        enabled: true,
+        visible: true,
+        locked: false,
+        order: 0,
+        renderOrder: 0,
+        components: [],
+      };
+      const maximum = collection === "scene layers" ? 199 : 100_000;
+      const command = (count: number) =>
+        collection === "layer objects"
+          ? {
+              type: "layer.create",
+              sceneId,
+              layer: scene.layers[0],
+              beforeLayerId: null,
+              objects: Array.from({ length: count }, () => ({
+                object,
+                beforeObjectId: null,
+              })),
+            }
+          : {
+              type: "scene.create",
+              scene: {
+                ...scene,
+                layers:
+                  collection === "scene layers"
+                    ? Array.from({ length: count }, () => scene.layers[0])
+                    : scene.layers,
+                objects:
+                  collection === "scene objects"
+                    ? Array.from({ length: count }, () => object)
+                    : [],
+              },
+              variables: null,
+              beforeSceneId: null,
+              entry: false,
+            };
+      expect(engine.ProjectMutation.safeParse(command(maximum)).success).toBe(
+        true,
+      );
+      expect(
+        engine.ProjectMutation.safeParse(command(maximum + 1)).success,
+      ).toBe(false);
+    },
+    20_000,
+  );
+
+  it("restores a temporarily oversized layer-owned object snapshot through mixed history", () => {
+    const before = project();
+    const scene = {
+      ...before.scenes[0]!,
+      id: id("0010"),
+      key: "carrier",
+      order: 2,
+      layers: [10, 11].map((order) => ({
+        ...before.scenes[0]!.layers[0]!,
+        id: id(String(1000 + order)),
+        order,
+      })),
+      objects: Array.from({ length: 1001 }, (_, order) => ({
+        id: id(String(2000 + order)),
+        name: "Object",
+        objectType: "CUSTOM" as const,
+        parentId: null,
+        layerId: id("1010"),
+        enabled: true,
+        visible: true,
+        locked: false,
+        order,
+        renderOrder: 0,
+        components: [
+          {
+            id: id(String(4000 + order)),
+            type: "Transform" as const,
+            version: 1 as const,
+            properties: engine.v2ComponentRegistry.Transform.defaults(),
+          },
+        ],
+      })),
+    };
+    const result = engine.applyProjectMutationsWithHistory(before, [
+      {
+        type: "scene.create",
+        scene,
+        variables: null,
+        beforeSceneId: null,
+        entry: false,
+      },
+      {
+        type: "layer.delete",
+        sceneId: scene.id,
+        layerId: id("1010"),
+        confirmed: true,
+      },
+      {
+        type: "scene.delete",
+        sceneId: scene.id,
+        replacementSceneId: null,
+        confirmed: true,
+      },
+      rename("Kept"),
+    ]);
+    const inverse = engine.ProjectMutation.array().parse(result.undo);
+    const restore = inverse.find((command) => command.type === "layer.create");
+    expect(restore?.type === "layer.create" && restore.objects.length).toBe(
+      1001,
+    );
+    expect(apply(result.document, inverse)).toEqual(before);
+    expect(apply(before, result.redo)).toEqual(result.document);
+  });
+
+  it("replays the exact reachable 199-layer peak within the 100-command protocol", () => {
+    const before = project();
+    const scene = before.scenes[0]!;
+    scene.layers = Array.from({ length: 100 }, (_, order) => ({
+      ...scene.layers[0]!,
+      id: id(String(1000 + order)),
+      order,
+    }));
+    const commands: engine.ProjectMutation[] = [
+      ...Array.from({ length: 99 }, (_, order) => ({
+        type: "layer.create" as const,
+        sceneId,
+        layer: {
+          ...scene.layers[0]!,
+          id: id(String(2000 + order)),
+          order: 100 + order,
+        },
+        objects: [],
+        beforeLayerId: null,
+      })),
+      {
+        type: "scene.delete",
+        sceneId,
+        replacementSceneId: id("0003"),
+        confirmed: true,
+      },
+    ];
+    const result = engine.applyProjectMutationsWithHistory(before, commands);
+    expect(result.undo).toHaveLength(100);
+    expect(
+      apply(result.document, engine.ProjectMutation.array().parse(result.undo)),
+    ).toEqual(before);
+    expect(apply(before, result.redo)).toEqual(result.document);
+  });
+
+  it.each(["layers", "objects"] as const)(
+    "rejects composed carriers beyond the atomic %s capacity even when later deleted",
+    (collection) => {
+      const before = project();
+      const scene = {
+        ...before.scenes[0]!,
+        id: id("0010"),
+        key: "carrier",
+        order: 2,
+      };
+      const object: engine.GameObjectV2Type = {
+        id: id("0020"),
+        name: "Object",
+        objectType: "CUSTOM",
+        parentId: null,
+        layerId: scene.layers[0]!.id,
+        enabled: true,
+        visible: true,
+        locked: false,
+        order: 0,
+        renderOrder: 0,
+        components: [],
+      };
+      if (collection === "layers")
+        scene.layers = Array.from({ length: 199 }, () => scene.layers[0]!);
+      else scene.objects = Array.from({ length: 100_000 }, () => object);
+      expect(() =>
+        apply(before, [
+          {
+            type: "scene.create",
+            scene,
+            variables: null,
+            beforeSceneId: null,
+            entry: false,
+          },
+          {
+            type: "layer.create",
+            sceneId: scene.id,
+            layer: { ...scene.layers[0]!, id: id("0030"), order: 200 },
+            beforeLayerId: null,
+            objects:
+              collection === "objects"
+                ? [
+                    {
+                      object: {
+                        ...object,
+                        id: id("0031"),
+                        layerId: id("0030"),
+                      },
+                      beforeObjectId: null,
+                    },
+                  ]
+                : [],
+          },
+          removeScene(scene.id, null),
+        ]),
+      ).toThrow(`Atomic scene ${collection} limit exceeded`);
+    },
+    20_000,
+  );
 });
