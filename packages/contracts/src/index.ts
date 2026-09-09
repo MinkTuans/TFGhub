@@ -5,6 +5,7 @@ export {
   EngineProjectV2,
   applyProjectMutations,
   applyProjectMutationsWithHistory,
+  v2ComponentRegistry,
   type EngineProjectV2Type,
 } from '@indieforge/engine-core';
 export { CreateEngineGameInput } from './studio-projects.js';

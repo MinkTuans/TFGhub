@@ -58,6 +58,710 @@ const rename = (name: string, target = sceneId) => ({
   name,
 });
 
+describe("object and component authoring", () => {
+  const component = (
+    suffix: string,
+    type: engine.V2ComponentType,
+    properties?: unknown,
+  ) => ({
+    id: id(suffix),
+    type,
+    version: 1 as const,
+    properties: properties ?? engine.v2ComponentRegistry[type].defaults(),
+  });
+  const object = (suffix = "0010", order = 0): engine.GameObjectV2Type => ({
+    id: id(suffix),
+    name: "Object",
+    objectType: "CUSTOM",
+    parentId: null,
+    layerId: id("0004"),
+    enabled: true,
+    visible: true,
+    locked: false,
+    order,
+    renderOrder: -4,
+    components: [
+      component(String(Number(suffix) + 1).padStart(4, "0"), "Transform"),
+    ],
+  });
+  const apply = (input: engine.EngineProjectV2Type, commands: unknown[]) =>
+    engine.applyProjectMutations(input, commands as engine.ProjectMutation[]);
+  const history = (input: engine.EngineProjectV2Type, commands: unknown[]) =>
+    engine.applyProjectMutationsWithHistory(
+      input,
+      commands as engine.ProjectMutation[],
+    );
+  const create = (...objects: engine.GameObjectV2Type[]) => ({
+    type: "object.create",
+    sceneId,
+    objects: objects.map((object) => ({ object, beforeObjectId: null })),
+  });
+  const update = (changes: object, objectId = id("0010")) => ({
+    type: "object.update",
+    sceneId,
+    objectId,
+    changes,
+  });
+  const remove = (...objectIds: string[]) => ({
+    type: "object.delete",
+    sceneId,
+    objectIds,
+    confirmed: true,
+  });
+  const add = (value: ReturnType<typeof component>, objectId = id("0010")) => ({
+    type: "component.add",
+    sceneId,
+    objectId,
+    component: value,
+    beforeComponentId: null,
+  });
+  const editComponent = (componentId: string, properties: unknown) => ({
+    type: "component.update",
+    sceneId,
+    objectId: id("0010"),
+    componentId,
+    properties,
+  });
+  const removeComponent = (componentId: string) => ({
+    type: "component.remove",
+    sceneId,
+    objectId: id("0010"),
+    componentId,
+  });
+  function populated() {
+    const input = project();
+    input.scenes[0]!.layers.push({
+      ...input.scenes[0]!.layers[0]!,
+      id: id("0006"),
+      type: "UI",
+      order: 1,
+    });
+    input.scenes[0]!.layers.push({
+      ...input.scenes[0]!.layers[0]!,
+      id: id("0007"),
+      type: "COLLISION",
+      order: 2,
+    });
+    input.scenes[0]!.objects = [object(), object("0020", 4)];
+    return input;
+  }
+  function roundTrip(input: engine.EngineProjectV2Type, commands: unknown[]) {
+    const result = history(input, commands);
+    const restored = history(
+      result.document,
+      engine.ProjectMutation.array().parse(result.undo),
+    );
+    expect(restored.document).toEqual(input);
+    expect(
+      apply(input, engine.ProjectMutation.array().parse(result.redo)),
+    ).toEqual(result.document);
+    expect(
+      apply(input, engine.ProjectMutation.array().parse(restored.undo)),
+    ).toEqual(result.document);
+    expect(
+      engine.EngineProjectV2.parse(JSON.parse(JSON.stringify(result.document))),
+    ).toEqual(result.document);
+    return result;
+  }
+
+  it.each([
+    ["PLAYER", ["Movement", "Health", "SpriteRenderer"]],
+    ["NPC", ["Dialogue", "Interactable"]],
+    ["ITEM", ["InventoryItem", "SpriteRenderer"]],
+    ["TRIGGER", ["Trigger", "Collider"]],
+    ["UI", ["UIPanel", "Text", "UIImage", "UIButton"]],
+    ["DECORATION", ["SpriteRenderer"]],
+    ["CUSTOM", ["Custom"]],
+  ] as const)("creates a %s solely from shared components", (role, types) => {
+    const input = populated();
+    const value = object("0030", 8);
+    value.objectType = role;
+    if (role === "UI") value.layerId = id("0006");
+    types.forEach((type, index) =>
+      value.components.push(
+        component(String(40 + index).padStart(4, "0"), type),
+      ),
+    );
+    const result = roundTrip(input, [create(value)]);
+    expect(
+      result.document.scenes[0]!.objects.find((entry) => entry.id === value.id),
+    ).toEqual(value);
+  });
+
+  it.each([
+    { name: " Renamed " },
+    { parentId: id("0020") },
+    { enabled: false },
+    { visible: false },
+    { locked: true },
+    { layerId: id("0006"), order: 9 },
+    { renderOrder: -90 },
+  ])("updates stable object fields %j with exact undo", (changes) => {
+    const input = populated();
+    input.scenes[0]!.objects.reverse();
+    const result = roundTrip(input, [update(changes)]);
+    expect(result.document.scenes[0]!.objects[1]).toMatchObject({
+      ...changes,
+      ...("name" in changes ? { name: "Renamed" } : {}),
+    });
+  });
+
+  it("reorders an entire layer using sparse stable-ID orders independent of hierarchy and render order", () => {
+    const input = populated();
+    input.scenes[0]!.objects[1]!.parentId = id("0010");
+    const result = roundTrip(input, [
+      {
+        type: "object.reorder",
+        sceneId,
+        layerId: id("0004"),
+        orders: [
+          { id: id("0020"), order: 0 },
+          { id: id("0010"), order: 70 },
+        ],
+      },
+    ]);
+    expect(
+      result.document.scenes[0]!.objects.map(({ id, order, renderOrder }) => ({
+        id,
+        order,
+        renderOrder,
+      })),
+    ).toEqual([
+      { id: id("0010"), order: 70, renderOrder: -4 },
+      { id: id("0020"), order: 0, renderOrder: -4 },
+    ]);
+  });
+
+  it("duplicates a deep subtree across layers with deterministic fresh owned IDs and typed remapping only", () => {
+    const input = populated();
+    const [parent, external] = input.scenes[0]!.objects;
+    parent!.components.push(
+      component("0012", "Dialogue", {
+        startNodeId: id("0013"),
+        nodes: [
+          {
+            id: id("0013"),
+            speakerName: "NPC",
+            text: id("0010"),
+            avatarAssetId: null,
+            choices: [
+              {
+                id: id("0014"),
+                text: sceneId,
+                conditionId: null,
+                eventId: null,
+              },
+            ],
+          },
+        ],
+      }),
+      component("0015", "Collider", {
+        ...(engine.v2ComponentRegistry.Collider.defaults() as object),
+        collisionLayerId: id("0007"),
+      }),
+      component("0016", "Custom", {
+        definitionKey: "custom.ids",
+        config: { objectId: id("0010"), nested: { value: 1 } },
+      }),
+      component("0017", "Camera", {
+        followObjectId: external!.id,
+        bounds: null,
+        smoothing: 0,
+      }),
+    );
+    const child = {
+      ...object("0030", 2),
+      parentId: parent!.id,
+      layerId: id("0006"),
+    };
+    const grandchild = { ...object("0040", 6), parentId: child.id };
+    grandchild.components.push(
+      component("0042", "Camera", {
+        followObjectId: parent!.id,
+        bounds: null,
+        smoothing: 0,
+      }),
+    );
+    input.scenes[0]!.objects = [grandchild, external!, parent!, child];
+    const command = {
+      type: "object.duplicate",
+      sceneId,
+      objectId: parent!.id,
+      newId: id("0090"),
+      name: "Copy",
+    };
+    const before = structuredClone(input);
+    const result = roundTrip(input, [command]);
+    const copies = result.document.scenes[0]!.objects.slice(4);
+    const copiedParent = copies.find((value) => value.id === id("0090"))!;
+    const copiedChild = copies.find((value) => value.layerId === id("0006"))!;
+    const copiedGrandchild = copies.find(
+      (value) => value.parentId === copiedChild.id,
+    )!;
+    expect(copiedParent.name).toBe("Copy");
+    expect(copiedChild.parentId).toBe(copiedParent.id);
+    expect(copiedGrandchild.components[1]!.properties).toMatchObject({
+      followObjectId: copiedParent.id,
+    });
+    expect(copiedParent.components[4]!.properties).toMatchObject({
+      followObjectId: external!.id,
+    });
+    expect(copiedParent.components[2]!.properties).toMatchObject({
+      collisionLayerId: id("0007"),
+    });
+    expect(copiedParent.components[3]!.properties).toEqual(
+      parent!.components[3]!.properties,
+    );
+    const dialogue = copiedParent.components[1]!.properties as {
+      startNodeId: string;
+      nodes: Array<{
+        id: string;
+        text: string;
+        choices: Array<{ id: string; text: string }>;
+      }>;
+    };
+    expect(dialogue.startNodeId).toBe(dialogue.nodes[0]!.id);
+    expect(dialogue.nodes[0]!.text).toBe(id("0010"));
+    expect(dialogue.nodes[0]!.choices[0]!.text).toBe(sceneId);
+    const originalIds = input.scenes[0]!.objects.flatMap((value) => [
+      value.id,
+      ...value.components.map((entry) => entry.id),
+    ]).concat(id("0013"), id("0014"));
+    const copiedIds = copies
+      .flatMap((value) => [
+        value.id,
+        ...value.components.map((entry) => entry.id),
+      ])
+      .concat(dialogue.nodes[0]!.id, dialogue.nodes[0]!.choices[0]!.id);
+    expect(new Set(copiedIds).size).toBe(copiedIds.length);
+    expect(copiedIds.some((value) => originalIds.includes(value))).toBe(false);
+    expect(copies.map((value) => value.renderOrder)).toEqual([-4, -4, -4]);
+    expect(apply(input, [command])).toEqual(result.document);
+    expect(input).toEqual(before);
+    expect(() => apply(result.document, [command])).toThrow(/ID|unique/);
+  });
+
+  it("preserves the subtree's explicit relative order when its storage array is shuffled", () => {
+    const input = populated();
+    input.scenes[0]!.objects[0]!.order = 50;
+    const child = { ...object("0030", 10), parentId: id("0010") };
+    input.scenes[0]!.objects.push(child);
+    const result = roundTrip(input, [
+      {
+        type: "object.duplicate",
+        sceneId,
+        objectId: id("0010"),
+        newId: id("0090"),
+        name: "Copy",
+      },
+    ]);
+    const copies = result.document.scenes[0]!.objects.slice(3);
+    expect(copies.find((value) => value.id === id("0090"))!.order).toBe(52);
+    expect(copies.find((value) => value.parentId === id("0090"))!.order).toBe(
+      51,
+    );
+  });
+
+  it("restores deletion at exact array anchors including interleaved survivors and cross-layer descendants", () => {
+    const input = populated();
+    const child = {
+      ...object("0030", 2),
+      parentId: id("0010"),
+      layerId: id("0006"),
+    };
+    const grandchild = { ...object("0040", 6), parentId: child.id };
+    input.scenes[0]!.objects = [
+      grandchild,
+      input.scenes[0]!.objects[1]!,
+      input.scenes[0]!.objects[0]!,
+      child,
+    ];
+    const result = roundTrip(input, [
+      remove(id("0010"), child.id, grandchild.id),
+    ]);
+    expect(result.document.scenes[0]!.objects.map((entry) => entry.id)).toEqual(
+      [id("0020")],
+    );
+  });
+
+  it("keeps forward parent references atomic and create inverses restricted to their exact owned IDs", () => {
+    const input = populated();
+    const parent = object("0030", 9);
+    const result = roundTrip(input, [
+      update({ parentId: parent.id }),
+      create(parent),
+    ]);
+    expect(result.document.scenes[0]!.objects[0]!.parentId).toBe(parent.id);
+  });
+
+  it("adds, replaces properties, and removes repeatable components using stable IDs and exact positions", () => {
+    const input = populated();
+    const health = component("0012", "Health");
+    const result = roundTrip(input, [
+      add(health),
+      add(component("0013", "Health")),
+      editComponent(health.id, { current: 12, maximum: 90 }),
+    ]);
+    expect(result.document.scenes[0]!.objects[0]!.components[1]).toEqual({
+      ...health,
+      properties: { current: 12, maximum: 90 },
+    });
+    const removed = roundTrip(result.document, [removeComponent(health.id)]);
+    expect(
+      removed.document.scenes[0]!.objects[0]!.components.map(
+        (entry) => entry.id,
+      ),
+    ).toEqual([id("0011"), id("0013")]);
+    expect(result.redo[0]).toEqual(add(health));
+  });
+
+  it("replaces Transform atomically while preserving required Transform at the final boundary", () => {
+    const input = populated();
+    const transform = component("0012", "Transform", {
+      x: -12,
+      y: 14,
+      width: 64,
+      height: 48,
+      rotation: 23,
+      scaleX: -2,
+      scaleY: 3,
+    });
+    const result = roundTrip(input, [
+      removeComponent(id("0011")),
+      add(transform),
+    ]);
+    expect(result.document.scenes[0]!.objects[0]!.components).toEqual([
+      transform,
+    ]);
+  });
+
+  it.each([
+    [
+      "cycle",
+      [
+        update({ parentId: id("0020") }),
+        update({ parentId: id("0010") }, id("0020")),
+      ],
+      /cycle/,
+    ],
+    ["missing parent", [update({ parentId: id("0099") })], /parent/],
+    ["missing layer", [update({ layerId: id("0099") })], /Object layer/],
+    ["required Transform", [removeComponent(id("0011"))], /Transform/],
+    ["duplicate Transform", [add(component("0012", "Transform"))], /Transform/],
+    ["duplicate ID", [add(component("0011", "Health"))], /ID|unique/],
+    ["incompatible UI", [add(component("0012", "Text"))], /compatible/],
+    [
+      "incompatible camera layer",
+      [add(component("0012", "Camera")), update({ layerId: id("0006") })],
+      /compatible/,
+    ],
+    [
+      "wrong collider layer",
+      [
+        add(
+          component("0012", "Collider", {
+            ...(engine.v2ComponentRegistry.Collider.defaults() as object),
+            collisionLayerId: id("0004"),
+          }),
+        ),
+      ],
+      /COLLISION/,
+    ],
+    [
+      "missing camera target",
+      [
+        add(
+          component("0012", "Camera", {
+            followObjectId: id("0099"),
+            bounds: null,
+            smoothing: 0,
+          }),
+        ),
+      ],
+      /references/,
+    ],
+    ["missing object", [update({ name: "Missing" }, id("0099"))], /target/i],
+    ["missing component", [editComponent(id("0099"), {})], /target/i],
+  ])("rejects %s atomically", (_label, commands, message) => {
+    const input = populated();
+    const before = structuredClone(input);
+    expect(() =>
+      history(input, [rename("Earlier"), ...(commands as unknown[])]),
+    ).toThrow(message as RegExp);
+    expect(input).toEqual(before);
+  });
+
+  it.each(["x", "y", "width", "height", "rotation", "scaleX", "scaleY"])(
+    "rejects non-finite Transform %s values",
+    (field) => {
+      const input = populated();
+      for (const value of [NaN, Infinity, -Infinity]) {
+        expect(() =>
+          apply(input, [
+            editComponent(id("0011"), {
+              ...(engine.v2ComponentRegistry.Transform.defaults() as object),
+              [field]: value,
+            }),
+          ]),
+        ).toThrow(/finite|number|nan/i);
+      }
+    },
+  );
+
+  it.each([
+    "camera",
+    "event object",
+    "event component",
+    "choice",
+    "script",
+    "parent",
+  ])("rejects deletion with an incoming %s reference", (kind) => {
+    const input = populated();
+    const parent = input.scenes[0]!.objects[0]!;
+    parent.components.push(
+      component("0012", "Dialogue", {
+        startNodeId: id("0013"),
+        nodes: [
+          {
+            id: id("0013"),
+            speakerName: "",
+            avatarAssetId: null,
+            text: "",
+            choices: [
+              { id: id("0014"), text: "Go", eventId: null, conditionId: null },
+            ],
+          },
+        ],
+      }),
+    );
+    if (kind === "camera")
+      input.scenes[0]!.objects[1]!.components.push(
+        component("0022", "Camera", {
+          followObjectId: parent.id,
+          bounds: null,
+          smoothing: 0,
+        }),
+      );
+    if (kind === "parent") input.scenes[0]!.objects[1]!.parentId = parent.id;
+    if (kind === "script")
+      input.scripts.push({
+        id: id("0050"),
+        version: 1,
+        name: "Attached",
+        language: "JAVASCRIPT",
+        source: "",
+        capabilities: [],
+        attachments: [{ id: id("0051"), type: "OBJECT", objectId: parent.id }],
+      });
+    if (kind.startsWith("event") || kind === "choice")
+      input.events.push({
+        id: id("0050"),
+        version: 1,
+        name: "Incoming",
+        enabled: true,
+        order: 0,
+        trigger:
+          kind === "choice"
+            ? {
+                type: "ON_CHOICE_SELECTED",
+                objectId: parent.id,
+                componentId: id("0012"),
+                choiceId: id("0014"),
+              }
+            : { type: "ON_CLICK", objectId: parent.id },
+        condition:
+          kind === "event component"
+            ? {
+                id: id("0052"),
+                version: 1,
+                type: "HAS_COMPONENT",
+                objectId: parent.id,
+                componentId: id("0012"),
+              }
+            : null,
+        steps: [{ id: id("0051"), version: 1, type: "COMPLETE_GAME" }],
+      });
+    expect(engine.EngineProjectV2.safeParse(input).success).toBe(true);
+    const commands =
+      kind === "event component" || kind === "choice"
+        ? [removeComponent(id("0012"))]
+        : [remove(parent.id)];
+    expect(() => history(input, commands)).toThrow(
+      /references|parent|owner|component/i,
+    );
+  });
+
+  it("detaches nested component inputs, document, undo and redo from each other", () => {
+    const input = populated();
+    const custom = component("0012", "Custom", {
+      definitionKey: "custom.config",
+      config: { nested: { value: 1 } },
+    });
+    input.scenes[0]!.objects[0]!.components.push(custom);
+    const command = editComponent(custom.id, {
+      definitionKey: "custom.config",
+      config: { nested: { value: 2 } },
+    });
+    const before = structuredClone({ input, command });
+    const result = history(input, [command]);
+    const config = result.document.scenes[0]!.objects[0]!.components[1]!
+      .properties as { config: { nested: { value: number } } };
+    config.config.nested.value = 3;
+    expect({ input, command }).toEqual(before);
+    expect(result.redo).toEqual([command]);
+    expect(
+      apply(populated(), [create(object("0030", 9))]).scenes[0]!.objects,
+    ).toHaveLength(3);
+    const undo = result.undo[0] as unknown as {
+      properties: { config: { nested: { value: number } } };
+    };
+    undo.properties.config.nested.value = 4;
+    expect({ input, command }).toEqual(before);
+    expect(config.config.nested.value).toBe(3);
+  });
+
+  it("rejects malformed object/component commands and incomplete layer orders", () => {
+    const input = populated();
+    for (const command of [
+      { ...remove(id("0010")), confirmed: false },
+      remove(),
+      remove(id("0010"), id("0010")),
+      update({ id: id("0080") }),
+      update({ components: [] }),
+      update({ renderOrder: 1.5 }),
+      { ...add(component("0012", "Health")), beforeComponentId: id("0099") },
+      {
+        ...create(object("0030", 8)),
+        objects: [{ object: object("0030", 8), beforeObjectId: id("0099") }],
+      },
+      ...[
+        [{ id: id("0010"), order: 0 }],
+        [
+          { id: id("0010"), order: 0 },
+          { id: id("0020"), order: 0 },
+        ],
+        [
+          { id: id("0010"), order: 0 },
+          { id: id("0010"), order: 1 },
+        ],
+      ].map((orders) => ({
+        type: "object.reorder",
+        sceneId,
+        layerId: id("0004"),
+        orders,
+      })),
+    ])
+      expect(() => apply(input, [command])).toThrow();
+    expect(() =>
+      apply(input, [create({ ...object("0030", 8), components: [] })]),
+    ).toThrow(/Transform/);
+  });
+
+  it.each(["object", "layer", "scene"])(
+    "replays a 131-component transitional %s carrier and rejects 132",
+    (kind) => {
+      const input = populated();
+      const full = object("0030", 10);
+      full.components.push(
+        ...Array.from({ length: 130 }, (_, index) =>
+          component(String(1000 + index), "Health"),
+        ),
+      );
+      const carrier = () =>
+        kind === "object"
+          ? create(full)
+          : kind === "layer"
+            ? {
+                type: "layer.create",
+                sceneId,
+                layer: {
+                  ...input.scenes[0]!.layers[0]!,
+                  id: id("0080"),
+                  order: 8,
+                },
+                beforeLayerId: null,
+                objects: [
+                  {
+                    object: { ...full, layerId: id("0080") },
+                    beforeObjectId: null,
+                  },
+                ],
+              }
+            : {
+                type: "scene.create",
+                scene: {
+                  ...input.scenes[1]!,
+                  id: id("0080"),
+                  key: "carrier",
+                  order: 8,
+                  layers: [{ ...input.scenes[1]!.layers[0]!, id: id("0081") }],
+                  objects: [{ ...full, layerId: id("0081") }],
+                },
+                variables: null,
+                beforeSceneId: null,
+                entry: false,
+              };
+      expect(engine.ProjectMutation.safeParse(carrier()).success).toBe(true);
+      const cleanup =
+        kind === "object"
+          ? remove(full.id)
+          : kind === "layer"
+            ? {
+                type: "layer.delete",
+                sceneId,
+                layerId: id("0080"),
+                confirmed: true,
+              }
+            : {
+                type: "scene.delete",
+                sceneId: id("0080"),
+                replacementSceneId: null,
+                confirmed: true,
+              };
+      roundTrip(input, [carrier(), cleanup, rename("Kept")]);
+      full.components.push(component("1200", "Health"));
+      expect(engine.ProjectMutation.safeParse(carrier()).success).toBe(false);
+    },
+  );
+
+  it("rejects composed carriers beyond the component peak even if the object is later deleted", () => {
+    const input = populated();
+    const full = object("0030", 10);
+    full.components.push(
+      ...Array.from({ length: 130 }, (_, index) =>
+        component(String(1000 + index), "Health"),
+      ),
+    );
+    expect(() =>
+      history(input, [
+        create(full),
+        add(component("1200", "Health"), full.id),
+        remove(full.id),
+      ]),
+    ).toThrow("Atomic object components limit exceeded");
+  });
+
+  it("undoes a 100-command batch at the 131-component peak and final V2 stays canonical", () => {
+    const input = populated();
+    input.scenes[0]!.objects[0]!.components.push(
+      ...Array.from({ length: 31 }, (_, index) =>
+        component(String(1000 + index), "Health"),
+      ),
+    );
+    const commands = [
+      ...Array.from({ length: 99 }, (_, index) =>
+        add(component(String(1100 + index), "Health")),
+      ),
+      remove(id("0010")),
+    ];
+    const result = roundTrip(input, commands);
+    expect(result.undo).toHaveLength(100);
+    expect(result.document.scenes[0]!.objects.map((value) => value.id)).toEqual(
+      [id("0020")],
+    );
+  });
+});
+
 describe("V2 mutation batches", () => {
   it("addresses stable IDs when scene array order changes and preserves other fields", () => {
     const apply = reducer();

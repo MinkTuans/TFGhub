@@ -2,6 +2,7 @@ import { z } from "zod";
 import { StableId } from "../stable-id.js";
 import { EngineProjectV2 } from "./project-schema.js";
 import {
+  ComponentInstanceV2,
   GameObjectV2,
   LayerV2,
   SceneV2,
@@ -28,10 +29,25 @@ export const PROJECT_MUTATION_BATCH_LIMIT = 100;
 const transitionLimits = {
   layers: V2_SCENE_LIMITS.layers + PROJECT_MUTATION_BATCH_LIMIT - 1,
   objects: V2_SCENE_LIMITS.objects * PROJECT_MUTATION_BATCH_LIMIT,
+  components:
+    V2_SCENE_LIMITS.componentsPerObject + PROJECT_MUTATION_BATCH_LIMIT - 1,
 };
+const transitionObject = GameObjectV2.extend({
+  components: z.array(ComponentInstanceV2).max(transitionLimits.components),
+});
+const anchoredObjects = z
+  .array(
+    z
+      .object({
+        object: transitionObject,
+        beforeObjectId: StableId.nullable(),
+      })
+      .strict(),
+  )
+  .max(transitionLimits.objects);
 const transitionScene = SceneV2.innerType().extend({
   layers: z.array(LayerV2).min(1).max(transitionLimits.layers),
-  objects: z.array(GameObjectV2).max(transitionLimits.objects),
+  objects: z.array(transitionObject).max(transitionLimits.objects),
 });
 
 export const SceneMutation = z
@@ -86,16 +102,7 @@ export const ProjectMutation = z.discriminatedUnion("type", [
       type: z.literal("layer.create"),
       sceneId: StableId,
       layer: LayerV2,
-      objects: z
-        .array(
-          z
-            .object({
-              object: GameObjectV2,
-              beforeObjectId: StableId.nullable(),
-            })
-            .strict(),
-        )
-        .max(transitionLimits.objects),
+      objects: anchoredObjects,
       beforeLayerId: StableId.nullable(),
     })
     .strict(),
@@ -125,6 +132,82 @@ export const ProjectMutation = z.discriminatedUnion("type", [
       sceneId: StableId,
       layerId: StableId,
       confirmed: z.literal(true),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("object.create"),
+      sceneId: StableId,
+      objects: anchoredObjects.min(1),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("object.update"),
+      sceneId: StableId,
+      objectId: StableId,
+      changes: GameObjectV2.omit({
+        id: true,
+        objectType: true,
+        components: true,
+      }).partial(),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("object.reorder"),
+      sceneId: StableId,
+      layerId: StableId,
+      orders: orders.max(transitionLimits.objects),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("object.duplicate"),
+      sceneId: StableId,
+      objectId: StableId,
+      newId: StableId,
+      name,
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("object.delete"),
+      sceneId: StableId,
+      // Exact ownership makes inverses safe even across forward parent references.
+      objectIds: z.array(StableId).min(1).max(transitionLimits.objects),
+      confirmed: z.literal(true),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("component.add"),
+      sceneId: StableId,
+      objectId: StableId,
+      component: ComponentInstanceV2,
+      beforeComponentId: StableId.nullable(),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("component.update"),
+      sceneId: StableId,
+      objectId: StableId,
+      componentId: StableId,
+      properties: z
+        .unknown()
+        .refine(
+          (value) => value !== undefined,
+          "Component properties are required",
+        ),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("component.remove"),
+      sceneId: StableId,
+      objectId: StableId,
+      componentId: StableId,
     })
     .strict(),
 ]);
@@ -179,9 +262,9 @@ function reorder(
 // temporary: anchors keep first-match semantics; final validation owns IDs.
 function insertObjects(
   scene: SceneV2,
-  command: Extract<ProjectMutation, { type: "layer.create" }>,
+  objects: z.infer<typeof anchoredObjects>,
 ) {
-  if (!command.objects.length) return;
+  if (!objects.length) return;
   type Link = { value: GameObjectV2 | null; previous: Link; next: Link };
   const root = { value: null } as Link;
   root.previous = root.next = root;
@@ -193,10 +276,8 @@ function insertObjects(
     if (!byId.has(value.id)) byId.set(value.id, link);
   };
   scene.objects.forEach((object) => add(object, root));
-  for (let index = command.objects.length - 1; index >= 0; index -= 1) {
-    const { object, beforeObjectId } = command.objects[index]!;
-    if (object.layerId !== command.layer.id)
-      throw new Error("Restored object must belong to the created layer");
+  for (let index = objects.length - 1; index >= 0; index -= 1) {
+    const { object, beforeObjectId } = objects[index]!;
     if (byId.has(object.id)) throw new Error("Stable ID already exists");
     const anchor = beforeObjectId ? byId.get(beforeObjectId) : root;
     if (!anchor) throw new ProjectMutationTargetError(beforeObjectId!);
@@ -278,7 +359,7 @@ function copyIds(
 ) {
   const ids = new Map([[rootId, newId]]);
   const add = (id: string) => {
-    ids.set(id, uuidV5(id, newId));
+    if (id !== rootId) ids.set(id, uuidV5(id, newId));
   };
   extraIds.forEach(add);
   objects.forEach((object) => {
@@ -297,6 +378,51 @@ function copyIds(
     });
   });
   return ids;
+}
+
+function subtree(scene: SceneV2, rootId: string) {
+  target(scene.objects, rootId);
+  const children = new Map<string, string[]>();
+  for (const object of scene.objects) {
+    if (!object.parentId) continue;
+    const siblings = children.get(object.parentId) ?? [];
+    siblings.push(object.id);
+    children.set(object.parentId, siblings);
+  }
+  const ids = new Set<string>();
+  const pending = [rootId];
+  while (pending.length) {
+    const id = pending.pop()!;
+    if (ids.has(id)) continue;
+    ids.add(id);
+    for (const child of children.get(id) ?? []) pending.push(child);
+  }
+  return scene.objects.filter((object) => ids.has(object.id));
+}
+
+function duplicateObjects(
+  scene: SceneV2,
+  objectId: string,
+  newId: string,
+  name: string,
+) {
+  const originals = subtree(scene, objectId);
+  const copies = copyObjects(originals, copyIds(objectId, newId, originals));
+  const layerOrders = new Map<string, number>();
+  for (const object of scene.objects)
+    layerOrders.set(
+      object.layerId,
+      Math.max(layerOrders.get(object.layerId) ?? -1, object.order),
+    );
+  // Canonical ordering is independent of the array's storage order.
+  for (const object of [...copies].sort(
+    (left, right) => left.order - right.order,
+  )) {
+    object.order = (layerOrders.get(object.layerId) ?? -1) + 1;
+    layerOrders.set(object.layerId, object.order);
+    if (object.id === newId) object.name = name;
+  }
+  return copies;
 }
 
 /** Applies an ordered batch to a detached document, or throws without changing either input. */
@@ -386,7 +512,13 @@ function applyBatch(
       case "layer.create": {
         const scene = target(next.scenes, command.sceneId);
         insert(scene.layers, command.layer, command.beforeLayerId);
-        insertObjects(scene, command);
+        if (
+          command.objects.some(
+            ({ object }) => object.layerId !== command.layer.id,
+          )
+        )
+          throw new Error("Restored object must belong to the created layer");
+        insertObjects(scene, command.objects);
         break;
       }
       case "layer.update":
@@ -431,6 +563,82 @@ function applyBatch(
         );
         break;
       }
+      case "object.create":
+        insertObjects(target(next.scenes, command.sceneId), command.objects);
+        break;
+      case "object.update":
+        Object.assign(
+          target(
+            target(next.scenes, command.sceneId).objects,
+            command.objectId,
+          ),
+          command.changes,
+        );
+        break;
+      case "object.reorder": {
+        const scene = target(next.scenes, command.sceneId);
+        target(scene.layers, command.layerId);
+        reorder(
+          scene.objects.filter((object) => object.layerId === command.layerId),
+          command.orders,
+        );
+        break;
+      }
+      case "object.duplicate": {
+        const scene = target(next.scenes, command.sceneId);
+        const copies = duplicateObjects(
+          scene,
+          command.objectId,
+          command.newId,
+          command.name,
+        );
+        // Avoid spread argument limits for bounded transitional scene carriers.
+        for (const object of copies) scene.objects.push(object);
+        break;
+      }
+      case "object.delete": {
+        const scene = target(next.scenes, command.sceneId);
+        const ids = new Set(command.objectIds);
+        if (ids.size !== command.objectIds.length)
+          throw new Error("Duplicate object ID");
+        const existing = new Set(scene.objects.map((object) => object.id));
+        for (const id of ids)
+          if (!existing.has(id)) throw new ProjectMutationTargetError(id);
+        scene.objects = scene.objects.filter((object) => !ids.has(object.id));
+        break;
+      }
+      case "component.add":
+        insert(
+          target(target(next.scenes, command.sceneId).objects, command.objectId)
+            .components,
+          command.component,
+          command.beforeComponentId,
+        );
+        break;
+      case "component.update": {
+        const object = target(
+          target(next.scenes, command.sceneId).objects,
+          command.objectId,
+        );
+        const component = target(object.components, command.componentId);
+        // Parse now so any later inverse snapshot carries valid property shapes.
+        component.properties = ComponentInstanceV2.parse({
+          ...component,
+          properties: command.properties,
+        }).properties;
+        break;
+      }
+      case "component.remove": {
+        const object = target(
+          target(next.scenes, command.sceneId).objects,
+          command.objectId,
+        );
+        target(object.components, command.componentId);
+        object.components = object.components.filter(
+          (component) => component.id !== command.componentId,
+        );
+        break;
+      }
     }
     // Resource safety only, never intermediate semantic validation. Every
     // captured inverse must fit the same bounded transition carrier schema.
@@ -445,6 +653,12 @@ function applyBatch(
         throw new Error("Atomic scene layers limit exceeded");
       if (touched.objects.length > transitionLimits.objects)
         throw new Error("Atomic scene objects limit exceeded");
+      if (
+        touched.objects.some(
+          (object) => object.components.length > transitionLimits.components,
+        )
+      )
+        throw new Error("Atomic object components limit exceeded");
     }
   }
   return { document: EngineProjectV2.parse(next), undo, redo };
@@ -478,6 +692,84 @@ function inverse(
   const scene =
     "sceneId" in command ? target(before.scenes, command.sceneId) : null;
   switch (command.type) {
+    case "object.create":
+      return {
+        type: "object.delete",
+        sceneId: command.sceneId,
+        objectIds: command.objects.map(({ object }) => object.id),
+        confirmed: true,
+      };
+    case "object.duplicate": {
+      const objects = subtree(scene!, command.objectId);
+      const ids = copyIds(command.objectId, command.newId, objects);
+      return {
+        type: "object.delete",
+        sceneId: command.sceneId,
+        objectIds: objects.map((object) => ids.get(object.id)!),
+        confirmed: true,
+      };
+    }
+    case "object.delete": {
+      const ids = new Set(command.objectIds);
+      return {
+        type: "object.create",
+        sceneId: command.sceneId,
+        objects: scene!.objects.flatMap((object, index) =>
+          ids.has(object.id)
+            ? [
+                {
+                  object,
+                  beforeObjectId: scene!.objects[index + 1]?.id ?? null,
+                },
+              ]
+            : [],
+        ),
+      };
+    }
+    case "object.update": {
+      const object = target(scene!.objects, command.objectId);
+      return {
+        ...command,
+        changes: Object.fromEntries(
+          Object.keys(command.changes).map((key) => [
+            key,
+            object[key as keyof typeof command.changes],
+          ]),
+        ),
+      };
+    }
+    case "object.reorder":
+      return {
+        ...command,
+        orders: savedOrders(
+          scene!.objects.filter((object) => object.layerId === command.layerId),
+        ),
+      };
+    case "component.add":
+      return {
+        type: "component.remove",
+        sceneId: command.sceneId,
+        objectId: command.objectId,
+        componentId: command.component.id,
+      };
+    case "component.update":
+      return {
+        ...command,
+        properties: target(
+          target(scene!.objects, command.objectId).components,
+          command.componentId,
+        ).properties,
+      };
+    case "component.remove": {
+      const components = target(scene!.objects, command.objectId).components;
+      return {
+        type: "component.add",
+        sceneId: command.sceneId,
+        objectId: command.objectId,
+        component: target(components, command.componentId),
+        beforeComponentId: nextId(components, command.componentId),
+      };
+    }
     case "scene.rename":
       return { ...command, name: scene!.name };
     case "scene.update":
