@@ -194,6 +194,12 @@ const Transform = z
     rotation,
     scaleX: scale,
     scaleY: scale,
+    // Local normalized pivot. Older V2 documents acquire the same center
+    // default as new objects when read; no world transform is persisted.
+    pivot: z
+      .object({ x: finite.min(0).max(1), y: finite.min(0).max(1) })
+      .strict()
+      .default({ x: 0.5, y: 0.5 }),
   })
   .strict();
 
@@ -457,6 +463,7 @@ export const v2ComponentRegistry: Readonly<
     rotation: 0,
     scaleX: 1,
     scaleY: 1,
+    pivot: { x: 0.5, y: 0.5 },
   })),
   SpriteRenderer: definition(
     "SpriteRenderer",

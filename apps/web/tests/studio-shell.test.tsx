@@ -22,6 +22,7 @@ import {
 } from "../components/studio/studio-provider";
 import { browserRecoveryStorage } from "../components/studio/studio-recovery";
 import { StudioConflictError } from "../components/studio/studio-state";
+import { recordingContext } from "./canvas-context";
 
 vi.mock("../lib/session", () => ({ privateGet: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
@@ -492,7 +493,7 @@ test("failed recovery is visible and its retry action reads recovery again", asy
   ).not.toBeInTheDocument();
 });
 
-test("the shell never exposes future controls, a pretend canvas, or browser alerts", async () => {
+test("the shell provides a read-only canvas without future editing controls or browser alerts", async () => {
   const alert = vi.spyOn(window, "alert").mockImplementation(() => {});
   await shell();
   expect(
@@ -500,10 +501,50 @@ test("the shell never exposes future controls, a pretend canvas, or browser aler
       name: /Chạy thử|Xuất bản|AI|Thêm đối tượng|Tài nguyên|Mã nguồn|Kiểm tra/,
     }),
   ).not.toBeInTheDocument();
-  expect(document.querySelector("canvas, iframe")).toBeNull();
+  expect(screen.getByRole("img", { name: "Scene: Khởi đầu" }).tagName).toBe(
+    "CANVAS",
+  );
+  expect(document.querySelector("iframe")).toBeNull();
   expect(screen.getByText(/máy tính/)).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Cài đặt Studio" }));
   expect(alert).not.toHaveBeenCalled();
+});
+
+test("the real center canvas redraws the current canonical scene at DPR without creating mutations or gestures", async () => {
+  const { context, calls } = recordingContext();
+  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(context);
+  vi.spyOn(
+    HTMLCanvasElement.prototype,
+    "getBoundingClientRect",
+  ).mockReturnValue({
+    x: 0,
+    y: 0,
+    left: 0,
+    top: 0,
+    right: 640,
+    bottom: 480,
+    width: 640,
+    height: 480,
+    toJSON: () => ({}),
+  });
+  vi.stubGlobal("devicePixelRatio", 2);
+  const h = await shell();
+  const canvas = screen.getByRole("img", { name: "Scene: Khởi đầu" });
+  expect(canvas).toHaveAttribute("width", "1280");
+  expect(canvas).toHaveAttribute("height", "960");
+  expect(calls).toContainEqual({ name: "fillRect", args: [0, 0, 640, 480] });
+  calls.length = 0;
+  fireEvent.change(screen.getByRole("combobox", { name: "Scene hiện tại" }), {
+    target: { value: id(3) },
+  });
+  expect(screen.getByRole("img", { name: "Scene: Bến cảng" })).toBe(canvas);
+  expect(calls).toContainEqual({ name: "fillRect", args: [0, 0, 800, 480] });
+  fireEvent.pointerDown(canvas, { clientX: 10, clientY: 10 });
+  fireEvent.pointerMove(canvas, { clientX: 20, clientY: 20 });
+  fireEvent.pointerUp(canvas);
+  expect(h.studio.state.document).toEqual(project);
+  expect(h.studio.state.pending).toBeNull();
+  expect(h.studio.state.history.past).toEqual([]);
 });
 
 test.each([

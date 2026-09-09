@@ -67,6 +67,40 @@ const newIds = () => {
   let next = 100;
   return () => id(next++);
 };
+
+it("creates an explicit per-object pivot override and a top-left tile pivot in canonical commands", () => {
+  const input = project();
+  const custom = api.createObjectCommand(
+    input.scenes[0],
+    {
+      objectType: "PLAYER",
+      name: "Feet",
+      layerId: id(3),
+      transform: { pivot: { x: 0.5, y: 1 } },
+    },
+    newIds(),
+  );
+  expect(custom.type).toBe("object.create");
+  if (custom.type === "object.create")
+    expect(custom.objects[0].object.components[0].properties).toHaveProperty(
+      "pivot",
+      { x: 0.5, y: 1 },
+    );
+  const tile = api.createObjectCommand(
+    input.scenes[0],
+    {
+      objectType: "TILEMAP",
+      name: "Tiles",
+      layerId: id(3),
+    },
+    newIds(),
+  );
+  if (tile.type === "object.create")
+    expect(tile.objects[0].object.components[0].properties).toHaveProperty(
+      "pivot",
+      { x: 0, y: 0 },
+    );
+});
 const commit = (
   state: ReturnType<typeof createStudioState>,
   mutations: StudioMutation[],
@@ -422,6 +456,7 @@ describe("shared object command primitives", () => {
         rotation: 25,
         scaleX: -2,
         scaleY: 3,
+        pivot: { x: 0.5, y: 0.5 },
       });
       if (objectType === "PLAYER")
         expect(

@@ -6,6 +6,13 @@ export {
   applyProjectMutations,
   applyProjectMutationsWithHistory,
   v2ComponentRegistry,
+  buildRenderList,
+  transformPoint,
+  type Point,
+  type Bounds,
+  type Matrix2D,
+  type RenderItem,
+  type RenderPrimitive,
   type EngineProjectV2Type,
 } from '@indieforge/engine-core';
 export { CreateEngineGameInput } from './studio-projects.js';

@@ -1,29 +1,83 @@
-import type { EngineProjectV2Type } from "@indieforge/contracts";
+import { useEffect, useMemo, useRef } from "react";
+import {
+  buildRenderList,
+  type EngineProjectV2Type,
+} from "@indieforge/contracts";
 import { StudioButton } from "./studio-topbar";
 import { LayerList } from "./layer-list";
+import { renderScene } from "./canvas/scene-renderer";
 
 type Scene = EngineProjectV2Type["scenes"][number];
 
-export function StudioSceneOverview({ scene }: { scene: Scene }) {
+export function StudioSceneOverview({
+  scene,
+  pixelArt = false,
+}: {
+  scene: Scene;
+  pixelArt?: boolean;
+}) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const list = useMemo(() => buildRenderList(scene), [scene]);
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const context = canvas.getContext("2d");
+    if (!context) return;
+    const draw = () => {
+      const { width, height } = canvas.getBoundingClientRect();
+      if (width <= 0 || height <= 0) return;
+      const pixelRatio = window.devicePixelRatio || 1;
+      canvas.width = Math.max(1, Math.round(width * pixelRatio));
+      canvas.height = Math.max(1, Math.round(height * pixelRatio));
+      const zoom = Math.min(width / scene.width, height / scene.height);
+      renderScene(
+        context,
+        list,
+        {
+          x: -(width / zoom - scene.width) / 2,
+          y: -(height / zoom - scene.height) / 2,
+          zoom,
+          viewportWidth: width,
+          viewportHeight: height,
+        },
+        { pixelRatio, surface: scene, pixelArt },
+      );
+    };
+    draw();
+    const observer =
+      typeof ResizeObserver === "undefined" ? null : new ResizeObserver(draw);
+    observer?.observe(canvas);
+    window.addEventListener("resize", draw);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener("resize", draw);
+    };
+  }, [list, scene, pixelArt]);
   return (
     <section className="studio-overview" aria-label="Tổng quan Scene">
       <div className="studio-overview__heading">
-        <span className="studio-kicker">Scene / Tổng quan</span>
-        <span className="studio-readonly">Thông tin dự án</span>
+        <h2 className="studio-kicker">{scene.name}</h2>
+        <span className="studio-readonly">Xem Scene</span>
       </div>
-      <div className="studio-overview__content">
-        <p className="studio-kicker">Scene hiện tại</p>
-        <h2>{scene.name}</h2>
+      <div className="studio-canvas-stage">
+        <canvas
+          ref={canvasRef}
+          role="img"
+          aria-label={`Scene: ${scene.name}`}
+          aria-describedby="studio-canvas-description"
+        >
+          Trình duyệt cần hỗ trợ Canvas2D để hiển thị Scene.
+        </canvas>
+      </div>
+      <div className="studio-canvas-caption" id="studio-canvas-description">
         <p>
           {scene.width} × {scene.height} px <span aria-hidden="true">·</span>{" "}
           {scene.layers.length} lớp <span aria-hidden="true">·</span>{" "}
           {scene.objects.length} đối tượng
         </p>
-        <p className="studio-muted">
-          {scene.objects.length
-            ? "Chọn Scene trong danh sách để xem thông tin của từng cảnh."
-            : "Scene này chưa có đối tượng."}
-        </p>
+        {scene.objects.length === 0 && (
+          <p className="studio-muted">Scene này chưa có đối tượng.</p>
+        )}
       </div>
     </section>
   );

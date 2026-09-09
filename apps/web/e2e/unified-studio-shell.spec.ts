@@ -150,7 +150,8 @@ test("desktop opens a full-width dark shell, reads the saved Scene, collapses pa
   await expect(shell).toHaveCSS("color", "rgb(237, 242, 255)");
   await expect(page.getByRole("button", { name: "Hoàn tác" })).toBeDisabled();
   await expect(page.getByRole("button", { name: "Làm lại" })).toBeDisabled();
-  await expect(page.locator("canvas, iframe")).toHaveCount(0);
+  await expect(page.locator("canvas")).toHaveCount(1);
+  await expect(page.locator("iframe")).toHaveCount(0);
   await expect(
     page.getByRole("button", {
       name: /Chạy thử|Xuất bản|Thêm đối tượng|Tài nguyên|Mã nguồn|Kiểm tra|AI/,

@@ -26,6 +26,7 @@ const transform = (componentId: string) => ({
     rotation: 0,
     scaleX: 1,
     scaleY: 1,
+    pivot: { x: 0.5, y: 0.5 },
   },
 });
 

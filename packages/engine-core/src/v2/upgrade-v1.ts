@@ -111,7 +111,11 @@ function convertComponent(
         id: component.id,
         type: "Transform",
         version: 1,
-        properties: { ...component.properties, ...extent },
+        properties: {
+          ...component.properties,
+          ...extent,
+          pivot: { x: 0.5, y: 0.5 },
+        },
       };
     case "Sprite":
       return {
@@ -319,6 +323,7 @@ function convertComponents(
         rotation: 0,
         scaleX: 1,
         scaleY: 1,
+        pivot: { x: 0.5, y: 0.5 },
       },
     });
   }

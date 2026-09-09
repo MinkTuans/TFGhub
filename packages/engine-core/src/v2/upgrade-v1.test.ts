@@ -33,6 +33,27 @@ function stableIds(value: unknown): string[] {
 }
 
 describe("upgradeEngineProjectV1", () => {
+  it("adds explicit center pivots to upgraded object and prefab transforms without changing V1 local data", () => {
+    const source = EngineProjectV1.parse(
+      JSON.parse(fixture("v1-project.json")),
+    );
+    const before = structuredClone(source);
+    const output = upgradeEngineProjectV1(source);
+    const components = [
+      ...output.scenes.flatMap((scene) =>
+        scene.objects.flatMap((object) => object.components),
+      ),
+      ...output.prefabs.flatMap((prefab) => prefab.components),
+    ];
+    const transforms = components.filter(
+      (component) => component.type === "Transform",
+    );
+    expect(transforms.length).toBeGreaterThan(0);
+    for (const transform of transforms)
+      expect(transform.properties).toHaveProperty("pivot", { x: 0.5, y: 0.5 });
+    expect(source).toEqual(before);
+  });
+
   it("matches the reviewed V2 golden bytes without mutating or replacing V1 IDs", () => {
     const source = EngineProjectV1.parse(
       JSON.parse(fixture("v1-project.json")),

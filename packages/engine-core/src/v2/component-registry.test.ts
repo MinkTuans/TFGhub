@@ -17,6 +17,57 @@ const ids = {
 };
 
 describe("V2 component registry", () => {
+  it("normalizes older V2 transforms to a center pivot without mutating them", () => {
+    const input = {
+      x: 3,
+      y: 4,
+      width: 20,
+      height: 10,
+      rotation: 90,
+      scaleX: -1,
+      scaleY: 2,
+    };
+    expect(v2ComponentRegistry.Transform.schema.parse(input)).toEqual({
+      ...input,
+      pivot: { x: 0.5, y: 0.5 },
+    });
+    expect(input).not.toHaveProperty("pivot");
+    expect(v2ComponentRegistry.Transform.defaults()).toHaveProperty("pivot", {
+      x: 0.5,
+      y: 0.5,
+    });
+  });
+
+  it.each([
+    { x: 0, y: 0 },
+    { x: 0.5, y: 1 },
+    { x: 1, y: 1 },
+  ])("preserves an explicit normalized pivot %j", (pivot) => {
+    const parsed = v2ComponentRegistry.Transform.schema.safeParse({
+      ...(v2ComponentRegistry.Transform.defaults() as object),
+      pivot,
+    });
+    expect(parsed.success).toBe(true);
+    if (parsed.success) expect(parsed.data).toHaveProperty("pivot", pivot);
+  });
+
+  it.each([
+    { x: -0.1, y: 0 },
+    { x: 0, y: 1.1 },
+    { x: NaN, y: 0 },
+    { x: 0, y: Infinity },
+    { x: 0 },
+    { x: 0, y: 0, z: 0 },
+    null,
+  ])("rejects invalid pivot %j", (pivot) => {
+    expect(
+      v2ComponentRegistry.Transform.schema.safeParse({
+        ...(v2ComponentRegistry.Transform.defaults() as object),
+        pivot,
+      }).success,
+    ).toBe(false);
+  });
+
   it("provides the complete composable component set with valid defaults and metadata-only handler keys", () => {
     expect(V2_COMPONENT_TYPES).toEqual([
       "Transform",

@@ -69,7 +69,11 @@
                 "height": 32,
                 "rotation": 0,
                 "scaleX": 1,
-                "scaleY": 1
+                "scaleY": 1,
+                "pivot": {
+                  "x": 0.5,
+                  "y": 0.5
+                }
               }
             },
             {
@@ -130,7 +134,11 @@
             "scaleX": 1,
             "scaleY": 1,
             "width": 32,
-            "height": 32
+            "height": 32,
+            "pivot": {
+              "x": 0.5,
+              "y": 0.5
+            }
           }
         }
       ]

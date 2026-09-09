@@ -67,7 +67,10 @@ export function StudioShell({ initialGame }: { initialGame: GameSummary }) {
           open={sidebarOpen}
           onToggle={toggleSidebar}
         />
-        <StudioSceneOverview scene={scene} />
+        <StudioSceneOverview
+          scene={scene}
+          pixelArt={state.document.settings.pixelArt}
+        />
         <StudioInspector
           scene={scene}
           open={inspectorOpen}

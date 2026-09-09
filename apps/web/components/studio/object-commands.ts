@@ -14,7 +14,7 @@ type TransformChanges = Partial<
     "x" | "y" | "width" | "height" | "rotation" | "scaleX" | "scaleY",
     number
   >
->;
+> & { pivot?: { x: number; y: number } };
 
 // Roles are editable starting compositions; they impose no game-type lanes or
 // additional canonical rules on the shared component instances.
@@ -57,7 +57,10 @@ export function createObjectCommand(
   const components = compositions[options.objectType].map((type) => {
     const definition = v2ComponentRegistry[type];
     const properties = definition.defaults() as Record<string, unknown>;
-    if (type === "Transform") Object.assign(properties, options.transform);
+    if (type === "Transform") {
+      if (options.objectType === "TILEMAP") properties.pivot = { x: 0, y: 0 };
+      Object.assign(properties, options.transform);
+    }
     if (type === "Movement" && options.objectType === "PLAYER")
       properties.controls = "PLAYER";
     if (type === "Collider" && options.objectType === "TRIGGER")

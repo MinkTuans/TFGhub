@@ -1372,6 +1372,7 @@ describe("object and component authoring", () => {
       rotation: 23,
       scaleX: -2,
       scaleY: 3,
+      pivot: { x: 0.5, y: 0.5 },
     });
     const result = roundTrip(input, [
       removeComponent(id("0011")),
@@ -1380,6 +1381,25 @@ describe("object and component authoring", () => {
     expect(result.document.scenes[0]!.objects[0]!.components).toEqual([
       transform,
     ]);
+  });
+
+  it("round-trips explicit pivot component edits through canonical mutation history and JSON reload", () => {
+    const input = populated();
+    const properties = {
+      ...input.scenes[0]!.objects[0]!.components[0]!.properties,
+      pivot: { x: 0.5, y: 1 },
+    };
+    expect(
+      engine.v2ComponentRegistry.Transform.schema.safeParse(properties).success,
+    ).toBe(true);
+    const result = roundTrip(input, [editComponent(id("0011"), properties)]);
+    const reloaded = engine.EngineProjectV2.parse(
+      JSON.parse(JSON.stringify(result.document)),
+    );
+    expect(reloaded).toEqual(result.document);
+    expect(reloaded.scenes[0]!.objects[0]!.components[0]!.properties).toEqual(
+      properties,
+    );
   });
 
   it.each([

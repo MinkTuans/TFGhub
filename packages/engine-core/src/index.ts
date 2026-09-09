@@ -121,6 +121,15 @@ export {
 } from "./v2/project-schema.js";
 export { upgradeEngineProjectV1 } from "./v2/upgrade-v1.js";
 export {
+  buildRenderList,
+  transformPoint,
+  type Point,
+  type Bounds,
+  type Matrix2D,
+  type RenderItem,
+  type RenderPrimitive,
+} from "./runtime/render-model.js";
+export {
   SceneMutation,
   ProjectMutation,
   ProjectMutationTargetError,
