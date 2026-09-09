@@ -135,6 +135,60 @@ async function semanticPixels(canvas: Locator, declaredBounds?: TextBounds[]) {
       };
     });
     const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+    const geometry = [
+      canvas.width,
+      canvas.height,
+      window.devicePixelRatio,
+      canvas.getBoundingClientRect().width,
+      canvas.getBoundingClientRect().height,
+      canvas.dataset.cameraX,
+      canvas.dataset.cameraY,
+      canvas.dataset.cameraZoom,
+    ];
+    const redraw = async () => {
+      window.dispatchEvent(new Event("resize"));
+      await new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+      );
+      if (
+        JSON.stringify([
+          canvas.width,
+          canvas.height,
+          window.devicePixelRatio,
+          canvas.getBoundingClientRect().width,
+          canvas.getBoundingClientRect().height,
+          canvas.dataset.cameraX,
+          canvas.dataset.cameraY,
+          canvas.dataset.cameraZoom,
+        ]) !== JSON.stringify(geometry)
+      )
+        throw new Error(
+          "Background pass changed canonical camera or raster dimensions",
+        );
+    };
+    const originalFillText = Object.getOwnPropertyDescriptor(
+      context,
+      "fillText",
+    );
+    let omittedText = 0;
+    let background: Uint8ClampedArray;
+    try {
+      // Suppress only glyph emission on this context, not primitives. The real
+      // canvas redraw retains every fill/stroke, matrix, order, clip and DPR.
+      context.fillText = () => {
+        omittedText++;
+      };
+      await redraw();
+      if (!omittedText)
+        throw new Error("Background pass did not render the text fixture");
+      background = context.getImageData(0, 0, canvas.width, canvas.height).data;
+    } finally {
+      if (originalFillText)
+        Object.defineProperty(context, "fillText", originalFillText);
+      else Reflect.deleteProperty(context, "fillText");
+      await redraw();
+    }
+    let invalidTextBackgroundPixels = 0;
     let outsideInk = 0;
     for (let offset = 0; offset < pixels.length; offset += 4) {
       const x = (offset / 4) % canvas.width;
@@ -155,6 +209,25 @@ async function semanticPixels(canvas: Locator, declaredBounds?: TextBounds[]) {
         if (white > 240) outsideInk++;
         continue;
       }
+      // Fixture glyphs are white on an opaque scene. Every masked pixel must
+      // be its independently rendered background or a white glyph blend;
+      // dark/color corruption is not an allowed antialiasing variation.
+      const base = [...background.slice(offset, offset + 3)];
+      const channel = base.indexOf(Math.min(...base));
+      const alpha =
+        (pixels[offset + channel] - base[channel]) / (255 - base[channel]);
+      if (
+        pixels[offset + 3] !== 255 ||
+        background[offset + 3] !== 255 ||
+        !(alpha >= 0 && alpha <= 1) ||
+        base.some(
+          (value, channel) =>
+            Math.abs(
+              pixels[offset + channel] - (value + alpha * (255 - value)),
+            ) > 1,
+        )
+      )
+        invalidTextBackgroundPixels++;
       const { bounds } = region;
       const column = Math.min(
         5,
@@ -175,12 +248,20 @@ async function semanticPixels(canvas: Locator, declaredBounds?: TextBounds[]) {
       pixels.fill(0, offset, offset + 4);
     }
     const digest = await crypto.subtle.digest("SHA-256", pixels);
+    const backgroundDigest = await crypto.subtle.digest(
+      "SHA-256",
+      new Uint8Array(background),
+    );
     return {
       width: canvas.width,
       height: canvas.height,
       exactOutsideText: [...new Uint8Array(digest)]
         .map((byte) => byte.toString(16).padStart(2, "0"))
         .join(""),
+      exactBackground: [...new Uint8Array(backgroundDigest)]
+        .map((byte) => byte.toString(16).padStart(2, "0"))
+        .join(""),
+      invalidTextBackgroundPixels,
       outsideInk,
       text: text.map(({ bounds, ink, columns, cells, samples }) => ({
         bounds,
@@ -193,12 +274,32 @@ async function semanticPixels(canvas: Locator, declaredBounds?: TextBounds[]) {
 }
 
 function expectTextInk(snapshot: Awaited<ReturnType<typeof semanticPixels>>) {
+  expect(snapshot.invalidTextBackgroundPixels).toBe(0);
   expect(snapshot.outsideInk).toBe(0);
   for (const text of snapshot.text) {
     expect(text.ink).toBeGreaterThan(10);
     // Both declared strings have bright ink in left, middle and right thirds.
     for (const column of text.columns) expect(column).toBeGreaterThan(0);
   }
+}
+
+function expectSameScenePixels(
+  before: Awaited<ReturnType<typeof semanticPixels>>,
+  after: Awaited<ReturnType<typeof semanticPixels>>,
+) {
+  expectTextInk(before);
+  expectTextInk(after);
+  expect([after.width, after.height]).toEqual([before.width, before.height]);
+  expect(after.exactOutsideText).toBe(before.exactOutsideText);
+  expect(after.exactBackground).toBe(before.exactBackground);
+  after.text.forEach((text, index) => {
+    expect(text.bounds).toEqual(before.text[index].bounds);
+    text.coverage.forEach((coverage, cell) =>
+      expect(
+        Math.abs(coverage - before.text[index].coverage[cell]),
+      ).toBeLessThanOrEqual(0.04),
+    );
+  });
 }
 
 async function setup(page: Page) {
@@ -289,6 +390,9 @@ async function setup(page: Page) {
   });
   source.width = 320;
   source.height = 240;
+  // Grid gestures have their own native coverage; this fixture isolates the
+  // canonical renderer so white glyphs have an independent opaque background.
+  source.settings.grid.enabled = false;
   source.background = { color: "#102030", assetId: null };
   source.name = "Canonical Canvas";
   source.layers = [ui, front, { ...ground, name: "Ground" }];
@@ -325,6 +429,7 @@ async function setup(page: Page) {
               height: 240,
               name: source.name,
               background: source.background,
+              settings: source.settings,
             },
           },
           {
@@ -409,17 +514,7 @@ test("official canonical revisions preserve geometry, text regions and exact non
     contentType: "application/json",
     body: JSON.stringify({ before, after }),
   });
-  expectTextInk(after);
-  expect([after.width, after.height]).toEqual([before.width, before.height]);
-  expect(after.exactOutsideText).toBe(before.exactOutsideText);
-  after.text.forEach((text, index) => {
-    expect(text.bounds).toEqual(before.text[index].bounds);
-    text.coverage.forEach((coverage, cell) =>
-      expect(
-        Math.abs(coverage - before.text[index].coverage[cell]),
-      ).toBeLessThanOrEqual(0.04),
-    );
-  });
+  expectSameScenePixels(before, after);
   const read = await (
     await page.request.get(`/api/games/${gameId}/engine-project`)
   ).json();
@@ -466,6 +561,75 @@ test("native Canvas2D uses physical backing pixels at DPR 2 and clips scene marg
   await expect.poll(() => pixel(canvas, 40, 40)).toEqual([0, 255, 0, 255]);
   // Fitting preserves the scene aspect ratio and leaves transparent margins.
   expect(geometry.corner).toEqual([0, 0, 0, 0]);
+});
+
+test("native pixel oracle rejects dark placeholder corruption inside glyph bounds", async ({
+  page,
+}) => {
+  const { canvas } = await setup(page);
+  await expect(
+    page.getByRole("status", { name: "Trạng thái dự án" }),
+  ).toHaveText("Đã lưu");
+  const before = await semanticPixels(canvas);
+  const changed = await canvas.evaluate((element, bounds) => {
+    const canvas = element as HTMLCanvasElement;
+    const context = canvas.getContext("2d")!;
+    const image = context.getImageData(0, 0, canvas.width, canvas.height);
+    let changed = 0;
+    for (let y = bounds.top; y < bounds.bottom; y++) {
+      for (let x = bounds.left; x < bounds.right; x++) {
+        const offset = (y * canvas.width + x) * 4;
+        if (Math.min(...image.data.slice(offset, offset + 3)) > 200) continue;
+        image.data.set([80, 0, 0, 255], offset);
+        changed++;
+      }
+    }
+    context.putImageData(image, 0, 0);
+    return changed;
+  }, before.text[1].bounds);
+  expect(changed).toBeGreaterThan(1000);
+  const corrupted = await semanticPixels(
+    canvas,
+    before.text.map(({ bounds }) => bounds),
+  );
+  expect(corrupted).not.toEqual(before);
+  expect(corrupted.invalidTextBackgroundPixels).toBe(changed);
+  expect(() => expectSameScenePixels(before, corrupted)).toThrow();
+});
+
+test("native pixel oracle accepts one-byte white glyph rounding variation", async ({
+  page,
+}) => {
+  const { canvas } = await setup(page);
+  await expect(
+    page.getByRole("status", { name: "Trạng thái dự án" }),
+  ).toHaveText("Đã lưu");
+  const before = await semanticPixels(canvas);
+  const changed = await canvas.evaluate((element, bounds) => {
+    const canvas = element as HTMLCanvasElement;
+    const context = canvas.getContext("2d")!;
+    const image = context.getImageData(0, 0, canvas.width, canvas.height);
+    let changed = 0;
+    for (let y = bounds.top; y < bounds.bottom; y++) {
+      for (let x = bounds.left; x < bounds.right; x++) {
+        const offset = (y * canvas.width + x) * 4;
+        if (
+          !image.data.slice(offset, offset + 3).every((value) => value === 255)
+        )
+          continue;
+        image.data.set([254, 254, 254, 255], offset);
+        changed++;
+      }
+    }
+    context.putImageData(image, 0, 0);
+    return changed;
+  }, before.text[1].bounds);
+  expect(changed).toBeGreaterThan(100);
+  const rounded = await semanticPixels(
+    canvas,
+    before.text.map(({ bounds }) => bounds),
+  );
+  expectSameScenePixels(before, rounded);
 });
 
 test("pending layer visibility recovers in the real Studio after reload and saves the same local scene", async ({
