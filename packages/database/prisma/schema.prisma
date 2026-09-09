@@ -45,45 +45,209 @@ enum GameReviewState {
   REJECTED
 }
 
+enum RevisionRetention {
+  STANDARD
+  PINNED
+}
+
+enum GameAssetKind {
+  IMAGE
+  AUDIO
+  FONT
+  OTHER
+}
+
+enum GameAssetState {
+  UPLOADING
+  READY
+  TOMBSTONED
+  GC_PENDING
+}
+
+enum GameBuildState {
+  QUEUED
+  BUILDING
+  READY
+  FAILED
+  CANCELLED
+}
+
+enum GameReleaseState {
+  PENDING_REVIEW
+  PUBLISHED
+  SUPERSEDED
+  REJECTED
+}
+
 model User {
-  id           String            @id @default(cuid())
-  email        String            @unique
-  passwordHash String
-  role         UserRole          @default(USER)
-  createdAt    DateTime          @default(now())
-  profile      DeveloperProfile?
-  games        Game[]
+  id                String                  @id @default(cuid())
+  email             String                  @unique
+  passwordHash      String
+  role              UserRole                @default(USER)
+  createdAt         DateTime                @default(now())
+  profile           DeveloperProfile?
+  games             Game[]
+  projectRevisions  EngineProjectRevision[] @relation("RevisionAuthor")
+  gameBuilds        GameBuild[]             @relation("BuildCreator")
+  submittedReleases GameRelease[]           @relation("ReleaseSubmitter")
+  reviewedReleases  GameRelease[]           @relation("ReleaseReviewer")
 }
 
 model DeveloperProfile {
-  userId      String   @id
+  userId      String @id
   displayName String
-  bio         String   @default("")
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bio         String @default("")
+  user        User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Game {
-  id              String          @id @default(cuid())
-  ownerId         String
-  slug            String          @unique
-  title           String
-  description     String          @default("")
-  visibility      GameVisibility  @default(DRAFT)
-  accessMode      GameAccessMode  @default(GUEST_ALLOWED)
-  moderationState ModerationState @default(CLEAR)
-  sourceType      GameSourceType  @default(UPLOAD)
-  reviewState     GameReviewState @default(DRAFT)
-  projectData     Json?
-  artifactVersion Int             @default(0)
-  artifactReady   Boolean         @default(false)
-  coverVersion     Int             @default(0)
-  coverContentType String?
-  viewportWidth    Int             @default(16)
-  viewportHeight   Int             @default(9)
-  reviewNote      String?
-  submittedAt     DateTime?
-  reviewedAt      DateTime?
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
-  owner           User            @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  id                        String          @id @default(cuid())
+  ownerId                   String
+  slug                      String          @unique
+  title                     String
+  description               String          @default("")
+  visibility                GameVisibility  @default(DRAFT)
+  accessMode                GameAccessMode  @default(GUEST_ALLOWED)
+  moderationState           ModerationState @default(CLEAR)
+  sourceType                GameSourceType  @default(UPLOAD)
+  reviewState               GameReviewState @default(DRAFT)
+  projectData               Json?
+  artifactVersion           Int             @default(0)
+  artifactReady             Boolean         @default(false)
+  coverVersion              Int             @default(0)
+  coverContentType          String?
+  viewportWidth             Int             @default(16)
+  viewportHeight            Int             @default(9)
+  reviewNote                String?
+  submittedAt               DateTime?
+  reviewedAt                DateTime?
+  currentPublishedReleaseId String?
+  createdAt                 DateTime        @default(now())
+  updatedAt                 DateTime        @updatedAt
+  owner                     User            @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  engineProject             EngineProject?
+  builds                    GameBuild[]
+  releases                  GameRelease[]
+}
+
+model EngineProject {
+  id                 String                  @id @default(cuid())
+  gameId             String                  @unique
+  headRevisionNumber Int                     @default(0)
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
+  game               Game                    @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  revisions          EngineProjectRevision[]
+  assets             GameAsset[]
+}
+
+model EngineProjectRevision {
+  id             String                @id @default(cuid())
+  projectId      String
+  revisionNumber Int
+  schemaVersion  Int
+  document       Json
+  contentHash    String
+  byteSize       BigInt
+  retention      RevisionRetention     @default(STANDARD)
+  authorId       String
+  createdAt      DateTime              @default(now())
+  project        EngineProject         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  author         User                  @relation("RevisionAuthor", fields: [authorId], references: [id], onDelete: Restrict)
+  assets         EngineRevisionAsset[]
+  builds         GameBuild[]
+
+  @@unique([projectId, revisionNumber])
+}
+
+model GameAsset {
+  id           String                @id
+  projectId    String
+  kind         GameAssetKind
+  displayName  String
+  state        GameAssetState        @default(UPLOADING)
+  storageKey   String
+  contentHash  String
+  mimeType     String
+  byteSize     BigInt
+  width        Int?
+  height       Int?
+  durationMs   Int?
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime              @updatedAt
+  tombstonedAt DateTime?
+  project      EngineProject         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  revisions    EngineRevisionAsset[]
+  builds       GameBuildAsset[]
+
+  @@unique([id, contentHash])
+}
+
+model EngineRevisionAsset {
+  revisionId  String
+  assetId     String
+  contentHash String
+  revision    EngineProjectRevision @relation(fields: [revisionId], references: [id], onDelete: Cascade)
+  asset       GameAsset             @relation(fields: [assetId, contentHash], references: [id, contentHash], onDelete: Restrict, onUpdate: Restrict)
+
+  @@id([revisionId, assetId])
+}
+
+model GameBuild {
+  id                    String                 @id @default(cuid())
+  gameId                String
+  engineRevisionId      String?
+  legacyArtifactVersion Int?
+  state                 GameBuildState         @default(QUEUED)
+  runtimeFamily         String
+  runtimeVersion        String
+  manifest              Json?
+  contentHash           String?
+  diagnostics           Json?
+  creatorId             String
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  completedAt           DateTime?
+  game                  Game                   @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  engineRevision        EngineProjectRevision? @relation(fields: [engineRevisionId], references: [id], onDelete: Restrict)
+  creator               User                   @relation("BuildCreator", fields: [creatorId], references: [id], onDelete: Restrict)
+  assets                GameBuildAsset[]
+  releases              GameRelease[]
+
+  @@unique([gameId, id])
+}
+
+model GameBuildAsset {
+  buildId     String
+  assetId     String
+  contentHash String
+  build       GameBuild @relation(fields: [buildId], references: [id], onDelete: Cascade)
+  asset       GameAsset @relation(fields: [assetId, contentHash], references: [id, contentHash], onDelete: Restrict, onUpdate: Restrict)
+
+  @@id([buildId, assetId])
+  @@unique([buildId, assetId, contentHash])
+}
+
+model GameRelease {
+  id               String           @id @default(cuid())
+  gameId           String
+  buildId          String
+  state            GameReleaseState @default(PENDING_REVIEW)
+  submitterId      String
+  reviewerId       String?
+  reviewNote       String?
+  originReleaseId  String?
+  submittedAt      DateTime         @default(now())
+  reviewedAt       DateTime?
+  publishedAt      DateTime?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  game             Game             @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  build            GameBuild        @relation(fields: [gameId, buildId], references: [gameId, id], onDelete: Restrict)
+  submitter        User             @relation("ReleaseSubmitter", fields: [submitterId], references: [id], onDelete: Restrict)
+  reviewer         User?            @relation("ReleaseReviewer", fields: [reviewerId], references: [id], onDelete: Restrict)
+  originRelease    GameRelease?     @relation("ReleaseRollback", fields: [gameId, originReleaseId], references: [gameId, id], onDelete: NoAction, onUpdate: NoAction)
+  rollbackReleases GameRelease[]    @relation("ReleaseRollback")
+
+  @@unique([gameId, id])
 }
