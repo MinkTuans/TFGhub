@@ -28,7 +28,20 @@ function surface(target: EventTarget | null) {
   );
 }
 
+function undoSurface(event: KeyboardEvent) {
+  return (
+    (event.ctrlKey || event.metaKey) &&
+    ["z", "y"].includes(event.key.toLowerCase()) &&
+    event.target instanceof Element &&
+    !event.target.closest(
+      "input, textarea, select, [contenteditable], dialog",
+    ) &&
+    !!event.target.closest("button[data-studio-undo-surface]")
+  );
+}
+
 /** One editor-local keyboard route for the active canvas and its hierarchy.
+ * Explicit command buttons opt into undo/redo only; their other keys stay native.
  * Native control keys and events from other Studios never enter this route. */
 export function StudioShortcutsProvider({ children }: { children: ReactNode }) {
   const shortcuts = useRef<Shortcuts | null>(null);
@@ -39,7 +52,7 @@ export function StudioShortcutsProvider({ children }: { children: ReactNode }) {
         style={{ display: "contents" }}
         onKeyDown={(event) => {
           if (
-            surface(event.target) &&
+            (surface(event.target) || undoSurface(event)) &&
             (event.target as Element).closest(boundary) ===
               event.currentTarget &&
             !event.currentTarget.querySelector("dialog[open]")

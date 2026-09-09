@@ -658,6 +658,78 @@ test("hierarchy focus retains canvas undo shortcuts with editable-field guards",
   expect(h.studio.state.document.scenes[0].objects[0].name).toBe("Changed");
 });
 
+test.each(["ctrlKey", "metaKey"])(
+  "resize-handle %s undo/redo runs once while other button keys stay native",
+  async (modifier) => {
+    const h = await mount();
+    clickCanvas();
+    expect(row("Child")).toHaveFocus();
+    fireEvent.keyDown(document.activeElement!, { key: "Enter" });
+    expect(canvas()).toHaveFocus();
+    // jsdom has no native Tab navigation; the official browser case tabs here.
+    const handle = screen.getByRole("button", { name: "Đổi kích thước" });
+    handle.focus();
+    const width = () => screen.getByRole("spinbutton", { name: "width" });
+    fireEvent.keyDown(document.activeElement!, { key: "ArrowRight" });
+    fireEvent.keyDown(document.activeElement!, { key: "ArrowRight" });
+    expect(width()).toHaveValue(42);
+    expect(h.studio.state.history.past).toHaveLength(2);
+    expect(
+      fireEvent.keyDown(document.activeElement!, {
+        key: "z",
+        [modifier]: true,
+      }),
+    ).toBe(false);
+    expect(width()).toHaveValue(41);
+    expect(h.studio.state.history.past).toHaveLength(1);
+    expect(h.studio.state.history.future).toHaveLength(1);
+    fireEvent.keyDown(document.activeElement!, {
+      key: "Z",
+      [modifier]: true,
+      shiftKey: true,
+    });
+    expect(width()).toHaveValue(42);
+    fireEvent.keyDown(document.activeElement!, { key: "z", [modifier]: true });
+    fireEvent.keyDown(document.activeElement!, { key: "y", [modifier]: true });
+    expect(width()).toHaveValue(42);
+    const before = h.studio.state.document;
+    for (const key of ["Delete", "Backspace", "Escape", " ", "Enter", "z"]) {
+      expect(fireEvent.keyDown(handle, { key })).toBe(true);
+    }
+    expect(
+      fireEvent.keyDown(handle, {
+        key: "z",
+        [modifier]: true,
+        isComposing: true,
+      }),
+    ).toBe(true);
+    expect(
+      fireEvent.keyDown(handle, {
+        key: "z",
+        [modifier]: true,
+        altKey: true,
+      }),
+    ).toBe(true);
+    expect(handle).toHaveFocus();
+    expect(canvas()).toHaveAttribute("data-selected-object-id", id(11));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    const save = screen.getByRole("button", { name: "Lưu đối tượng" });
+    save.focus();
+    for (const key of ["z", "y", "Delete", "Backspace", "Escape", " "]) {
+      expect(
+        fireEvent.keyDown(save, {
+          key,
+          [modifier]: ["z", "y"].includes(key),
+        }),
+      ).toBe(true);
+    }
+    expect(h.studio.state.document).toBe(before);
+    expect(h.studio.state.history.past).toHaveLength(2);
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(canvas()).toHaveAttribute("data-selected-object-id", id(11));
+  },
+);
+
 test.each(["Delete", "Backspace"])(
   "tree-focused %s retains the canvas confirmation and locked/hidden guards",
   async (key) => {

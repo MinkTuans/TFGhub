@@ -616,6 +616,7 @@ function CanvasSession({ scene, pixelArt = false, assetMetadata = [] }: Props) {
             ref={handle}
             type="button"
             className="studio-resize-handle"
+            data-studio-undo-surface=""
             aria-label="Đổi kích thước"
             title="Đổi kích thước (phím mũi tên, Shift: 10 px)"
             onPointerDown={(event) => begin(event, true)}

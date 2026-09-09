@@ -190,6 +190,65 @@ async function client(canvas: Locator, x: number, y: number) {
   );
 }
 
+for (const modifier of ["Control", "Meta"]) {
+  test(`native resize-handle ${modifier} undo/redo after mouse, Enter and Tab`, async ({
+    page,
+  }) => {
+    const app = await setup(page);
+    const point = await client(app.canvas, 50, 50);
+    await page.mouse.click(point.x, point.y);
+    await expect(
+      page.getByRole("treeitem", {
+        name: "Editable panel",
+        exact: true,
+      }),
+    ).toBeFocused();
+    await page.keyboard.press("Enter");
+    await expect(app.canvas).toBeFocused();
+    await page.keyboard.press("Tab");
+    const handle = page.getByRole("button", {
+      name: "Đổi kích thước",
+      exact: true,
+    });
+    await expect(handle).toBeFocused();
+    const width = page.getByRole("spinbutton", { name: "width", exact: true });
+    await page.keyboard.press("ArrowRight");
+    await page.keyboard.press("ArrowRight");
+    await expect(width).toHaveValue("42");
+    await page.keyboard.press(`${modifier}+z`);
+    await expect(width).toHaveValue("41");
+    await page.keyboard.press(`${modifier}+Shift+z`);
+    await expect(width).toHaveValue("42");
+    await page.keyboard.press(`${modifier}+z`);
+    await expect(width).toHaveValue("41");
+    await page.keyboard.press(`${modifier}+y`);
+    await expect(width).toHaveValue("42");
+    for (const key of ["Space", "Enter", "Delete", "Backspace", "Escape"]) {
+      await page.keyboard.press(key);
+      await expect(handle).toBeFocused();
+      await expect(width).toHaveValue("42");
+      await expect(app.canvas).toHaveAttribute(
+        "data-selected-object-id",
+        app.main.id,
+      );
+      await expect(page.getByRole("dialog")).toHaveCount(0);
+    }
+    await expect(
+      page.getByRole("status", { name: "Trạng thái dự án" }),
+    ).toHaveText("Đã lưu");
+    const saved = await app.head();
+    expect(
+      saved.project.scenes[0].objects.find(
+        (object: { id: string }) => object.id === app.main.id,
+      ).components[0].properties.width,
+    ).toBe(42);
+    await page.reload();
+    await expect(
+      page.getByRole("spinbutton", { name: "width", exact: true }),
+    ).toHaveValue("42");
+  });
+}
+
 for (const key of ["Delete", "Backspace"]) {
   test(`native tree-focused ${key} opens confirmation after mouse selection`, async ({
     page,
