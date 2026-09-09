@@ -24,8 +24,9 @@ import {
 } from "./studio-state";
 import { studioReducer, type StudioCommand } from "./studio-reducer";
 import {
-  createIndexedDbRecoveryStorage,
+  browserRecoveryStorage,
   recoveryEnvelope,
+  withRecoveryStorage,
   type RecoveryStorage,
 } from "./studio-recovery";
 
@@ -46,6 +47,18 @@ const StudioContext = createContext<{
   dispatch: (command: StudioCommand) => void;
 } | null>(null);
 
+function createMutationId(): string {
+  // getRandomValues also works on ordinary HTTP/IP origins. UUID v4 keeps
+  // 122 random bits after setting its version and variant.
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = Array.from(bytes, (byte) =>
+    byte.toString(16).padStart(2, "0"),
+  ).join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
 export function StudioProvider(props: StudioProviderProps) {
   // A navigation/account change starts a separate lifecycle and cancels old timers.
   const key = JSON.stringify([
@@ -58,7 +71,7 @@ export function StudioProvider(props: StudioProviderProps) {
 
 function StudioSession(props: StudioProviderProps) {
   const [dependencies] = useState(() => ({
-    storage: props.storage ?? createIndexedDbRecoveryStorage(),
+    storage: props.storage ?? browserRecoveryStorage,
     transport: props.transport ?? createStudioTransport(),
     clock: props.clock ?? {
       now: () => Date.now(),
@@ -67,7 +80,7 @@ function StudioSession(props: StudioProviderProps) {
       clearTimeout: (timer: ReturnType<typeof setTimeout>) =>
         clearTimeout(timer),
     },
-    newMutationId: props.newMutationId ?? (() => crypto.randomUUID()),
+    newMutationId: props.newMutationId ?? createMutationId,
     debounceMs: props.debounceMs ?? 500,
   }));
   const { storage, transport, clock, newMutationId, debounceMs } = dependencies;
@@ -80,7 +93,6 @@ function StudioSession(props: StudioProviderProps) {
     ready: false,
   }));
   const mounted = useRef(false);
-  const writes = useRef(Promise.resolve());
   const scheduledVersion = useRef(-1);
   const inFlight = useRef<string | null>(null);
   const dispatch = useCallback(
@@ -107,7 +119,7 @@ function StudioSession(props: StudioProviderProps) {
   useEffect(() => {
     if (ready) return;
     let active = true;
-    storage.read(identity).then(
+    withRecoveryStorage(storage, identity, () => storage.read(identity)).then(
       (recovery) => {
         if (active) reduce({ type: "restore", recovery });
       },
@@ -124,19 +136,19 @@ function StudioSession(props: StudioProviderProps) {
     if (!state.ready || scheduledVersion.current === state.version) return;
     scheduledVersion.current = state.version;
     const envelope = recoveryEnvelope(state);
-    // Serialize snapshots so a slow older write cannot overwrite a newer edit/ack.
-    writes.current = writes.current
-      .then(() => storage.write(envelope))
-      .then(
-        () => {
-          if (mounted.current)
-            reduce({ type: "persisted", version: state.version });
-        },
-        () => {
-          if (mounted.current)
-            reduce({ type: "storage-failed", version: state.version });
-        },
-      );
+    // Enqueue now, so replacement hydration also waits for outgoing snapshots.
+    void withRecoveryStorage(storage, state.identity, () =>
+      storage.write(envelope),
+    ).then(
+      () => {
+        if (mounted.current)
+          reduce({ type: "persisted", version: state.version });
+      },
+      () => {
+        if (mounted.current)
+          reduce({ type: "storage-failed", version: state.version });
+      },
+    );
   }, [state, storage]);
 
   const { status, version, persistedVersion } = state;

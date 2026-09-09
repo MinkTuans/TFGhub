@@ -170,6 +170,119 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+interface StudioBrowserWindow extends Window {
+  studio: ReturnType<
+    typeof import("../components/studio/studio-provider").useStudio
+  >;
+  mountStudio(props?: Partial<StudioProviderProps>): void;
+  unmountStudio(): void;
+  nativeStorage: typeof import("../components/studio/studio-recovery").browserRecoveryStorage;
+  handoff: {
+    releaseFirst(): void;
+    releaseLast(): void;
+    firstPersisted: boolean;
+    lastStarted: boolean;
+  };
+}
+
+async function studioBrowser() {
+  const { createViteServer } = await import("vitest/node");
+  const { chromium } = await import("@playwright/test");
+  const { existsSync } = await import("node:fs");
+  const entry = "\0virtual:studio-browser";
+  const server = await createViteServer({
+    configFile: false,
+    logLevel: "error",
+    server: { host: "127.0.0.1", port: 0 },
+    define: {
+      "process.env.NEXT_PUBLIC_API_URL": JSON.stringify("http://192.0.2.50"),
+    },
+    plugins: [
+      {
+        name: "studio-browser-test-fixture",
+        resolveId: (value) => (value === entry ? entry : undefined),
+        load: (value) =>
+          value === entry
+            ? `
+        import "/@vite/env";
+        import { createElement, StrictMode, useEffect } from "react";
+        import { createRoot } from "react-dom/client";
+        import { StudioProvider, useStudio } from "/components/studio/studio-provider.tsx";
+        import { browserRecoveryStorage } from "/components/studio/studio-recovery.ts";
+        function Observe() {
+          const studio = useStudio();
+          useEffect(() => { window.studio = studio; }, [studio]);
+          return null;
+        }
+        window.nativeStorage = browserRecoveryStorage;
+        window.mountStudio = (props = {}) => {
+          const root = createRoot(document.getElementById("root"));
+          window.unmountStudio = () => root.unmount();
+          root.render(createElement(StrictMode, null,
+            createElement(StudioProvider, { identity: ${JSON.stringify(identity)},
+              initial: ${JSON.stringify({ revision: 0, document: project() })}, ...props },
+              createElement(Observe))));
+        };
+      `
+            : undefined,
+        configureServer(vite) {
+          vite.middlewares.use((request, response, next) => {
+            if (request.url !== "/") {
+              next();
+              return;
+            }
+            response.setHeader("Content-Type", "text/html");
+            response.end(
+              '<div id="root"></div><script type="module" src="/@id/__x00__virtual:studio-browser"></script>',
+            );
+          });
+        },
+      },
+    ],
+  });
+  await server.listen();
+  const address = server.httpServer!.address();
+  if (!address || typeof address === "string")
+    throw new Error("Missing test server address");
+  let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
+  try {
+    browser = await chromium.launch({
+      headless: true,
+      executablePath:
+        process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ??
+        (existsSync("/usr/bin/google-chrome")
+          ? "/usr/bin/google-chrome"
+          : undefined),
+    });
+    const page = await browser.newPage();
+    await page.route("http://192.0.2.50/**", async (route) => {
+      const url = new URL(route.request().url());
+      await route.fulfill({
+        response: await route.fetch({
+          url: `http://127.0.0.1:${address.port}${url.pathname}${url.search}`,
+        }),
+      });
+    });
+    await page.goto("http://192.0.2.50/");
+    await page.waitForFunction(
+      () =>
+        typeof (window as unknown as StudioBrowserWindow).mountStudio ===
+        "function",
+    );
+    return {
+      page,
+      close: async () => {
+        await browser!.close();
+        await server.close();
+      },
+    };
+  } catch (error) {
+    await browser?.close();
+    await server.close();
+    throw error;
+  }
+}
+
 describe("Studio reducer and history", () => {
   it("optimistically applies validated stable-ID edits without mutating the acknowledged document", async () => {
     const { state, reducer } = await modules();
@@ -272,6 +385,72 @@ describe("Studio reducer and history", () => {
 });
 
 describe("Studio autosave and recovery", () => {
+  it.each([false, true])(
+    "drains outgoing queued writes before replacement hydration (earlier write rejected: %s)",
+    async (rejectEarlier) => {
+      vi.useFakeTimers();
+      const memory = memoryStorage();
+      const firstGate = deferred<void>();
+      const lastGate = deferred<void>();
+      const storage: RecoveryStorage = {
+        read: memory.storage.read,
+        async write(envelope) {
+          const name = envelope.pending?.mutations.at(-1)?.name;
+          if (name === "First") {
+            await firstGate.promise;
+            if (rejectEarlier) throw new Error("first write failed");
+          }
+          if (name === "Latest") await lastGate.promise;
+          await memory.storage.write(envelope);
+        },
+      };
+      const outgoing = await harness({ storage });
+      act(() =>
+        outgoing.result.current.dispatch({
+          type: "commit",
+          mutations: [rename("First")],
+        }),
+      );
+      await tick();
+      act(() =>
+        outgoing.result.current.dispatch({
+          type: "commit",
+          mutations: [rename("Latest")],
+        }),
+      );
+      await tick();
+      outgoing.unmount();
+      const incoming = await harness({ storage });
+      try {
+        expect(incoming.result.current.state.ready).toBe(false);
+        await act(async () => firstGate.resolve());
+        await tick();
+        expect(incoming.result.current.state.ready).toBe(false);
+        const other = await harness({
+          storage,
+          identity: { ...identity, userId: "other" },
+        });
+        expect(other.result.current.state.ready).toBe(true);
+        other.unmount();
+        await act(async () => lastGate.resolve());
+        await tick();
+        expect(incoming.result.current.state.ready).toBe(true);
+        expect(incoming.result.current.state.document).toEqual(
+          project("Latest"),
+        );
+        expect(await memory.storage.read(identity)).toMatchObject({
+          pending: { mutations: [rename("First"), rename("Latest")] },
+        });
+      } finally {
+        incoming.unmount();
+        await act(async () => {
+          firstGate.resolve();
+          lastGate.resolve();
+        });
+      }
+    },
+  );
+
   it("keeps pointer previews out of history, recovery, and autosave until commit", async () => {
     vi.useFakeTimers();
     const h = await harness();
@@ -770,6 +949,204 @@ describe("Studio autosave and recovery", () => {
 });
 
 describe("Studio browser boundaries", () => {
+  it("hands off queued native IndexedDB writes between default provider sessions", async () => {
+    const { page, close } = await studioBrowser();
+    try {
+      await page.evaluate(() => {
+        const fixture = window as unknown as StudioBrowserWindow;
+        let releaseFirst!: () => void;
+        let releaseLast!: () => void;
+        const firstGate = new Promise<void>((resolve) => {
+          releaseFirst = resolve;
+        });
+        const lastGate = new Promise<void>((resolve) => {
+          releaseLast = resolve;
+        });
+        fixture.handoff = {
+          releaseFirst,
+          releaseLast,
+          firstPersisted: false,
+          lastStarted: false,
+        };
+        const write = fixture.nativeStorage.write;
+        fixture.nativeStorage.write = async (envelope) => {
+          const name = envelope.pending?.mutations.at(-1)?.name;
+          if (name === "First") {
+            await write(envelope);
+            fixture.handoff.firstPersisted = true;
+            await firstGate;
+            return;
+          }
+          if (name === "Latest") {
+            fixture.handoff.lastStarted = true;
+            await lastGate;
+          }
+          await write(envelope);
+        };
+        fixture.mountStudio();
+      });
+      await page.waitForFunction(
+        () => (window as unknown as StudioBrowserWindow).studio?.state.ready,
+      );
+      await page.evaluate(
+        (mutation) =>
+          (window as unknown as StudioBrowserWindow).studio.dispatch({
+            type: "commit",
+            mutations: [mutation],
+          }),
+        rename("First"),
+      );
+      await page.waitForFunction(
+        () => (window as unknown as StudioBrowserWindow).handoff.firstPersisted,
+      );
+      await page.evaluate(
+        (mutation) =>
+          (window as unknown as StudioBrowserWindow).studio.dispatch({
+            type: "commit",
+            mutations: [mutation],
+          }),
+        rename("Latest"),
+      );
+      await page.waitForFunction(
+        () =>
+          (window as unknown as StudioBrowserWindow).studio.state.document
+            .scenes[0].name === "Latest",
+      );
+      await page.evaluate(() => {
+        const fixture = window as unknown as StudioBrowserWindow;
+        fixture.unmountStudio();
+        fixture.mountStudio();
+      });
+      await page.waitForFunction(
+        () => !(window as unknown as StudioBrowserWindow).studio.state.ready,
+      );
+      await page.evaluate(() =>
+        (window as unknown as StudioBrowserWindow).handoff.releaseFirst(),
+      );
+      await page.waitForFunction(
+        () => (window as unknown as StudioBrowserWindow).handoff.lastStarted,
+      );
+      expect(
+        await page.evaluate(
+          () => (window as unknown as StudioBrowserWindow).studio.state.ready,
+        ),
+      ).toBe(false);
+      await page.evaluate(() =>
+        (window as unknown as StudioBrowserWindow).handoff.releaseLast(),
+      );
+      await page.waitForFunction(
+        () => (window as unknown as StudioBrowserWindow).studio.state.ready,
+      );
+      expect(
+        await page.evaluate(
+          () =>
+            (window as unknown as StudioBrowserWindow).studio.state.document,
+        ),
+      ).toEqual(project("Latest"));
+      expect(
+        await page.evaluate(
+          (scope) =>
+            (window as unknown as StudioBrowserWindow).nativeStorage.read(
+              scope,
+            ),
+          identity,
+        ),
+      ).toMatchObject({
+        pending: { mutations: [rename("First"), rename("Latest")] },
+      });
+    } finally {
+      await close();
+    }
+  }, 75_000);
+
+  it("edits and autosaves with default dependencies on an ordinary HTTP/IP origin", async () => {
+    const { page, close } = await studioBrowser();
+    try {
+      const requests: ApplyMutationBatchInput[] = [];
+      await page.route(
+        "http://192.0.2.50/games/game/engine-project/mutations",
+        async (route) => {
+          const batch = route
+            .request()
+            .postDataJSON() as ApplyMutationBatchInput;
+          requests.push(batch);
+          await route.fulfill({
+            json: {
+              status: "SUPPORTED",
+              project: project(batch.mutations.at(-1)!.name),
+              revision: {
+                revisionNumber: batch.baseRevision + 1,
+                schemaVersion: 2,
+                contentHash: "a".repeat(64),
+                byteSize: 100,
+                retention: "STANDARD",
+                createdAt: "2026-09-09T00:00:00.000Z",
+              },
+            },
+          });
+        },
+      );
+      expect(
+        await page.evaluate(() => ({
+          secure: isSecureContext,
+          randomUUID: typeof crypto.randomUUID,
+        })),
+      ).toEqual({ secure: false, randomUUID: "undefined" });
+      await page.evaluate(() =>
+        (window as unknown as StudioBrowserWindow).mountStudio(),
+      );
+      await page.waitForFunction(
+        () => (window as unknown as StudioBrowserWindow).studio?.state.ready,
+      );
+      for (const name of ["HTTP edit", "Second edit"]) {
+        const error = await page.evaluate((mutation) => {
+          try {
+            (window as unknown as StudioBrowserWindow).studio.dispatch({
+              type: "commit",
+              mutations: [mutation],
+            });
+            return null;
+          } catch (error) {
+            return String(error);
+          }
+        }, rename(name));
+        expect(error).toBeNull();
+        await page.waitForFunction((expectedName) => {
+          const state = (window as unknown as StudioBrowserWindow).studio.state;
+          return (
+            state.status === "UNSYNCED" ||
+            (state.status === "SAVED" &&
+              state.document.scenes[0].name === expectedName)
+          );
+        }, name);
+        expect(
+          await page.evaluate(() => ({
+            status: (window as unknown as StudioBrowserWindow).studio.state
+              .status,
+            recoveryError: (window as unknown as StudioBrowserWindow).studio
+              .state.recoveryError,
+          })),
+        ).toEqual({ status: "SAVED", recoveryError: false });
+      }
+      expect(requests).toHaveLength(2);
+      expect(requests[0].mutationId).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+      );
+      expect(requests[1].mutationId).not.toBe(requests[0].mutationId);
+      const recovered = await page.evaluate(
+        (scope) =>
+          (window as unknown as StudioBrowserWindow).nativeStorage.read(scope),
+        identity,
+      );
+      expect(recovered).toMatchObject({
+        acknowledged: { revision: 2, document: project("Second edit") },
+        pending: null,
+      });
+    } finally {
+      await close();
+    }
+  }, 75_000);
+
   it("posts only the typed batch with session credentials and retains structured 409 details", async () => {
     const { state } = await modules();
     const requests: Array<{ url: string; options?: RequestInit }> = [];
@@ -840,7 +1217,9 @@ describe("Studio browser boundaries", () => {
       headless: true,
       executablePath:
         process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ??
-        (existsSync("/usr/bin/google-chrome") ? "/usr/bin/google-chrome" : undefined),
+        (existsSync("/usr/bin/google-chrome")
+          ? "/usr/bin/google-chrome"
+          : undefined),
     });
     try {
       const page = await browser.newPage();
@@ -903,6 +1282,6 @@ describe("Studio browser boundaries", () => {
     } finally {
       await browser.close();
     }
-  // Includes browser process startup as well as the native storage assertions.
+    // Includes browser process startup as well as the native storage assertions.
   }, 45_000);
 });

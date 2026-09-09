@@ -24,6 +24,40 @@ export interface RecoveryStorage {
   write(envelope: RecoveryEnvelope): Promise<void>;
 }
 
+// I/O ordering outlives a provider mount. Only unfinished operation tails are
+// retained; separate storage backends and recovery keys are independent.
+const recoveryOperations = new WeakMap<
+  RecoveryStorage,
+  Map<string, Promise<void>>
+>();
+
+export function withRecoveryStorage<T>(
+  storage: RecoveryStorage,
+  identity: StudioIdentity,
+  operation: () => Promise<T>,
+): Promise<T> {
+  let operations = recoveryOperations.get(storage);
+  if (!operations) {
+    operations = new Map();
+    recoveryOperations.set(storage, operations);
+  }
+  const key = JSON.stringify([identity.userId, identity.projectId]);
+  const result = (operations.get(key) ?? Promise.resolve()).then(operation);
+  // A failed earlier write must not prevent a later snapshot or read from running.
+  const tail = result.then(
+    () => {},
+    () => {},
+  );
+  operations.set(key, tail);
+  void tail.then(() => {
+    if (operations.get(key) === tail) {
+      operations.delete(key);
+      if (operations.size === 0) recoveryOperations.delete(storage);
+    }
+  });
+  return result;
+}
+
 export function recoveryEnvelope(state: StudioState): RecoveryEnvelope {
   return structuredClone({
     version: 1,
@@ -175,3 +209,7 @@ export function createIndexedDbRecoveryStorage(
     write: (envelope) => transaction<void>(envelope, envelope),
   };
 }
+
+// Construction has no browser side effects. Stable identity lets sequential
+// default provider sessions share only their in-progress recovery I/O ordering.
+export const browserRecoveryStorage = createIndexedDbRecoveryStorage();
