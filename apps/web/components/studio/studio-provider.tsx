@@ -13,6 +13,7 @@ import {
 import { EngineProjectV2 } from "@indieforge/contracts";
 import { ApiError } from "../../lib/api-client";
 import { StudioSelectionProvider } from "./studio-selection";
+import { StudioShortcutsProvider } from "./studio-shortcuts";
 import {
   createStudioState,
   createStudioHeadReader,
@@ -270,13 +271,15 @@ function StudioSession(props: StudioProviderProps) {
 
   return (
     <StudioContext value={{ state, dispatch }}>
-      <StudioSelectionProvider
-        document={state.document}
-        identity={state.identity}
-        ready={state.ready}
-      >
-        {props.children}
-      </StudioSelectionProvider>
+      <StudioShortcutsProvider>
+        <StudioSelectionProvider
+          document={state.document}
+          identity={state.identity}
+          ready={state.ready}
+        >
+          {props.children}
+        </StudioSelectionProvider>
+      </StudioShortcutsProvider>
     </StudioContext>
   );
 }

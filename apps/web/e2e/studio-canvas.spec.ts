@@ -190,6 +190,155 @@ async function client(canvas: Locator, x: number, y: number) {
   );
 }
 
+for (const key of ["Delete", "Backspace"]) {
+  test(`native tree-focused ${key} opens confirmation after mouse selection`, async ({
+    page,
+  }) => {
+    const app = await setup(page);
+    const point = await client(app.canvas, 50, 50);
+    await page.mouse.click(point.x, point.y);
+    await expect(
+      page.getByRole("treeitem", { name: "Editable panel", exact: true }),
+    ).toBeFocused();
+    await page.keyboard.press(key);
+    const dialog = page.getByRole("dialog", { name: /Xóa “Editable panel”/ });
+    await expect(dialog).toBeVisible();
+    expect((await app.head()).project).toEqual(app.baseline.project);
+    await page.keyboard.press("Escape");
+    await expect(dialog).not.toBeVisible();
+    await expect(app.canvas).toHaveAttribute(
+      "data-selected-object-id",
+      app.main.id,
+    );
+  });
+}
+
+test("native tree-focused Escape clears mouse selection without refocusing canvas", async ({
+  page,
+}) => {
+  const app = await setup(page);
+  const point = await client(app.canvas, 50, 50);
+  await page.mouse.click(point.x, point.y);
+  await expect(
+    page.getByRole("treeitem", { name: "Editable panel", exact: true }),
+  ).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(app.canvas).not.toHaveAttribute("data-selected-object-id");
+  expect((await app.head()).project).toEqual(app.baseline.project);
+});
+
+test("native tree-focused Space pans without a revision, browser scroll or hierarchy focus handoff", async ({
+  page,
+}) => {
+  const app = await setup(page);
+  const point = await client(app.canvas, 50, 50);
+  await page.mouse.click(point.x, point.y);
+  await expect(
+    page.getByRole("treeitem", { name: "Editable panel", exact: true }),
+  ).toBeFocused();
+  const before = await app.canvas.getAttribute("data-camera-x");
+  const scroll = await page.evaluate(() => window.scrollY);
+  await page.keyboard.down("Space");
+  await page.evaluate(() => new Promise(requestAnimationFrame));
+  expect(await page.evaluate(() => window.scrollY)).toBe(scroll);
+  await page.mouse.move(point.x, point.y);
+  await page.mouse.down();
+  await page.mouse.move(point.x + 40, point.y + 25, { steps: 6 });
+  await page.mouse.up();
+  await page.keyboard.up("Space");
+  await expect(app.canvas).toBeFocused();
+  await expect(app.canvas).not.toHaveAttribute("data-camera-x", before!);
+  expect(app.requests).toHaveLength(0);
+  expect((await app.head()).project).toEqual(app.baseline.project);
+});
+
+test("native multiline component strings edit, undo and reload exact canonical newlines", async ({
+  page,
+}) => {
+  const app = await setup(page),
+    original = "First line\nSecond line\n",
+    edited = "Edited first\nEdited second\n";
+  const gameId = page.url().split("/").at(-1)!,
+    head = await app.head();
+  const response = await page.request.post(
+    `/api/games/${gameId}/engine-project/mutations`,
+    {
+      data: {
+        baseRevision: head.revision.revisionNumber,
+        mutationId: randomUUID(),
+        mutations: ["InventoryItem", "Text"].map((type) => ({
+          type: "component.add",
+          sceneId: head.project.scenes[0].id,
+          objectId: app.main.id,
+          component: {
+            id: randomUUID(),
+            type,
+            version: 1,
+            properties: {
+              ...(v2ComponentRegistry[
+                type as "InventoryItem" | "Text"
+              ].defaults() as object),
+              [type === "Text" ? "text" : "description"]: original,
+            },
+          },
+          beforeComponentId: null,
+        })),
+      },
+    },
+  );
+  expect(response.status(), await response.text()).toBe(201);
+  await page.reload();
+  await page
+    .getByRole("treeitem", { name: "Editable panel", exact: true })
+    .click();
+  for (const [type, field] of [
+    ["InventoryItem", "description"],
+    ["Text", "text"],
+  ]) {
+    const component = page.getByRole("group", { name: type, exact: true });
+    const textbox = component.getByRole("textbox", {
+      name: field,
+      exact: true,
+    });
+    await expect(textbox).toHaveValue(original);
+    await textbox.fill(edited);
+    const save = component.getByRole("button", {
+      name: `Lưu ${type}`,
+      exact: true,
+    });
+    await save.click();
+    await expect(save).toBeFocused();
+    await page.getByRole("button", { name: "Hoàn tác", exact: true }).click();
+    await expect(textbox).toHaveValue(original);
+    await page.getByRole("button", { name: "Làm lại", exact: true }).click();
+    await expect(textbox).toHaveValue(edited);
+  }
+  await expect(
+    page.getByRole("status", { name: "Trạng thái dự án" }),
+  ).toHaveText("Đã lưu");
+  const saved = (await app.head()).project;
+  const components = saved.scenes[0].objects.find(
+    (object: { id: string }) => object.id === app.main.id,
+  ).components;
+  expect(
+    components.find((component: { type: string }) => component.type === "Text")
+      .properties.text,
+  ).toBe(edited);
+  expect(
+    components.find(
+      (component: { type: string }) => component.type === "InventoryItem",
+    ).properties.description,
+  ).toBe(edited);
+  await page.reload();
+  await expect(
+    page.getByRole("textbox", { name: "text", exact: true }),
+  ).toHaveValue(edited);
+  await expect(
+    page.getByRole("textbox", { name: "description", exact: true }),
+  ).toHaveValue(edited);
+  expect((await app.head()).project).toEqual(saved);
+});
+
 test("hierarchy and inspector edit the official canonical project, retain selection and reload exact saved edits", async ({
   page,
 }) => {

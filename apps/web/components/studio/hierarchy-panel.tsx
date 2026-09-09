@@ -137,16 +137,8 @@ function HierarchySession({ scene }: { scene: Scene }) {
     if (event.target !== event.currentTarget || event.nativeEvent.isComposing)
       return;
     if (event.altKey) return;
-    if (event.ctrlKey || event.metaKey) {
-      if (editable && ["z", "y"].includes(event.key.toLowerCase())) {
-        event.preventDefault();
-        dispatch({
-          type:
-            event.key.toLowerCase() === "y" || event.shiftKey ? "redo" : "undo",
-        });
-      }
-      return;
-    }
+    // Editor-wide shortcuts bubble to the owning Studio boundary.
+    if (event.ctrlKey || event.metaKey) return;
     const index = rows.indexOf(row);
     if (
       [

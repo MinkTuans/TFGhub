@@ -30,6 +30,7 @@ import { useStudioSelection } from "../studio-selection";
 import { createAssetDrop, STUDIO_ASSET_MIME } from "../asset-drop";
 import { prepareStudioCommit } from "../studio-history";
 import { studioValidationMessage } from "../component-editor";
+import { useStudioShortcuts } from "../studio-shortcuts";
 
 type Props = {
   scene: CanvasScene;
@@ -390,43 +391,33 @@ function CanvasSession({ scene, pixelArt = false, assetMetadata = [] }: Props) {
       return;
     }
     move(event);
+    const wasPanning = !!pan.current;
     const mutation = controller.finish(event.pointerId);
     pan.current = null;
     release(event.pointerId);
     if (mutation && editable)
       dispatch({ type: "commit", mutations: [mutation] });
-    if (selectionId && !pan.current)
+    if (selectionId && !wasPanning)
       selectObject(scene.id, selectionId, "hierarchy");
     scheduleDraw();
   }
   function key(event: KeyboardEvent) {
-    if (
-      event.nativeEvent.isComposing ||
-      event.altKey ||
-      (event.target as HTMLElement).closest(
-        "input, textarea, select, [contenteditable], dialog",
-      )
-    )
-      return;
-    if (event.key === "Escape") {
+    if (event.nativeEvent.isComposing || event.altKey) return;
+    const modified = event.ctrlKey || event.metaKey;
+    if (!modified && event.key === "Escape") {
       event.preventDefault();
       cancel();
       space.current = false;
       choose(null);
       return;
     }
-    if (event.key === " ") {
-      if (event.target === canvas.current) {
-        event.preventDefault();
-        space.current = true;
-      }
+    if (!modified && event.key === " ") {
+      event.preventDefault();
+      space.current = true;
       return;
     }
     if (!editable || deleting) return;
-    if (
-      (event.ctrlKey || event.metaKey) &&
-      ["z", "y"].includes(event.key.toLowerCase())
-    ) {
+    if (modified && ["z", "y"].includes(event.key.toLowerCase())) {
       event.preventDefault();
       cancel();
       dispatch({
@@ -435,6 +426,7 @@ function CanvasSession({ scene, pixelArt = false, assetMetadata = [] }: Props) {
       });
     } else if (
       ["Delete", "Backspace"].includes(event.key) &&
+      !modified &&
       selected &&
       !selected.locked &&
       controller.pointerId === null
@@ -443,23 +435,20 @@ function CanvasSession({ scene, pixelArt = false, assetMetadata = [] }: Props) {
       setDeleting(selected.objectId);
     }
   }
+  useStudioShortcuts({
+    keyDown: key,
+    keyUp: (event) => {
+      if (event.key === " ") space.current = false;
+    },
+    blur: () => {
+      space.current = false;
+      cancel();
+    },
+  });
   const deleteTarget =
     deleting && scene.objects.find((object) => object.id === deleting);
   return (
-    <section
-      className="studio-overview"
-      aria-label="Tổng quan Scene"
-      onKeyDown={key}
-      onKeyUp={(event) => {
-        if (event.key === " ") space.current = false;
-      }}
-      onBlur={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget)) {
-          space.current = false;
-          cancel();
-        }
-      }}
-    >
+    <section className="studio-overview" aria-label="Tổng quan Scene">
       <div className="studio-overview__heading">
         <h2 className="studio-kicker">{scene.name}</h2>
         <output aria-live="polite">

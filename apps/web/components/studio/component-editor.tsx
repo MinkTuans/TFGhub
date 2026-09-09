@@ -215,7 +215,7 @@ function Fields({
     return (
       <label>
         {label}
-        <input
+        <textarea
           aria-label={label}
           value={typeof value === "string" ? value : ""}
           onChange={(event) => change(event.target.value)}

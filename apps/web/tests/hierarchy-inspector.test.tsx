@@ -658,6 +658,172 @@ test("hierarchy focus retains canvas undo shortcuts with editable-field guards",
   expect(h.studio.state.document.scenes[0].objects[0].name).toBe("Changed");
 });
 
+test.each(["Delete", "Backspace"])(
+  "tree-focused %s retains the canvas confirmation and locked/hidden guards",
+  async (key) => {
+    const h = await mount();
+    clickCanvas();
+    expect(row("Child")).toHaveFocus();
+    expect(fireEvent.keyDown(document.activeElement!, { key })).toBe(false);
+    const dialog = screen.getByRole("dialog", { name: /Xóa “Child”/ });
+    expect(h.studio.state.history.past).toHaveLength(0);
+    fireEvent.keyDown(dialog, { key: "Escape" });
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(canvas()).toHaveAttribute("data-selected-object-id", id(11));
+    select("Locked");
+    fireEvent.keyDown(document.activeElement!, { key });
+    expect(screen.queryByRole("dialog")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Ẩn World UI" }));
+    select("Child");
+    fireEvent.keyDown(document.activeElement!, { key });
+    expect(screen.queryByRole("dialog")).toBeNull();
+  },
+);
+
+test("tree-focused Escape clears selection without changing canonical data", async () => {
+  const h = await mount();
+  clickCanvas();
+  expect(row("Child")).toHaveFocus();
+  expect(fireEvent.keyDown(document.activeElement!, { key: "Escape" })).toBe(
+    false,
+  );
+  expect(canvas()).not.toHaveAttribute("data-selected-object-id");
+  expect(h.studio.state.history.past).toHaveLength(0);
+});
+
+test("tree-focused held Space pans without moving objects or handing focus back, and blur releases Space", async () => {
+  const h = await mount();
+  clickCanvas();
+  const before = h.studio.state.document;
+  expect(row("Child")).toHaveFocus();
+  expect(fireEvent.keyDown(document.activeElement!, { key: " " })).toBe(false);
+  fireEvent.pointerDown(canvas(), { button: 0, clientX: 60, clientY: 70 });
+  fireEvent.pointerMove(canvas(), { clientX: 90, clientY: 90 });
+  fireEvent.pointerUp(canvas(), { clientX: 90, clientY: 90 });
+  expect(canvas()).toHaveFocus();
+  expect(canvas()).toHaveAttribute("data-camera-x", "-30");
+  expect(h.studio.state.document).toBe(before);
+  fireEvent.blur(window);
+  fireEvent.click(screen.getByRole("button", { name: "Vừa Scene" }));
+  clickCanvas();
+  fireEvent.pointerDown(canvas(), { button: 0, clientX: 60, clientY: 70 });
+  fireEvent.pointerMove(canvas(), { clientX: 90, clientY: 90 });
+  fireEvent.pointerUp(canvas(), { clientX: 90, clientY: 90 });
+  expect(h.studio.state.history.past).toHaveLength(1);
+  expect(
+    h.studio.state.document.scenes[0].objects[0].components[0].properties,
+  ).toMatchObject({ x: 70, y: 60 });
+});
+
+test("editor shortcuts ignore controls, composing events and targets outside their Studio", async () => {
+  const h = await mount();
+  clickCanvas();
+  const before = h.studio.state.document;
+  const editable = document.createElement("div");
+  editable.setAttribute("contenteditable", "true");
+  row("Child").append(editable);
+  const targets = [
+    screen.getByRole("textbox", { name: "Tên đối tượng" }),
+    screen.getByRole("combobox", { name: "Đối tượng cha" }),
+    screen.getByRole("button", { name: "Chọn đối tượng" }),
+    editable,
+    document.body,
+  ];
+  for (const target of targets) {
+    for (const key of ["Delete", "Backspace", "Escape", " ", "z"]) {
+      expect(fireEvent.keyDown(target, { key, ctrlKey: key === "z" })).toBe(
+        true,
+      );
+    }
+  }
+  fireEvent.keyDown(row("Child"), { key: "Delete", isComposing: true });
+  fireEvent.keyDown(row("Child"), { key: "Escape", altKey: true });
+  expect(screen.queryByRole("dialog")).toBeNull();
+  expect(canvas()).toHaveAttribute("data-selected-object-id", id(11));
+  expect(h.studio.state.document).toBe(before);
+  editable.remove();
+});
+
+test("keyboard deletion and undo affect only the focused Studio once", async () => {
+  const first = await mount(),
+    second = await mount();
+  const firstCanvas = within(first.container).getByRole("img", {
+    name: /^Scene:/,
+  });
+  fireEvent.pointerDown(firstCanvas, { button: 0, clientX: 60, clientY: 70 });
+  fireEvent.pointerUp(firstCanvas, { clientX: 60, clientY: 70 });
+  fireEvent.keyDown(document.activeElement!, { key: "Delete" });
+  const dialog = within(first.container).getByRole("dialog", {
+    name: /Xóa “Child”/,
+  });
+  expect(within(second.container).queryByRole("dialog")).toBeNull();
+  fireEvent.click(within(dialog).getByRole("button", { name: "Xác nhận xóa" }));
+  expect(first.studio.state.document.scenes[0].objects).toHaveLength(2);
+  const group = within(first.container).getByRole("treeitem", {
+    name: "Group",
+  });
+  fireEvent.click(group);
+  fireEvent.keyDown(document.activeElement!, { key: "z", ctrlKey: true });
+  expect(first.studio.state.document).toEqual(project());
+  expect(first.studio.state.history.future).toHaveLength(1);
+  expect(second.studio.state.history.past).toHaveLength(0);
+  expect(second.studio.state.document).toEqual(project());
+});
+
+test.each([
+  { type: "InventoryItem" as const, field: "description", max: 2000 },
+  { type: "Text" as const, field: "text", max: 5000 },
+])(
+  "$type strings retain canonical newlines, blank values, validation and save focus through undo/reload",
+  async ({ type, field, max }) => {
+    const initial = project(),
+      original = "First line\nSecond line\n",
+      edited = "Edited first\nEdited second\n";
+    initial.scenes[0].objects[0].components.push({
+      id: id(700),
+      type,
+      version: 1,
+      properties: {
+        ...(v2ComponentRegistry[type].defaults() as object),
+        [field]: original,
+      },
+    });
+    const h = await mount(initial, { transport: true });
+    clickCanvas();
+    const group = screen.getByRole("group", { name: type });
+    const control = () => within(group).getByRole("textbox", { name: field });
+    expect(control()).toHaveValue(original);
+    fireEvent.change(control(), { target: { value: edited } });
+    const save = within(group).getByRole("button", {
+      name: `Lưu ${type}`,
+    });
+    save.focus();
+    fireEvent.click(save);
+    expect(save).toHaveFocus();
+    await waitFor(() => expect(h.studio.state.status).toBe("SAVED"));
+    expect(
+      h.server.scenes[0].objects[0].components.at(-1)?.properties,
+    ).toMatchObject({ [field]: edited });
+    fireEvent.change(control(), { target: { value: "x".repeat(max + 1) } });
+    fireEvent.click(save);
+    expect(within(group).getByRole("alert")).toBeVisible();
+    expect(h.studio.state.history.past).toHaveLength(1);
+    fireEvent.change(control(), { target: { value: "" } });
+    fireEvent.click(save);
+    expect(
+      h.studio.state.document.scenes[0].objects[0].components.at(-1)
+        ?.properties,
+    ).toMatchObject({ [field]: "" });
+    await act(async () => h.studio.dispatch({ type: "undo" }));
+    expect(control()).toHaveValue(edited);
+    await waitFor(() => expect(h.studio.state.status).toBe("SAVED"));
+    const saved = structuredClone(h.server);
+    h.unmount();
+    await mount(saved);
+    expect(screen.getByRole("textbox", { name: field })).toHaveValue(edited);
+  },
+);
+
 test("a real canvas drop uses its current camera and selected group, then selects, undoes and saves the created object", async () => {
   const { SceneCanvas } =
     await import("../components/studio/canvas/scene-canvas");
@@ -902,6 +1068,9 @@ test("native browser drops READY fixtures, edits, undoes, autosaves and reloads 
     entry = "\0virtual:hierarchy-browser";
   const server = await createViteServer({
     configFile: false,
+    // The recovery browser fixture starts another Vite server with different
+    // defines. Do not let its optimizer replace this page's runtime chunks.
+    cacheDir: "node_modules/.vite-hierarchy-inspector",
     logLevel: "error",
     server: { host: "127.0.0.1", port: 0 },
     define: {
@@ -969,6 +1138,9 @@ test("native browser drops READY fixtures, edits, undoes, autosaves and reloads 
     const batches: StudioMutation[][] = [],
       errors: string[] = [];
     page.on("pageerror", (error) => errors.push(error.message));
+    page.on("requestfailed", (request) =>
+      errors.push(`${request.url()}: ${request.failure()?.errorText}`),
+    );
     await page.route("http://192.0.2.51/**", async (route) => {
       const url = new URL(route.request().url());
       if (url.pathname === "/games/game/engine-project/mutations") {
@@ -1001,9 +1173,15 @@ test("native browser drops READY fixtures, edits, undoes, autosaves and reloads 
       });
     });
     await page.goto("http://192.0.2.51/");
-    await browserExpect(
-      page.getByRole("status", { name: "Save state" }),
-    ).toHaveText("SAVED");
+    try {
+      await browserExpect(
+        page.getByRole("status", { name: "Save state" }),
+      ).toHaveText("SAVED");
+    } catch (error) {
+      throw new Error(
+        `${String(error)}\nBrowser diagnostics: ${errors.join("; ")}`,
+      );
+    }
     const canvas = page.getByRole("img", { name: "Scene: Main" }),
       group = page.getByRole("treeitem", { name: "Group", exact: true });
     const treeTop = await page
