@@ -21,6 +21,7 @@ import {
 import type { StudioMutation } from "../components/studio/studio-state";
 import { recordingContext } from "./canvas-context";
 import { SceneManager } from "../components/studio/scene-manager";
+import { useStudioSelection } from "../components/studio/studio-selection";
 
 type Scene = EngineProjectV2Type["scenes"][number];
 const id = (n: number) =>
@@ -104,6 +105,7 @@ function project(objects = [object(10)]): EngineProjectV2Type {
 }
 let recorder: ReturnType<typeof recordingContext>;
 beforeEach(() => {
+  sessionStorage.clear();
   recorder = recordingContext();
   vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(
     recorder.context,
@@ -159,7 +161,7 @@ async function mount(
   function Content() {
     const current = useStudio();
     const [sceneIndex, setSceneIndex] = useState(0);
-    const [selected, setSelected] = useState<string | null>(null);
+    const { selectObject } = useStudioSelection();
     renders++;
     useEffect(() => {
       studio = current;
@@ -174,7 +176,13 @@ async function mount(
         >
           edit
         </div>
-        <button onClick={() => setSelected(id(11))}>Hierarchy select</button>
+        <button
+          onClick={() =>
+            selectObject(current.state.document.scenes[sceneIndex].id, id(11))
+          }
+        >
+          Hierarchy select
+        </button>
         <button onClick={() => setSceneIndex(1)}>Switch scene</button>
         {manager && (
           <SceneManager
@@ -182,11 +190,7 @@ async function mount(
             onSceneChange={() => {}}
           />
         )}
-        <SceneCanvas
-          scene={current.state.document.scenes[sceneIndex]}
-          selectedObjectId={selected}
-          onSelectionChange={setSelected}
-        />
+        <SceneCanvas scene={current.state.document.scenes[sceneIndex]} />
       </>
     );
   }

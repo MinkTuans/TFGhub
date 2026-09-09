@@ -11,20 +11,19 @@ import {
   StudioSettings,
 } from "./studio-panels";
 import { StudioToast } from "./studio-toast";
+import { useStudioSelection } from "./studio-selection";
 import "./studio-shell.css";
 
 export function StudioShell({ initialGame }: { initialGame: GameSummary }) {
   const { state } = useStudio();
-  const [selectedSceneId, setSelectedSceneId] = useState(
-    state.document.entrySceneId,
-  );
+  const { selection, selectScene } = useStudioSelection();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [inspectorOpen, setInspectorOpen] = useState(true);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const settingsRef = useRef<HTMLButtonElement>(null);
   // A recovered document may no longer contain the previous local selection.
   const scene =
-    state.document.scenes.find((scene) => scene.id === selectedSceneId) ??
+    state.document.scenes.find((scene) => scene.id === selection.sceneId) ??
     state.document.scenes.find(
       (scene) => scene.id === state.document.entrySceneId,
     ) ??
@@ -36,7 +35,7 @@ export function StudioShell({ initialGame }: { initialGame: GameSummary }) {
       <StudioTopbar
         initialGame={initialGame}
         sceneId={scene.id}
-        onSceneChange={setSelectedSceneId}
+        onSceneChange={selectScene}
         settingsOpen={settingsOpen}
         onSettingsToggle={() => setSettingsOpen((open) => !open)}
         settingsRef={settingsRef}
@@ -63,7 +62,7 @@ export function StudioShell({ initialGame }: { initialGame: GameSummary }) {
         <StudioSidebar
           scenes={state.document.scenes}
           sceneId={scene.id}
-          onSceneChange={setSelectedSceneId}
+          onSceneChange={selectScene}
           open={sidebarOpen}
           onToggle={toggleSidebar}
         />

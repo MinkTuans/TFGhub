@@ -2,6 +2,7 @@ import { type EngineProjectV2Type } from "@indieforge/contracts";
 import { StudioButton } from "./studio-topbar";
 import { LayerList } from "./layer-list";
 import { SceneCanvas } from "./canvas/scene-canvas";
+import { PropertyInspector } from "./property-inspector";
 
 type Scene = EngineProjectV2Type["scenes"][number];
 
@@ -40,6 +41,7 @@ export function StudioInspector({
       </div>
       {open && (
         <section id="studio-scene-info" aria-label="Thông tin Scene">
+          <PropertyInspector scene={scene} />
           <dl className="studio-properties">
             <div>
               <dt>Tên</dt>

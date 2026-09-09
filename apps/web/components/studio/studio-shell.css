@@ -46,9 +46,90 @@
   cursor: default;
 }
 .studio-shell input,
-.studio-shell select {
+.studio-shell select,
+.studio-shell textarea {
   min-height: 2.5rem;
   padding: 0.5rem 0.625rem;
+}
+.studio-hierarchy,
+.studio-property-inspector {
+  padding: 0.75rem;
+  display: grid;
+  gap: 0.75rem;
+  min-width: 0;
+  align-content: start;
+}
+.studio-hierarchy [role="treeitem"] {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  min-height: 2.5rem;
+  cursor: pointer;
+  border-radius: 0.3rem;
+}
+.studio-hierarchy [role="treeitem"][aria-selected="true"] {
+  background: #283953;
+  outline: 1px solid var(--primary);
+}
+.studio-hierarchy [role="treeitem"]:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.studio-hierarchy [role="treeitem"] button {
+  padding: 0.1rem 0.25rem;
+  min-width: 1.5rem;
+}
+.studio-tree-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.studio-hierarchy small {
+  color: var(--muted);
+  font-size: 0.65rem;
+}
+.studio-layer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem;
+  margin: 0.5rem 0;
+}
+.studio-layer-actions > span {
+  width: 100%;
+}
+.studio-property-inspector fieldset {
+  min-width: 0;
+  border: 1px solid var(--border);
+  padding: 0.5rem;
+  margin: 0.5rem 0;
+}
+.studio-property-inspector label {
+  display: grid;
+  gap: 0.25rem;
+  margin: 0.5rem 0;
+  font-size: 0.875rem;
+}
+.studio-property-inspector input,
+.studio-property-inspector select,
+.studio-property-inspector textarea {
+  width: 100%;
+  min-width: 0;
+}
+.studio-property-inspector label:has(input[type="checkbox"]) {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.studio-component code {
+  display: block;
+  overflow-wrap: anywhere;
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+.studio-component textarea {
+  min-height: 5rem;
+  resize: vertical;
 }
 .studio-shell input[type="checkbox"] {
   width: 1.125rem;

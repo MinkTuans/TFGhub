@@ -883,7 +883,10 @@ test("lost scene-create responses retain the attempted batch identity and duplic
   expect(next.document.scenes[2].name).toBe("Queued rename");
 });
 
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  vi.restoreAllMocks();
+  sessionStorage.clear();
+});
 async function shell(initial = project(), persist = false) {
   let studio!: ReturnType<typeof useStudio>;
   let saved = structuredClone(initial);

@@ -189,6 +189,81 @@ async function client(canvas: Locator, x: number, y: number) {
     { x, y },
   );
 }
+
+test("hierarchy and inspector edit the official canonical project, retain selection and reload exact saved edits", async ({
+  page,
+}) => {
+  const { canvas, main, locked, head } = await setup(page);
+  const start = await client(canvas, 50, 50);
+  await page.mouse.click(start.x, start.y);
+  const selected = page.getByRole("treeitem", {
+    name: "Editable panel",
+    exact: true,
+  });
+  await expect(selected).toHaveAttribute("aria-selected", "true");
+  await expect(selected).toBeFocused();
+  await expect(
+    page.getByRole("textbox", { name: "Tên đối tượng" }),
+  ).toHaveValue("Editable panel");
+  const lockedRow = page.getByRole("treeitem", {
+    name: "Locked panel",
+    exact: true,
+  });
+  await lockedRow.click();
+  await expect(canvas).toHaveAttribute("data-selected-object-id", locked.id);
+  await lockedRow.press("Enter");
+  await expect(canvas).toBeFocused();
+  await selected.click();
+  await page
+    .getByRole("textbox", { name: "Tên đối tượng" })
+    .fill("Inspected panel");
+  await page
+    .getByRole("button", { name: "Lưu đối tượng", exact: true })
+    .click();
+  const transform = page.getByRole("group", { name: "Transform", exact: true });
+  await transform
+    .getByRole("spinbutton", { name: "rotation", exact: true })
+    .fill("30");
+  await transform
+    .getByRole("button", { name: "Lưu Transform", exact: true })
+    .click();
+  await expect(
+    transform.getByRole("button", { name: "Lưu Transform", exact: true }),
+  ).toBeFocused();
+  await page.getByRole("button", { name: "Hoàn tác", exact: true }).click();
+  await expect(
+    transform.getByRole("spinbutton", { name: "rotation", exact: true }),
+  ).toHaveValue("0");
+  await page.getByRole("button", { name: "Làm lại", exact: true }).click();
+  await expect(
+    transform.getByRole("spinbutton", { name: "rotation", exact: true }),
+  ).toHaveValue("30");
+  await expect(
+    page.getByRole("status", { name: "Trạng thái dự án" }),
+  ).toHaveText("Đã lưu");
+  const saved = (await head()).project;
+  const edited = saved.scenes[0].objects.find(
+    (object: { id: string }) => object.id === main.id,
+  );
+  expect(edited.name).toBe("Inspected panel");
+  expect(edited.components[0].properties.rotation).toBe(30);
+  await page.reload();
+  await expect(
+    page.getByRole("status", { name: "Trạng thái dự án" }),
+  ).toHaveText("Đã lưu");
+  await expect(
+    page.getByRole("treeitem", { name: "Inspected panel", exact: true }),
+  ).toHaveAttribute("aria-selected", "true");
+  await expect(canvas).toHaveAttribute("data-selected-object-id", main.id);
+  await expect(
+    page.getByRole("textbox", { name: "Tên đối tượng" }),
+  ).toHaveValue("Inspected panel");
+  expect((await head()).project).toEqual(saved);
+  await page.screenshot({
+    path: "../../.superpowers/sdd/2026-09-09-unified-game-studio/task-17-official.png",
+    fullPage: true,
+  });
+});
 async function pixel(canvas: Locator, x: number, y: number) {
   const point = await client(canvas, x, y);
   return canvas.evaluate((element, point) => {
@@ -341,7 +416,9 @@ test("native resize, snap and confirmed delete each use canonical undo and redo"
   ]);
   await app.canvas.press("Meta+z");
   await expect.poll(() => app.requests.length).toBe(7);
-  await expect(page.getByRole("status", { name: "Trạng thái dự án" })).toHaveText("Đã lưu");
+  await expect(
+    page.getByRole("status", { name: "Trạng thái dự án" }),
+  ).toHaveText("Đã lưu");
   const restored = await app.head();
   expect(
     restored.project.scenes[0].objects.find(

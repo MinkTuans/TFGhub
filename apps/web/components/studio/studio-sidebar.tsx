@@ -1,6 +1,7 @@
 import type { EngineProjectV2Type } from "@indieforge/contracts";
 import { StudioButton } from "./studio-topbar";
 import { SceneManager } from "./scene-manager";
+import { HierarchyPanel } from "./hierarchy-panel";
 
 export function StudioSidebar({
   scenes,
@@ -33,7 +34,14 @@ export function StudioSidebar({
           {open ? "‹" : "›"}
         </StudioButton>
       </div>
-      {open && <SceneManager sceneId={sceneId} onSceneChange={onSceneChange} />}
+      {open && (
+        <>
+          <HierarchyPanel
+            scene={scenes.find((scene) => scene.id === sceneId)!}
+          />
+          <SceneManager sceneId={sceneId} onSceneChange={onSceneChange} />
+        </>
+      )}
     </aside>
   );
 }

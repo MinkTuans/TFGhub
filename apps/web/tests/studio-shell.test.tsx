@@ -27,6 +27,7 @@ import { recordingContext } from "./canvas-context";
 vi.mock("../lib/session", () => ({ privateGet: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 afterEach(() => {
+  sessionStorage.clear();
   vi.restoreAllMocks();
   vi.clearAllMocks();
   vi.unstubAllGlobals();
@@ -579,6 +580,7 @@ test.each([
         screen.getByRole("status", { name: "Trạng thái dự án" }),
       ).toHaveTextContent("Đang lưu"),
     );
+    await waitFor(() => expect(reject).toBeTypeOf("function"));
     await act(async () => reject(error));
     expect(
       screen.getByRole("status", { name: "Trạng thái dự án" }),

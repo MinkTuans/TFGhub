@@ -26,40 +26,42 @@ import {
   type CanvasScene,
 } from "./gesture-controller";
 import { drawSelectionOverlay, resizeCorner } from "./selection-overlay";
+import { useStudioSelection } from "../studio-selection";
+import { createAssetDrop, STUDIO_ASSET_MIME } from "../asset-drop";
+import { prepareStudioCommit } from "../studio-history";
+import { studioValidationMessage } from "../component-editor";
 
 type Props = {
   scene: CanvasScene;
   pixelArt?: boolean;
-  selectedObjectId?: string | null;
-  onSelectionChange?: (id: string | null) => void;
+  assetMetadata?: readonly unknown[];
 };
 
 export function SceneCanvas(props: Props) {
   return <CanvasSession key={props.scene.id} {...props} />;
 }
 
-function CanvasSession({
-  scene,
-  pixelArt = false,
-  selectedObjectId,
-  onSelectionChange,
-}: Props) {
+function CanvasSession({ scene, pixelArt = false, assetMetadata = [] }: Props) {
   const { state, dispatch } = useStudio();
+  const { selection, selectObject } = useStudioSelection();
   const editable =
     state.ready &&
     !state.recoveryError &&
     !state.resolution &&
     !state.batchError;
-  const [localSelection, setLocalSelection] = useState<string | null>(null);
   const requestedId =
-    selectedObjectId === undefined ? localSelection : selectedObjectId;
+    selection.sceneId === scene.id ? selection.objectId : null;
   const list = useMemo(() => buildRenderList(scene), [scene]);
   const selected = list.find((item) => item.objectId === requestedId);
-  const selectionId = selected?.objectId ?? null;
+  const selectedObject = scene.objects.find(
+    (object) => object.id === requestedId,
+  );
+  const selectionId = selectedObject?.id ?? null;
   const resizable = !!(editable && selected && canResize(scene, selected));
   const [tool, setTool] = useState<"select" | "pan">("select");
   const { enabled: grid, snap } = scene.settings.grid;
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [dropError, setDropError] = useState("");
   const [controller] = useState(() => new GestureController());
   const canvas = useRef<HTMLCanvasElement>(null);
   const handle = useRef<HTMLButtonElement>(null);
@@ -76,9 +78,12 @@ function CanvasSession({
   const descriptionId = useId();
 
   function choose(id: string | null) {
-    setLocalSelection(id);
-    onSelectionChange?.(id);
+    selectObject(scene.id, id);
   }
+  useEffect(() => {
+    if (selection.sceneId === scene.id && selection.focus === "canvas")
+      canvas.current?.focus({ preventScroll: true });
+  }, [selection.sequence, selection.sceneId, selection.focus, scene.id]);
   function toggleGrid(field: "enabled" | "snap") {
     if (!editable) return;
     cancel();
@@ -390,6 +395,8 @@ function CanvasSession({
     release(event.pointerId);
     if (mutation && editable)
       dispatch({ type: "commit", mutations: [mutation] });
+    if (selectionId && !pan.current)
+      selectObject(scene.id, selectionId, "hierarchy");
     scheduleDraw();
   }
   function key(event: KeyboardEvent) {
@@ -456,8 +463,8 @@ function CanvasSession({
       <div className="studio-overview__heading">
         <h2 className="studio-kicker">{scene.name}</h2>
         <output aria-live="polite">
-          {selected
-            ? `Đã chọn: ${scene.objects.find((object) => object.id === selectionId)?.name}`
+          {selectedObject
+            ? `Đã chọn: ${selectedObject.name}`
             : "Chọn đối tượng trên Scene"}
         </output>
       </div>
@@ -544,6 +551,57 @@ function CanvasSession({
           aria-label={`Scene: ${scene.name}`}
           aria-describedby={descriptionId}
           data-selected-object-id={selectionId ?? undefined}
+          onDragOver={(event) => {
+            if (
+              editable &&
+              event.dataTransfer.types.includes(STUDIO_ASSET_MIME)
+            ) {
+              event.preventDefault();
+              event.dataTransfer.dropEffect = "copy";
+            }
+          }}
+          onDrop={(event) => {
+            if (!event.dataTransfer.types.includes(STUDIO_ASSET_MIME)) return;
+            event.preventDefault();
+            if (!editable || !camera.current) return;
+            cancel();
+            try {
+              const payload = event.dataTransfer.getData(STUDIO_ASSET_MIME);
+              // A selected group receives children. Other selections choose only
+              // a layer; UI defaults to an editable UI layer when none is selected.
+              const role = JSON.parse(payload)?.role;
+              const target = selectedObject;
+              const layerId =
+                target?.layerId ??
+                [...scene.layers]
+                  .sort((a, b) => a.order - b.order)
+                  .find(
+                    (layer) =>
+                      layer.visible &&
+                      !layer.locked &&
+                      (role !== "UI" || layer.type === "UI"),
+                  )?.id;
+              if (!layerId)
+                throw new Error("Không có lớp phù hợp để nhận asset.");
+              const result = createAssetDrop({
+                document: state.document,
+                sceneId: scene.id,
+                layerId,
+                parentId: target?.objectType === "GROUP" ? target.id : null,
+                payload,
+                metadata: assetMetadata,
+                client: { x: event.clientX, y: event.clientY },
+                rect: event.currentTarget.getBoundingClientRect(),
+                camera: camera.current,
+              });
+              prepareStudioCommit(state, result.mutations);
+              dispatch({ type: "commit", mutations: result.mutations });
+              selectObject(scene.id, result.objectId, "hierarchy");
+              setDropError("");
+            } catch (error) {
+              setDropError(studioValidationMessage(error));
+            }
+          }}
           onPointerDown={(event) => begin(event)}
           onPointerMove={move}
           onPointerUp={end}
@@ -627,6 +685,7 @@ function CanvasSession({
         )}
       </div>
       <div className="studio-canvas-caption" id={descriptionId}>
+        {dropError && <p role="alert">{dropError}</p>}
         <p>
           {scene.width} × {scene.height} px · {scene.layers.length} lớp ·{" "}
           {scene.objects.length} đối tượng

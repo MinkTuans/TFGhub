@@ -1,0 +1,1106 @@
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
+import { useEffect } from "react";
+import { afterEach, beforeEach, expect, test, vi } from "vitest";
+import {
+  applyProjectMutations,
+  EngineProjectV2,
+  v2ComponentRegistry,
+  type EngineProjectV2Type,
+  type GameSummary,
+} from "@indieforge/contracts";
+import {
+  StudioProvider,
+  useStudio,
+} from "../components/studio/studio-provider";
+import { StudioShell } from "../components/studio/studio-shell";
+import { recordingContext } from "./canvas-context";
+import type { RecoveryStorage } from "../components/studio/studio-recovery";
+import type { StudioMutation } from "../components/studio/studio-state";
+
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
+const id = (n: number) =>
+  `550e8400-e29b-41d4-a716-${String(n).padStart(12, "0")}`;
+type Scene = EngineProjectV2Type["scenes"][number];
+function object(
+  n: number,
+  name: string,
+  type: Scene["objects"][number]["objectType"] = "UI",
+  x = 40,
+  y = 40,
+): Scene["objects"][number] {
+  return {
+    id: id(n),
+    name,
+    objectType: type,
+    parentId: null,
+    layerId: id(3),
+    order: n,
+    renderOrder: n,
+    enabled: true,
+    visible: true,
+    locked: false,
+    components: [
+      {
+        id: id(n + 100),
+        type: "Transform",
+        version: 1,
+        properties: {
+          ...(v2ComponentRegistry.Transform.defaults() as object),
+          x,
+          y,
+          width: 40,
+          height: 30,
+        },
+      },
+      ...(type === "GROUP"
+        ? []
+        : [
+            {
+              id: id(n + 200),
+              type: "UIPanel" as const,
+              version: 1 as const,
+              properties: v2ComponentRegistry.UIPanel.defaults(),
+            },
+          ]),
+    ],
+  };
+}
+function project(): EngineProjectV2Type {
+  const group = object(10, "Group", "GROUP", 0, 0),
+    child = object(11, "Child"),
+    locked = object(12, "Locked", "UI", 120, 40);
+  child.parentId = group.id;
+  child.layerId = id(4);
+  locked.locked = true;
+  return EngineProjectV2.parse({
+    schemaVersion: 2,
+    projectId: id(1),
+    engineFamily: "TFG_ENGINE",
+    entrySceneId: id(2),
+    settings: { viewport: { width: 640, height: 480 }, pixelArt: false },
+    assetIds: [id(900)],
+    scenes: [
+      {
+        id: id(2),
+        key: "main",
+        name: "Main",
+        type: "MIXED",
+        order: 0,
+        width: 640,
+        height: 480,
+        background: { color: "#102030", assetId: null },
+        settings: {
+          gravityX: 0,
+          gravityY: 0,
+          grid: { enabled: false, size: 32, snap: false },
+        },
+        layers: [
+          {
+            id: id(3),
+            name: "World UI",
+            type: "UI",
+            order: 0,
+            visible: true,
+            locked: false,
+          },
+          {
+            id: id(4),
+            name: "Overlay",
+            type: "UI",
+            order: 1,
+            visible: true,
+            locked: false,
+          },
+        ],
+        objects: [child, locked, group],
+      },
+      {
+        id: id(5),
+        key: "other",
+        name: "Other",
+        type: "MIXED",
+        order: 1,
+        width: 640,
+        height: 480,
+        background: { color: "#102030", assetId: null },
+        settings: {
+          gravityX: 0,
+          gravityY: 0,
+          grid: { enabled: false, size: 32, snap: false },
+        },
+        layers: [
+          {
+            id: id(6),
+            name: "Other layer",
+            type: "WORLD",
+            order: 0,
+            visible: true,
+            locked: false,
+          },
+        ],
+        objects: [],
+      },
+    ],
+    variables: { global: [], player: [], scene: {} },
+    prefabs: [],
+    events: [],
+    modules: [],
+    scripts: [],
+  });
+}
+const game = {
+  id: "game",
+  title: "Editor",
+  sourceType: "ENGINE",
+  reviewState: "DRAFT",
+} as GameSummary;
+beforeEach(() => {
+  sessionStorage.clear();
+  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(
+    recordingContext().context,
+  );
+  vi.spyOn(
+    HTMLCanvasElement.prototype,
+    "getBoundingClientRect",
+  ).mockReturnValue({
+    left: 10,
+    top: 20,
+    width: 640,
+    height: 480,
+    right: 650,
+    bottom: 500,
+    x: 10,
+    y: 20,
+    toJSON() {},
+  });
+  class Pointer extends MouseEvent {
+    pointerId = 1;
+  }
+  vi.stubGlobal("PointerEvent", Pointer);
+});
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
+async function mount(
+  document = project(),
+  options: {
+    storage?: RecoveryStorage;
+    transport?: boolean;
+    fixtures?: unknown[];
+  } = {},
+) {
+  let studio!: ReturnType<typeof useStudio>;
+  let server = structuredClone(document);
+  const batches: StudioMutation[][] = [];
+  let stored: unknown = null;
+  const storage = options.storage ?? {
+    read: async () => stored,
+    write: async (value: unknown) => {
+      stored = structuredClone(value);
+    },
+  };
+  function Observe() {
+    const current = useStudio();
+    useEffect(() => {
+      studio = current;
+    });
+    return null;
+  }
+  const result = render(
+    <StudioProvider
+      identity={{
+        userId: "owner",
+        gameId: "game",
+        projectId: document.projectId,
+      }}
+      initial={{ document, revision: 0 }}
+      storage={storage}
+      debounceMs={options.transport ? 20 : 60_000}
+      transport={async (_game, batch) => {
+        batches.push(structuredClone(batch.mutations));
+        server = applyProjectMutations(server, batch.mutations);
+        return { document: server, revision: batch.baseRevision + 1 };
+      }}
+    >
+      <StudioShell initialGame={game} />
+      <Observe />
+    </StudioProvider>,
+  );
+  await waitFor(() => expect(studio.state.ready).toBe(true));
+  return {
+    ...result,
+    storage,
+    batches,
+    get studio() {
+      return studio;
+    },
+    get server() {
+      return server;
+    },
+  };
+}
+const tree = () => screen.getByRole("tree", { name: "Đối tượng Scene" });
+const row = (name: string) => within(tree()).getByRole("treeitem", { name });
+const canvas = () => screen.getByRole("img", { name: /^Scene:/ });
+function clickCanvas(x = 50, y = 50) {
+  for (const phase of ["down", "up"])
+    fireEvent(
+      canvas(),
+      new PointerEvent(`pointer${phase}`, {
+        bubbles: true,
+        clientX: x + 10,
+        clientY: y + 20,
+        button: 0,
+      }),
+    );
+}
+function select(name: string) {
+  fireEvent.click(row(name));
+}
+
+test("canvas selection expands cross-layer ancestors, focuses the hierarchy row and drives inspector without document edits", async () => {
+  const h = await mount();
+  const before = h.studio.state.document;
+  clickCanvas();
+  expect(row("Group")).toHaveAttribute("aria-expanded", "true");
+  expect(row("Child")).toHaveAttribute("aria-selected", "true");
+  expect(row("Child")).toHaveFocus();
+  expect(screen.getByRole("textbox", { name: "Tên đối tượng" })).toHaveValue(
+    "Child",
+  );
+  expect(canvas()).toHaveAttribute("data-selected-object-id", id(11));
+  expect(h.studio.state.document).toBe(before);
+  expect(h.studio.state.history.past).toHaveLength(0);
+});
+test("hierarchy selects a locked object for inspection and highlights canvas while direct picking cannot", async () => {
+  await mount();
+  select("Locked");
+  expect(canvas()).toHaveAttribute("data-selected-object-id", id(12));
+  expect(screen.getByRole("textbox", { name: "Tên đối tượng" })).toHaveValue(
+    "Locked",
+  );
+  expect(screen.queryByRole("button", { name: "Đổi kích thước" })).toBeNull();
+  fireEvent.keyDown(row("Locked"), { key: "Enter" });
+  expect(canvas()).toHaveFocus();
+  clickCanvas(130, 50);
+  expect(canvas()).not.toHaveAttribute("data-selected-object-id");
+});
+
+test("canvas reselecting the same object reopens a manually collapsed ancestor and returns focus", async () => {
+  await mount();
+  clickCanvas();
+  fireEvent.click(screen.getByRole("button", { name: "Thu gọn Group" }));
+  expect(within(tree()).queryByRole("treeitem", { name: "Child" })).toBeNull();
+  clickCanvas();
+  expect(row("Child")).toHaveFocus();
+});
+test("nested tree keyboard expansion uses parent links across layers, roving focus and no duplicate children", async () => {
+  await mount();
+  const group = row("Group");
+  group.focus();
+  fireEvent.keyDown(group, { key: "ArrowRight" });
+  expect(group).toHaveAttribute("aria-expanded", "true");
+  fireEvent.keyDown(group, { key: "ArrowRight" });
+  expect(row("Child")).toHaveFocus();
+  expect(row("Child")).toHaveAttribute("aria-level", "3");
+  expect(
+    within(tree()).getAllByRole("treeitem", { name: "Child" }),
+  ).toHaveLength(1);
+  fireEvent.keyDown(row("Child"), { key: "ArrowLeft" });
+  expect(group).toHaveFocus();
+  fireEvent.keyDown(group, { key: "ArrowLeft" });
+  expect(group).toHaveAttribute("aria-expanded", "false");
+  fireEvent.keyDown(group, { key: "End" });
+  expect(row("Overlay")).toHaveFocus();
+  fireEvent.keyDown(row("Overlay"), { key: "Home" });
+  expect(row("World UI")).toHaveFocus();
+});
+test("selection survives canonical acknowledgement, reorder and remount with only IDs stored locally", async () => {
+  const h = await mount(project(), { transport: true });
+  select("Locked");
+  fireEvent.change(screen.getByRole("textbox", { name: "Tên đối tượng" }), {
+    target: { value: "Renamed" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Lưu đối tượng" }));
+  await waitFor(() => expect(h.studio.state.status).toBe("SAVED"));
+  expect(row("Renamed")).toHaveAttribute("aria-selected", "true");
+  await act(async () =>
+    h.studio.dispatch({
+      type: "commit",
+      mutations: [
+        {
+          type: "object.reorder",
+          sceneId: id(2),
+          layerId: id(3),
+          orders: [
+            { id: id(10), order: 12 },
+            { id: id(12), order: 10 },
+          ],
+        },
+      ],
+    }),
+  );
+  expect(row("Renamed")).toHaveAttribute("aria-selected", "true");
+  await waitFor(() => expect(h.studio.state.status).toBe("SAVED"));
+  const saved = structuredClone(h.server);
+  h.unmount();
+  await mount(saved);
+  expect(row("Renamed")).toHaveAttribute("aria-selected", "true");
+  expect(canvas()).toHaveAttribute("data-selected-object-id", id(12));
+  const values = Object.values(sessionStorage).join("");
+  expect(values).not.toContain("Renamed");
+  expect(values).not.toContain("components");
+});
+test("deleted selection falls back to scene and does not return on undo or a scene round trip", async () => {
+  const h = await mount();
+  clickCanvas();
+  await act(async () =>
+    h.studio.dispatch({
+      type: "commit",
+      mutations: [
+        {
+          type: "object.delete",
+          sceneId: id(2),
+          objectIds: [id(11)],
+          confirmed: true,
+        },
+      ],
+    }),
+  );
+  expect(canvas()).not.toHaveAttribute("data-selected-object-id");
+  expect(screen.queryByRole("textbox", { name: "Tên đối tượng" })).toBeNull();
+  await act(async () => h.studio.dispatch({ type: "undo" }));
+  expect(canvas()).not.toHaveAttribute("data-selected-object-id");
+  select("Locked");
+  fireEvent.change(screen.getByRole("combobox", { name: "Scene hiện tại" }), {
+    target: { value: id(5) },
+  });
+  expect(canvas()).not.toHaveAttribute("data-selected-object-id");
+  fireEvent.change(screen.getByRole("combobox", { name: "Scene hiện tại" }), {
+    target: { value: id(2) },
+  });
+  expect(canvas()).not.toHaveAttribute("data-selected-object-id");
+});
+test("layer reorder, visibility and lock are canonical undoable operations and inherited across parent layers", async () => {
+  const h = await mount();
+  select("Group");
+  fireEvent.click(screen.getByRole("button", { name: "Đưa World UI xuống" }));
+  expect(
+    h.studio.state.document.scenes[0].layers.find((l) => l.id === id(3))?.order,
+  ).toBe(1);
+  fireEvent.click(screen.getByRole("button", { name: "Khóa World UI" }));
+  clickCanvas();
+  expect(canvas()).not.toHaveAttribute("data-selected-object-id");
+  fireEvent.click(screen.getByRole("button", { name: "Ẩn World UI" }));
+  select("Group");
+  expect(screen.getByRole("textbox", { name: "Tên đối tượng" })).toHaveValue(
+    "Group",
+  );
+  expect(row("Group")).toHaveAttribute("data-effective-visible", "false");
+  fireEvent.keyDown(row("Group"), { key: "ArrowRight" });
+  expect(row("Child")).toHaveAttribute("data-effective-visible", "false");
+  expect(row("Child")).toHaveAttribute("data-effective-locked", "true");
+  expect(row("Child")).toHaveAccessibleDescription("Đang ẩn · Đã khóa");
+  await act(async () => h.studio.dispatch({ type: "undo" }));
+  expect(
+    h.studio.state.document.scenes[0].layers.find((l) => l.id === id(3))
+      ?.visible,
+  ).toBe(true);
+});
+test("schema-driven fields edit complete components and invalid coupled values preserve document/history", async () => {
+  const document = project();
+  document.scenes[0].objects[0].components.push({
+    id: id(400),
+    type: "Health",
+    version: 1,
+    properties: v2ComponentRegistry.Health.defaults(),
+  });
+  const h = await mount(document);
+  clickCanvas();
+  const health = screen.getByRole("group", { name: "Health" });
+  expect(within(health).getByText("tfg.v2.health.v1")).toBeVisible();
+  expect(within(health).getByText("Version 1")).toBeVisible();
+  fireEvent.change(
+    within(health).getByRole("spinbutton", { name: "current" }),
+    { target: { value: "120" } },
+  );
+  fireEvent.click(within(health).getByRole("button", { name: "Lưu Health" }));
+  expect(within(health).getByRole("alert")).toHaveTextContent(
+    "Current health cannot exceed maximum health",
+  );
+  expect(h.studio.state.history.past).toHaveLength(0);
+  fireEvent.change(
+    within(health).getByRole("spinbutton", { name: "maximum" }),
+    { target: { value: "150" } },
+  );
+  fireEvent.click(within(health).getByRole("button", { name: "Lưu Health" }));
+  expect(
+    h.studio.state.document.scenes[0].objects[0].components.at(-1)?.properties,
+  ).toEqual({ current: 120, maximum: 150 });
+  expect(h.studio.state.history.past).toHaveLength(1);
+  await act(async () => h.studio.dispatch({ type: "undo" }));
+  expect(
+    within(screen.getByRole("group", { name: "Health" })).getByRole(
+      "spinbutton",
+      { name: "current" },
+    ),
+  ).toHaveValue(100);
+});
+test("registry add/defaults, discriminated fields, nullable references and JSON fields retain validation authority", async () => {
+  const h = await mount();
+  select("Locked");
+  fireEvent.change(screen.getByRole("combobox", { name: "Thêm component" }), {
+    target: { value: "Collider" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Thêm component" }));
+  const collider = screen.getByRole("group", { name: "Collider" });
+  expect(
+    within(collider).getByRole("spinbutton", { name: "width" }),
+  ).toHaveValue(32);
+  fireEvent.change(within(collider).getByRole("combobox", { name: "shape" }), {
+    target: { value: "CIRCLE" },
+  });
+  expect(
+    within(collider).queryByRole("spinbutton", { name: "width" }),
+  ).toBeNull();
+  fireEvent.change(
+    within(collider).getByRole("spinbutton", { name: "radius" }),
+    { target: { value: "24" } },
+  );
+  fireEvent.click(
+    within(collider).getByRole("button", { name: "Lưu Collider" }),
+  );
+  expect(
+    h.studio.state.document.scenes[0].objects
+      .find((o) => o.id === id(12))!
+      .components.at(-1)?.properties,
+  ).toEqual({
+    shape: "CIRCLE",
+    radius: 24,
+    offsetX: 0,
+    offsetY: 0,
+    isTrigger: false,
+    collisionLayerId: null,
+  });
+  const savedCollider = screen.getByRole("group", { name: "Collider" });
+  fireEvent.change(
+    within(savedCollider).getByRole("textbox", { name: "collisionLayerId" }),
+    { target: { value: id(4) } },
+  );
+  const before = h.studio.state.document;
+  fireEvent.click(
+    within(savedCollider).getByRole("button", { name: "Lưu Collider" }),
+  );
+  expect(screen.getByRole("alert")).toHaveTextContent(/COLLISION/);
+  expect(h.studio.state.document).toBe(before);
+});
+test("typed object edits validate parent cycles atomically and pending component edits recover through existing storage", async () => {
+  const h = await mount();
+  select("Group");
+  fireEvent.change(screen.getByRole("textbox", { name: "Tên đối tượng" }), {
+    target: { value: "Invalid rename" },
+  });
+  fireEvent.change(screen.getByRole("combobox", { name: "Đối tượng cha" }), {
+    target: { value: id(11) },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Lưu đối tượng" }));
+  expect(screen.getByRole("alert")).toBeVisible();
+  expect(h.studio.state.history.past).toHaveLength(0);
+  clickCanvas();
+  const transform = screen.getByRole("group", { name: "Transform" });
+  fireEvent.change(
+    within(transform).getByRole("spinbutton", { name: "rotation" }),
+    { target: { value: "45" } },
+  );
+  fireEvent.click(
+    within(transform).getByRole("button", { name: "Lưu Transform" }),
+  );
+  await waitFor(() =>
+    expect(h.studio.state.persistedVersion).toBe(h.studio.state.version),
+  );
+  h.unmount();
+  const restored = await mount(project(), { storage: h.storage });
+  expect(
+    restored.studio.state.document.scenes[0].objects[0].components[0]
+      .properties,
+  ).toMatchObject({ rotation: 45 });
+  expect(screen.getByRole("textbox", { name: "Tên đối tượng" })).toHaveValue(
+    "Child",
+  );
+});
+
+test("moving an object to an occupied layer appends its order and undo restores exact membership", async () => {
+  const document = project();
+  document.scenes[0].objects[0].order = 10;
+  const h = await mount(document);
+  clickCanvas();
+  fireEvent.change(screen.getByRole("combobox", { name: "Lớp đối tượng" }), {
+    target: { value: id(3) },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Lưu đối tượng" }));
+  expect(h.studio.state.document.scenes[0].objects[0]).toMatchObject({
+    id: id(11),
+    layerId: id(3),
+    order: 13,
+    parentId: id(10),
+  });
+  expect(canvas()).toHaveAttribute("data-selected-object-id", id(11));
+  await act(async () => h.studio.dispatch({ type: "undo" }));
+  expect(h.studio.state.document).toEqual(document);
+});
+
+test("JSON component drafts reject invalid data, reset visibly to registry defaults and remove through history", async () => {
+  const h = await mount();
+  select("Locked");
+  fireEvent.change(screen.getByRole("combobox", { name: "Thêm component" }), {
+    target: { value: "Custom" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Thêm component" }));
+  const custom = screen.getByRole("group", { name: "Custom" });
+  const config = within(custom).getByRole("textbox", { name: "config" });
+  fireEvent.change(config, { target: { value: "{broken" } });
+  const before = h.studio.state.document;
+  fireEvent.click(within(custom).getByRole("button", { name: "Lưu Custom" }));
+  expect(within(custom).getByRole("alert")).toBeVisible();
+  expect(h.studio.state.document).toBe(before);
+  fireEvent.click(
+    within(custom).getByRole("button", { name: "Mặc định Custom" }),
+  );
+  expect(within(custom).getByRole("textbox", { name: "config" })).toHaveValue(
+    "{}",
+  );
+  fireEvent.change(within(custom).getByRole("textbox", { name: "config" }), {
+    target: { value: '{"effect":{"color":"blue"}}' },
+  });
+  fireEvent.click(within(custom).getByRole("button", { name: "Lưu Custom" }));
+  expect(
+    h.studio.state.document.scenes[0].objects
+      .find((o) => o.id === id(12))!
+      .components.at(-1)?.properties,
+  ).toEqual({
+    definitionKey: "custom.component",
+    config: { effect: { color: "blue" } },
+  });
+  fireEvent.click(
+    within(screen.getByRole("group", { name: "Custom" })).getByRole("button", {
+      name: "Gỡ Custom",
+    }),
+  );
+  expect(screen.queryByRole("group", { name: "Custom" })).toBeNull();
+  await act(async () => h.studio.dispatch({ type: "undo" }));
+  expect(
+    within(screen.getByRole("group", { name: "Custom" })).getByRole("textbox", {
+      name: "config",
+    }),
+  ).toHaveValue(JSON.stringify({ effect: { color: "blue" } }, null, 2));
+});
+
+test("successful property saves preserve keyboard focus on the save control", async () => {
+  await mount();
+  clickCanvas();
+  const component = screen.getByRole("group", { name: "Transform" });
+  fireEvent.change(
+    within(component).getByRole("spinbutton", { name: "rotation" }),
+    { target: { value: "20" } },
+  );
+  const save = within(component).getByRole("button", { name: "Lưu Transform" });
+  save.focus();
+  fireEvent.click(save);
+  expect(screen.getByRole("button", { name: "Lưu Transform" })).toHaveFocus();
+  fireEvent.change(screen.getByRole("textbox", { name: "Tên đối tượng" }), {
+    target: { value: "Keyboard item" },
+  });
+  const objectSave = screen.getByRole("button", { name: "Lưu đối tượng" });
+  objectSave.focus();
+  fireEvent.click(objectSave);
+  expect(screen.getByRole("button", { name: "Lưu đối tượng" })).toHaveFocus();
+});
+
+test("hierarchy focus retains canvas undo shortcuts with editable-field guards", async () => {
+  const h = await mount();
+  clickCanvas();
+  await act(async () =>
+    h.studio.dispatch({
+      type: "commit",
+      mutations: [
+        {
+          type: "object.update",
+          sceneId: id(2),
+          objectId: id(11),
+          changes: { name: "Changed" },
+        },
+      ],
+    }),
+  );
+  row("Changed").focus();
+  fireEvent.keyDown(row("Changed"), { key: "z", ctrlKey: true });
+  expect(screen.getByRole("textbox", { name: "Tên đối tượng" })).toHaveValue(
+    "Child",
+  );
+  fireEvent.keyDown(row("Child"), { key: "z", ctrlKey: true, shiftKey: true });
+  expect(screen.getByRole("textbox", { name: "Tên đối tượng" })).toHaveValue(
+    "Changed",
+  );
+  fireEvent.keyDown(screen.getByRole("textbox", { name: "Tên đối tượng" }), {
+    key: "z",
+    ctrlKey: true,
+  });
+  expect(h.studio.state.document.scenes[0].objects[0].name).toBe("Changed");
+});
+
+test("a real canvas drop uses its current camera and selected group, then selects, undoes and saves the created object", async () => {
+  const { SceneCanvas } =
+    await import("../components/studio/canvas/scene-canvas");
+  const { HierarchyPanel } =
+    await import("../components/studio/hierarchy-panel");
+  const { PropertyInspector } =
+    await import("../components/studio/property-inspector");
+  const { STUDIO_ASSET_MIME } = await dropModule();
+  let studio!: ReturnType<typeof useStudio>;
+  function Content() {
+    const value = useStudio();
+    useEffect(() => {
+      studio = value;
+    });
+    const scene = value.state.document.scenes[0];
+    return (
+      <>
+        <HierarchyPanel scene={scene} />
+        <SceneCanvas scene={scene} assetMetadata={[metadata()]} />
+        <PropertyInspector scene={scene} />
+      </>
+    );
+  }
+  render(
+    <StudioProvider
+      identity={{ userId: "owner", gameId: "game", projectId: id(1) }}
+      initial={{ document: project(), revision: 0 }}
+      storage={{ read: async () => null, write: async () => {} }}
+      debounceMs={60_000}
+    >
+      <Content />
+    </StudioProvider>,
+  );
+  await waitFor(() => expect(studio.state.ready).toBe(true));
+  select("Group");
+  fireEvent.click(screen.getByRole("button", { name: "Phóng to" }));
+  const dataTransfer = {
+    types: [STUDIO_ASSET_MIME],
+    getData: (type: string) =>
+      type === STUDIO_ASSET_MIME
+        ? JSON.stringify({ assetId: id(900), role: "ITEM" })
+        : "",
+  };
+  const event = new MouseEvent("drop", {
+    bubbles: true,
+    cancelable: true,
+    clientX: 330,
+    clientY: 260,
+  });
+  Object.defineProperty(event, "dataTransfer", { value: dataTransfer });
+  fireEvent(canvas(), event);
+  expect(studio.state.document.scenes[0].objects).toHaveLength(4);
+  const created = studio.state.document.scenes[0].objects.find(
+    (o) => o.name === "Fixture",
+  )!;
+  expect(created.parentId).toBe(id(10));
+  expect(created.components[0].properties).toMatchObject({ x: 320, y: 240 });
+  expect(row("Fixture")).toHaveAttribute("aria-selected", "true");
+  expect(canvas()).toHaveAttribute("data-selected-object-id", created.id);
+  expect(studio.state.history.past).toHaveLength(1);
+  await act(async () => studio.dispatch({ type: "undo" }));
+  expect(studio.state.document.scenes[0].objects).toHaveLength(3);
+});
+
+async function dropModule() {
+  const modules = import.meta.glob("../components/studio/asset-drop.ts");
+  expect(modules, "Asset drop boundary is not implemented").toHaveProperty([
+    "../components/studio/asset-drop.ts",
+  ]);
+  return (await modules[
+    "../components/studio/asset-drop.ts"
+  ]()) as typeof import("../components/studio/asset-drop");
+}
+const metadata = () => ({
+  id: id(900),
+  projectId: id(1),
+  state: "READY",
+  kind: "IMAGE",
+  name: "Fixture",
+  width: 64,
+  height: 32,
+});
+test.each(["IMAGE", "SPRITE", "ITEM", "UI"] as const)(
+  "%s drop creates a role composition with stable asset IDs at world coordinates",
+  async (role) => {
+    const { createAssetDrop } = await dropModule();
+    const document = project();
+    let counter = 1000;
+    const result = createAssetDrop({
+      document,
+      sceneId: id(2),
+      layerId: id(3),
+      parentId: null,
+      payload: JSON.stringify({ assetId: id(900), role }),
+      metadata: [metadata()],
+      client: { x: 170, y: 140 },
+      rect: { left: 10, top: 20, width: 640, height: 480 },
+      camera: {
+        x: 20,
+        y: 30,
+        zoom: 2,
+        viewportWidth: 640,
+        viewportHeight: 480,
+      },
+      newId: () => id(counter++),
+    });
+    const next = applyProjectMutations(document, result.mutations);
+    const created = next.scenes[0].objects.find(
+      (o) => o.id === result.objectId,
+    )!;
+    expect(created.objectType).toBe(
+      role === "ITEM" ? "ITEM" : role === "UI" ? "UI" : "DECORATION",
+    );
+    expect(
+      created.components.find((c) => c.type === "Transform")?.properties,
+    ).toMatchObject({ x: 100, y: 90, width: 64, height: 32 });
+    expect(created.components.map((c) => c.type)).toEqual(
+      role === "UI"
+        ? ["Transform", "UIPanel", "UIImage"]
+        : role === "ITEM"
+          ? ["Transform", "SpriteRenderer", "InventoryItem"]
+          : ["Transform", "SpriteRenderer"],
+    );
+    expect(
+      created.components.find(
+        (c) => c.type === (role === "UI" ? "UIImage" : "SpriteRenderer"),
+      )?.properties,
+    ).toMatchObject({ assetId: id(900) });
+    if (role === "ITEM")
+      expect(
+        created.components.find((c) => c.type === "InventoryItem")?.properties,
+      ).toMatchObject({ iconAssetId: id(900) });
+    expect(JSON.stringify(created)).not.toContain("READY");
+    expect(JSON.stringify(created)).not.toContain("projectId");
+    expect(document.scenes[0].objects).toHaveLength(3);
+  },
+);
+test.each([
+  null,
+  { ...metadata(), state: "TOMBSTONED" },
+  { ...metadata(), state: "UPLOADING" },
+  { ...metadata(), projectId: id(9) },
+  { ...metadata(), width: 0 },
+  { ...metadata(), kind: "AUDIO" },
+])(
+  "drop rejects missing, tombstoned, foreign or invalid metadata atomically: %j",
+  async (meta) => {
+    const { createAssetDrop } = await dropModule();
+    const document = project();
+    expect(() =>
+      createAssetDrop({
+        document,
+        sceneId: id(2),
+        layerId: id(3),
+        parentId: null,
+        payload: JSON.stringify({ assetId: id(900), role: "IMAGE" }),
+        metadata: meta ? [meta] : [],
+        client: { x: 50, y: 50 },
+        rect: { left: 0, top: 0, width: 640, height: 480 },
+        camera: {
+          x: 0,
+          y: 0,
+          zoom: 1,
+          viewportWidth: 640,
+          viewportHeight: 480,
+        },
+      }),
+    ).toThrow();
+    expect(document.scenes[0].objects).toHaveLength(3);
+  },
+);
+test.each([
+  "{}",
+  '{"assetId":"bad","role":"IMAGE"}',
+  JSON.stringify({
+    assetId: id(900),
+    role: "IMAGE",
+    url: "https://example.test/p.png",
+  }),
+  JSON.stringify({ assetId: id(901), role: "IMAGE" }),
+  JSON.stringify({ assetId: id(900), role: "PLAYER" }),
+])("drop rejects invalid payload %s", async (payload) => {
+  const { createAssetDrop } = await dropModule();
+  expect(() =>
+    createAssetDrop({
+      document: project(),
+      sceneId: id(2),
+      layerId: id(3),
+      parentId: null,
+      payload,
+      metadata: [metadata()],
+      client: { x: 50, y: 50 },
+      rect: { left: 0, top: 0, width: 640, height: 480 },
+      camera: { x: 0, y: 0, zoom: 1, viewportWidth: 640, viewportHeight: 480 },
+    }),
+  ).toThrow();
+});
+test("drop converts through rotated negative-scale parent and rejects locked/hidden or outside targets", async () => {
+  const { createAssetDrop } = await dropModule();
+  const document = project();
+  const parent = document.scenes[0].objects.find((o) => o.id === id(10))!;
+  Object.assign(parent.components[0].properties, {
+    x: 200,
+    y: 120,
+    rotation: 90,
+    scaleX: 2,
+    scaleY: -1,
+    pivot: { x: 0, y: 0 },
+  });
+  const options = {
+    document,
+    sceneId: id(2),
+    layerId: id(4),
+    parentId: id(10),
+    payload: JSON.stringify({ assetId: id(900), role: "IMAGE" }),
+    metadata: [metadata()],
+    client: { x: 220, y: 140 },
+    rect: { left: 0, top: 0, width: 640, height: 480 },
+    camera: { x: 0, y: 0, zoom: 1, viewportWidth: 640, viewportHeight: 480 },
+  };
+  const result = createAssetDrop(options);
+  const next = applyProjectMutations(document, result.mutations);
+  const created = next.scenes[0].objects.find((o) => o.id === result.objectId)!;
+  expect(created.parentId).toBe(id(10));
+  expect(created.components[0].properties).toMatchObject({ x: 10, y: 20 });
+  parent.locked = true;
+  expect(() => createAssetDrop(options)).toThrow();
+  parent.locked = false;
+  parent.visible = false;
+  expect(() => createAssetDrop(options)).toThrow();
+  parent.visible = true;
+  expect(() =>
+    createAssetDrop({ ...options, client: { x: -1, y: 20 } }),
+  ).toThrow();
+});
+
+test("native browser drops READY fixtures, edits, undoes, autosaves and reloads exact canonical selection", async () => {
+  const { createViteServer } = await import("vitest/node");
+  const { chromium, expect: browserExpect } = await import("@playwright/test");
+  const { existsSync } = await import("node:fs");
+  const initial = project(),
+    entry = "\0virtual:hierarchy-browser";
+  const server = await createViteServer({
+    configFile: false,
+    logLevel: "error",
+    server: { host: "127.0.0.1", port: 0 },
+    define: {
+      "process.env.NEXT_PUBLIC_API_URL": JSON.stringify("http://192.0.2.51"),
+    },
+    plugins: [
+      {
+        name: "hierarchy-browser-fixture",
+        resolveId: (value) => (value === entry ? entry : undefined),
+        load: (value) =>
+          value === entry
+            ? `
+      import '/@vite/env';
+      import { createElement as h, useEffect } from 'react';
+      import { createRoot } from 'react-dom/client';
+      import { StudioProvider, useStudio } from '/components/studio/studio-provider.tsx';
+      import { HierarchyPanel } from '/components/studio/hierarchy-panel.tsx';
+      import { PropertyInspector } from '/components/studio/property-inspector.tsx';
+      import { SceneCanvas } from '/components/studio/canvas/scene-canvas.tsx';
+      import '/components/studio/studio-shell.css';
+      function Editor() {
+        const studio = useStudio(), scene = studio.state.document.scenes[0];
+        useEffect(() => { window.studio = studio; }, [studio]);
+        return h('main', {className:'studio-shell'},
+          h('div',null,
+            h('button',{draggable:true,onDragStart:event => event.dataTransfer.setData('application/x-tfg-asset',${JSON.stringify(JSON.stringify({ assetId: id(900), role: "ITEM" }))})},'READY Fixture'),
+            h('button',{onClick:()=>studio.dispatch({type:'undo'})},'Undo'),
+            h('button',{onClick:()=>studio.dispatch({type:'redo'})},'Redo'),
+            h('output',{'aria-label':'Save state'},studio.state.status)),
+          h('div',{className:'studio-layout'},h(HierarchyPanel,{scene}),h(SceneCanvas,{scene,assetMetadata:${JSON.stringify([metadata()])}}),h('aside',{className:'studio-inspector'},h(PropertyInspector,{scene}))));
+      }
+      createRoot(document.getElementById('root')).render(h(StudioProvider,{identity:${JSON.stringify({ userId: "native-owner", gameId: "game", projectId: id(1) })},initial:${JSON.stringify({ document: initial, revision: 0 })}},h(Editor)));
+    `
+            : undefined,
+        configureServer(vite) {
+          vite.middlewares.use((request, response, next) => {
+            if (request.url !== "/") return next();
+            response.setHeader("Content-Type", "text/html");
+            response.end(
+              '<div id="root"></div><script type="module" src="/@id/__x00__virtual:hierarchy-browser"></script>',
+            );
+          });
+        },
+      },
+    ],
+  });
+  await server.listen();
+  const address = server.httpServer!.address();
+  if (!address || typeof address === "string")
+    throw new Error("Missing browser fixture address");
+  const browser = await chromium.launch({
+    executablePath:
+      process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ??
+      (existsSync("/usr/bin/google-chrome")
+        ? "/usr/bin/google-chrome"
+        : undefined),
+  });
+  try {
+    const page = await browser.newPage({
+      viewport: { width: 1440, height: 900 },
+      deviceScaleFactor: 2,
+    });
+    let canonical = structuredClone(initial),
+      revision = 0;
+    const batches: StudioMutation[][] = [],
+      errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    await page.route("http://192.0.2.51/**", async (route) => {
+      const url = new URL(route.request().url());
+      if (url.pathname === "/games/game/engine-project/mutations") {
+        const batch = route.request().postDataJSON();
+        expect(batch.baseRevision).toBe(revision);
+        canonical = applyProjectMutations(canonical, batch.mutations);
+        revision++;
+        batches.push(batch.mutations);
+        await route.fulfill({
+          status: 201,
+          json: {
+            status: "SUPPORTED",
+            project: canonical,
+            revision: {
+              revisionNumber: revision,
+              schemaVersion: 2,
+              contentHash: "a".repeat(64),
+              byteSize: 100,
+              retention: "PINNED",
+              createdAt: "2026-09-09T00:00:00.000Z",
+            },
+          },
+        });
+        return;
+      }
+      await route.fulfill({
+        response: await route.fetch({
+          url: `http://127.0.0.1:${address.port}${url.pathname}${url.search}`,
+        }),
+      });
+    });
+    await page.goto("http://192.0.2.51/");
+    await browserExpect(
+      page.getByRole("status", { name: "Save state" }),
+    ).toHaveText("SAVED");
+    const canvas = page.getByRole("img", { name: "Scene: Main" }),
+      group = page.getByRole("treeitem", { name: "Group", exact: true });
+    const treeTop = await page
+      .getByRole("tree", { name: "Đối tượng Scene" })
+      .evaluate((element) => element.getBoundingClientRect().top);
+    expect(treeTop).toBeLessThan(150);
+    await group.click();
+    await browserExpect(canvas).toHaveAttribute(
+      "data-selected-object-id",
+      id(10),
+    );
+    await group.press("Enter");
+    await browserExpect(canvas).toBeFocused();
+    await page
+      .getByRole("button", { name: "READY Fixture" })
+      .dragTo(canvas, { targetPosition: { x: 250, y: 170 } });
+    await browserExpect(
+      page.getByRole("textbox", { name: "Tên đối tượng" }),
+    ).toHaveValue("Fixture");
+    await browserExpect(
+      page.getByRole("treeitem", { name: "Fixture", exact: true }),
+    ).toBeFocused();
+    const droppedId = await canvas.getAttribute("data-selected-object-id");
+    expect(droppedId).toBeTruthy();
+    await browserExpect(
+      page.getByRole("status", { name: "Save state" }),
+    ).toHaveText("SAVED");
+    expect(batches).toHaveLength(1);
+    expect(batches[0].map((command) => command.type)).toEqual([
+      "object.create",
+      "component.update",
+      "component.update",
+    ]);
+    const dropped = canonical.scenes[0].objects.find(
+      (object) => object.id === droppedId,
+    )!;
+    expect(dropped.parentId).toBe(id(10));
+    const camera = await canvas.evaluate((element) => ({
+      x: Number(element.dataset.cameraX),
+      y: Number(element.dataset.cameraY),
+      zoom: Number(element.dataset.cameraZoom),
+    }));
+    const transform = dropped.components[0].properties as {
+      x: number;
+      y: number;
+    };
+    expect(transform.x).toBeCloseTo(250 / camera.zoom + camera.x, 1);
+    expect(transform.y).toBeCloseTo(170 / camera.zoom + camera.y, 1);
+    await page
+      .getByRole("textbox", { name: "Tên đối tượng" })
+      .fill("Collected item");
+    await page.getByRole("button", { name: "Lưu đối tượng" }).click();
+    const item = page.getByRole("group", {
+      name: "InventoryItem",
+      exact: true,
+    });
+    await item.getByRole("spinbutton", { name: "maximumQuantity" }).fill("7");
+    await item
+      .getByRole("button", { name: "Lưu InventoryItem", exact: true })
+      .click();
+    await page.getByRole("button", { name: "Undo", exact: true }).click();
+    await browserExpect(
+      item.getByRole("spinbutton", { name: "maximumQuantity" }),
+    ).toHaveValue("1");
+    await page.getByRole("button", { name: "Redo", exact: true }).click();
+    await browserExpect(
+      item.getByRole("spinbutton", { name: "maximumQuantity" }),
+    ).toHaveValue("7");
+    await browserExpect(
+      page.getByRole("status", { name: "Save state" }),
+    ).toHaveText("SAVED");
+    const saved = structuredClone(canonical);
+    await page.reload();
+    await browserExpect(
+      page.getByRole("status", { name: "Save state" }),
+    ).toHaveText("SAVED");
+    await browserExpect(
+      page.getByRole("treeitem", { name: "Collected item", exact: true }),
+    ).toHaveAttribute("aria-selected", "true");
+    await browserExpect(canvas).toHaveAttribute(
+      "data-selected-object-id",
+      droppedId!,
+    );
+    expect(
+      await page.evaluate(
+        () =>
+          (window as unknown as { studio: ReturnType<typeof useStudio> }).studio
+            .state.document,
+      ),
+    ).toEqual(saved);
+    expect(errors).toEqual([]);
+    await page.screenshot({
+      path: "../../.superpowers/sdd/2026-09-09-unified-game-studio/task-17-native.png",
+      fullPage: true,
+    });
+  } finally {
+    await browser.close();
+    await server.close();
+  }
+}, 60_000);
