@@ -22,7 +22,10 @@ import {
 } from "../components/studio/studio-provider";
 import { StudioShell } from "../components/studio/studio-shell";
 import { createStudioState } from "../components/studio/studio-state";
-import { studioReducer } from "../components/studio/studio-reducer";
+import {
+  prepareConflictResolution,
+  studioReducer,
+} from "../components/studio/studio-reducer";
 import {
   recoveryEnvelope,
   restoreRecovery,
@@ -403,6 +406,66 @@ test("rejects a compact gesture with an oversized inverse visibly without changi
   expect(h.studio.state.version).toBe(snapshot.version);
   expect(screen.getByRole("alert")).toHaveTextContent(/4 MiB/);
   expect(h.batches).toEqual([]);
+}, 20_000);
+
+test("conflict reapply preserves separately replayable history when combined inverses exceed the request limit", () => {
+  const before = project();
+  for (const [index, scene] of before.scenes.entries())
+    scene.objects[0].components.push({
+      id: id(900 + index),
+      type: "Custom",
+      version: 1,
+      properties: {
+        definitionKey: "custom.large",
+        config: { text: "x".repeat(2_100_000) },
+      },
+    });
+  const finalScene = structuredClone(before.scenes[0]);
+  finalScene.id = id(800);
+  finalScene.key = "remaining";
+  finalScene.order = 80;
+  finalScene.layers = [{ ...finalScene.layers[0], id: id(801) }];
+  finalScene.objects = [];
+  before.scenes.push(finalScene);
+  let state = createStudioState(identity, { revision: 0, document: before });
+  for (const [index, scene] of before.scenes.slice(0, 2).entries())
+    state = studioReducer(state, {
+      type: "commit",
+      ...metadata,
+      mutations: [
+        {
+          type: "scene.delete",
+          sceneId: scene.id,
+          confirmed: true,
+          replacementSceneId: index === 0 ? id(3) : id(800),
+        },
+      ],
+    });
+  expect(state.document.scenes).toHaveLength(1);
+  const resolved = prepareConflictResolution(
+    { ...state, status: "CONFLICT", conflictRevision: 4 },
+    { revision: 4, document: before },
+    "reapply",
+    { mutationId: "reapplied", timestamp: 4 },
+  );
+  expect(resolved.document).toEqual(state.document);
+  expect(resolved.pending?.mutations).toEqual(state.pending?.mutations);
+  expect(resolved.history.past).toHaveLength(2);
+  const firstUndo = studioReducer(resolved, {
+    type: "undo",
+    mutationId: "undo-1",
+    timestamp: 5,
+  });
+  const secondUndo = studioReducer(firstUndo, {
+    type: "undo",
+    mutationId: "undo-2",
+    timestamp: 6,
+  });
+  expect(secondUndo.document).toEqual(before);
+  for (const entry of resolved.history.past)
+    expect(Buffer.byteLength(JSON.stringify(entry.undo))).toBeLessThan(
+      4 * 1024 * 1024,
+    );
 }, 20_000);
 
 test("does not combine separately transportable gestures into an oversized outgoing batch", () => {

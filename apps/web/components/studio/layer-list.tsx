@@ -14,7 +14,7 @@ export function LayerList({ sceneId }: { sceneId: string }) {
   const layers = [...scene.layers].sort((a, b) => a.order - b.order);
   const selectedForDelete = layers.find((layer) => layer.id === deleting);
   const commit = (mutation: unknown) => {
-    if (!state.ready || state.batchError) return false;
+    if (!state.ready || state.resolution || state.batchError) return false;
     try {
       const mutations = ApplyMutationBatchInput.shape.mutations.parse([
         mutation,
@@ -35,7 +35,7 @@ export function LayerList({ sceneId }: { sceneId: string }) {
   return (
     <section className="studio-editor" aria-label="Các lớp">
       <h2>Các lớp</h2>
-      <fieldset disabled={!state.ready || state.batchError}>
+      <fieldset disabled={!state.ready || !!state.resolution || state.batchError}>
         <legend>Quản lý lớp</legend>
         <button
           type="button"
@@ -186,7 +186,7 @@ export function LayerList({ sceneId }: { sceneId: string }) {
             setDeleting(null);
             setError("");
           }}
-          disabled={!state.ready || state.batchError}
+          disabled={!state.ready || !!state.resolution || state.batchError}
           onConfirm={() => {
             if (
               commit({

@@ -7,12 +7,14 @@ export function StudioConfirmation({
   title,
   children,
   disabled,
+  confirmLabel = "Xác nhận xóa",
   onCancel,
   onConfirm,
 }: {
   title: string;
   children: ReactNode;
   disabled?: boolean;
+  confirmLabel?: string;
   onCancel: () => void;
   onConfirm: () => void;
 }) {
@@ -75,7 +77,7 @@ export function StudioConfirmation({
           Hủy
         </button>
         <button type="button" disabled={disabled} onClick={onConfirm}>
-          Xác nhận xóa
+          {confirmLabel}
         </button>
       </div>
     </dialog>

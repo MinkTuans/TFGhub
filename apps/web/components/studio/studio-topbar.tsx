@@ -185,7 +185,9 @@ export function StudioTopbar({
           <StudioButton
             tooltip="Hoàn tác thay đổi dự án"
             aria-label="Hoàn tác"
-            disabled={!state.ready || !state.history.past.length}
+            disabled={
+              !state.ready || !!state.resolution || !state.history.past.length
+            }
             onClick={() => dispatch({ type: "undo" })}
           >
             ↶
@@ -193,7 +195,9 @@ export function StudioTopbar({
           <StudioButton
             tooltip="Làm lại thay đổi dự án"
             aria-label="Làm lại"
-            disabled={!state.ready || !state.history.future.length}
+            disabled={
+              !state.ready || !!state.resolution || !state.history.future.length
+            }
             onClick={() => dispatch({ type: "redo" })}
           >
             ↷

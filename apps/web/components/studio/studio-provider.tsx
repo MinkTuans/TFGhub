@@ -14,6 +14,7 @@ import { EngineProjectV2 } from "@indieforge/contracts";
 import { ApiError } from "../../lib/api-client";
 import {
   createStudioState,
+  createStudioHeadReader,
   createStudioTransport,
   StudioConflictError,
   type StudioAcknowledgement,
@@ -21,8 +22,13 @@ import {
   type StudioIdentity,
   type StudioState,
   type StudioTransport,
+  type StudioHeadReader,
 } from "./studio-state";
-import { studioReducer, type StudioCommand } from "./studio-reducer";
+import {
+  prepareConflictResolution,
+  studioReducer,
+  type StudioCommand,
+} from "./studio-reducer";
 import {
   browserRecoveryStorage,
   recoveryEnvelope,
@@ -37,6 +43,7 @@ export interface StudioProviderProps {
   /** Dependencies are supplied by client consumers/tests, never across RSC. */
   storage?: RecoveryStorage;
   transport?: StudioTransport;
+  readHead?: StudioHeadReader;
   clock?: StudioClock;
   newMutationId?: () => string;
   debounceMs?: number;
@@ -73,6 +80,7 @@ function StudioSession(props: StudioProviderProps) {
   const [dependencies] = useState(() => ({
     storage: props.storage ?? browserRecoveryStorage,
     transport: props.transport ?? createStudioTransport(),
+    readHead: props.readHead ?? createStudioHeadReader(),
     clock: props.clock ?? {
       now: () => Date.now(),
       setTimeout: (callback: () => void, ms: number) =>
@@ -83,7 +91,8 @@ function StudioSession(props: StudioProviderProps) {
     newMutationId: props.newMutationId ?? createStudioId,
     debounceMs: props.debounceMs ?? 500,
   }));
-  const { storage, transport, clock, newMutationId, debounceMs } = dependencies;
+  const { storage, transport, readHead, clock, newMutationId, debounceMs } =
+    dependencies;
   const [state, reduce] = useReducer(studioReducer, props, (initialProps) => ({
     ...createStudioState(
       initialProps.identity,
@@ -95,6 +104,7 @@ function StudioSession(props: StudioProviderProps) {
   const mounted = useRef(false);
   const scheduledVersion = useRef(-1);
   const inFlight = useRef<string | null>(null);
+  const resolving = useRef(false);
   const dispatch = useCallback(
     (command: StudioCommand) => {
       if (command.type === "preview") reduce(command);
@@ -209,6 +219,53 @@ function StudioSession(props: StudioProviderProps) {
       }
     })();
   }, [state, transport, newMutationId, clock]);
+
+  useEffect(() => {
+    if (!state.resolution || resolving.current) return;
+    resolving.current = true;
+    const strategy = state.resolution;
+    void (async () => {
+      let phase: "fetch" | "validate" | "storage" = "fetch";
+      try {
+        const head = await readHead(state.identity.gameId);
+        if (!mounted.current) return;
+        phase = "validate";
+        const resolved = prepareConflictResolution(state, head, strategy, {
+          mutationId: newMutationId(),
+          timestamp: clock.now(),
+        });
+        phase = "storage";
+        // The same I/O queue orders outgoing conflict writes, this replacement,
+        // and replacement-session hydration. Until completion the UI keeps all
+        // original work; after interruption recovery sees one complete envelope.
+        await withRecoveryStorage(storage, state.identity, () =>
+          storage.write(recoveryEnvelope(resolved)),
+        );
+        if (mounted.current) {
+          scheduledVersion.current = resolved.version;
+          reduce({
+            type: "conflict-resolved",
+            version: state.version,
+            resolved,
+          });
+        }
+      } catch {
+        if (mounted.current)
+          reduce({
+            type: "resolution-failed",
+            version: state.version,
+            message:
+              phase === "storage"
+                ? "Không thể lưu dữ liệu khôi phục. Thay đổi cục bộ vẫn được giữ; hãy kiểm tra bộ nhớ trình duyệt và thử lại."
+                : phase === "validate"
+                  ? "Không thể áp dụng bản máy chủ hoặc các lệnh cục bộ: mục được tham chiếu có thể đã bị xóa, hoặc dữ liệu không còn hợp lệ. Thay đổi vẫn được giữ; hãy thử lại hoặc chọn bỏ thay đổi và tải bản máy chủ."
+                  : "Không thể tải bản máy chủ. Thay đổi cục bộ vẫn được giữ; hãy kiểm tra kết nối, quyền truy cập và thử lại.",
+          });
+      } finally {
+        resolving.current = false;
+      }
+    })();
+  }, [state, readHead, storage, newMutationId, clock]);
 
   return (
     <StudioContext value={{ state, dispatch }}>{props.children}</StudioContext>

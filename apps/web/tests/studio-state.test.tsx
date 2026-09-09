@@ -208,11 +208,12 @@ async function studioBrowser() {
         import { createElement, StrictMode, useEffect } from "react";
         import { createRoot } from "react-dom/client";
         import { StudioProvider, useStudio } from "/components/studio/studio-provider.tsx";
+        import { StudioToast } from "/components/studio/studio-toast.tsx";
         import { browserRecoveryStorage } from "/components/studio/studio-recovery.ts";
         function Observe() {
           const studio = useStudio();
           useEffect(() => { window.studio = studio; }, [studio]);
-          return null;
+          return createElement(StudioToast);
         }
         window.nativeStorage = browserRecoveryStorage;
         window.mountStudio = (props = {}) => {
@@ -282,6 +283,465 @@ async function studioBrowser() {
     throw error;
   }
 }
+
+describe("explicit conflict resolution", () => {
+  async function conflict(overrides: Partial<StudioProviderProps> = {}) {
+    vi.useFakeTimers();
+    const h = await harness(overrides);
+    act(() =>
+      h.result.current.dispatch({
+        type: "commit",
+        mutations: [rename("Local")],
+      }),
+    );
+    await tick(100);
+    act(() =>
+      h.result.current.dispatch({
+        type: "commit",
+        mutations: [rename("Later")],
+      }),
+    );
+    await act(async () =>
+      h.responses[0].reject(new h.loaded.state.StudioConflictError(4)),
+    );
+    await tick();
+    return h;
+  }
+
+  it.each(["discard", "reapply"] as const)(
+    "%s waits for durable replacement and freezes edits and duplicate resolution requests",
+    async (strategy) => {
+      const fetch = deferred<{
+        revision: number;
+        document: ReturnType<typeof project>;
+      }>();
+      const writes = deferred<void>();
+      const memory = memoryStorage();
+      let block = false;
+      const readHead = vi.fn(() => fetch.promise);
+      const h = await conflict({
+        readHead,
+        storage: {
+          read: memory.storage.read,
+          write: async (record) => {
+            if (block) await writes.promise;
+            await memory.storage.write(record);
+          },
+        },
+      });
+      const original = structuredClone(h.result.current.state);
+      block = true;
+      act(() => {
+        h.result.current.dispatch({ type: "resolve-conflict", strategy });
+        h.result.current.dispatch({ type: "resolve-conflict", strategy });
+      });
+      expect(h.result.current.state.resolution).toBe(strategy);
+      act(() => {
+        h.result.current.dispatch({
+          type: "commit",
+          mutations: [rename("Racing edit")],
+        });
+        h.result.current.dispatch({
+          type: "preview",
+          mutations: [rename("Racing preview")],
+        });
+        h.result.current.dispatch({ type: "undo" });
+        h.result.current.dispatch({ type: "redo" });
+      });
+      expect(h.result.current.state.document).toEqual(original.document);
+      expect(h.result.current.state.pending).toEqual(original.pending);
+      expect(h.result.current.state.queued).toEqual(original.queued);
+      expect(h.result.current.state.preview).toBeNull();
+      const remote = project("Remote");
+      remote.scenes[0].width = 900;
+      await act(async () => fetch.resolve({ revision: 4, document: remote }));
+      await tick(1000);
+      expect(readHead).toHaveBeenCalledExactlyOnceWith(identity.gameId);
+      expect(h.requests).toHaveLength(1);
+      expect(h.result.current.state.document).toEqual(original.document);
+      expect(await memory.storage.read(identity)).toMatchObject({
+        acknowledged: original.acknowledged,
+        pending: original.pending,
+        queued: original.queued,
+        conflict: true,
+      });
+      await act(async () => writes.resolve());
+      await tick();
+      expect(h.result.current.state.resolution).toBeNull();
+      expect(h.result.current.state.acknowledged).toEqual({
+        revision: 4,
+        document: remote,
+      });
+      expect(h.result.current.state.document.scenes[0]).toMatchObject({
+        name: strategy === "discard" ? "Remote" : "Later",
+        width: 900,
+      });
+      expect(h.result.current.state.history.future).toEqual([]);
+      if (strategy === "discard") {
+        expect(h.result.current.state.history.past).toEqual([]);
+        expect(h.result.current.state.pending).toBeNull();
+        expect(h.result.current.state.queued).toEqual([]);
+        expect(h.result.current.state.status).toBe("SAVED");
+      } else {
+        expect(h.result.current.state.pending).toMatchObject({
+          baseRevision: 4,
+          mutations: [rename("Local"), rename("Later")],
+        });
+        expect(h.result.current.state.pending!.mutationId).not.toBe(
+          original.pending!.mutationId,
+        );
+        act(() => h.result.current.dispatch({ type: "undo" }));
+        expect(h.result.current.state.document.scenes[0]).toMatchObject({
+          name: "Remote",
+          width: 900,
+        });
+        act(() => h.result.current.dispatch({ type: "redo" }));
+        expect(h.result.current.state.document.scenes[0].name).toBe("Later");
+      }
+    },
+  );
+
+  it.each([
+    "fetch",
+    "storage",
+    "deleted-target",
+    "foreign-head",
+    "stale-head",
+  ] as const)(
+    "retains the exact conflict on %s failure across reload",
+    async (failure) => {
+      const memory = memoryStorage();
+      let fail = false;
+      const remote = project("Remote");
+      if (failure === "deleted-target") {
+        remote.scenes[0].id = id(20);
+        remote.entrySceneId = id(20);
+      }
+      if (failure === "foreign-head") remote.projectId = id(30);
+      const h = await conflict({
+        readHead: async () => {
+          if (fail && failure === "fetch") throw new Error("offline");
+          return {
+            revision: failure === "stale-head" ? 3 : 4,
+            document: remote,
+          };
+        },
+        storage: {
+          read: memory.storage.read,
+          write: async (record) => {
+            if (fail && failure === "storage") throw new Error("quota");
+            await memory.storage.write(record);
+          },
+        },
+      });
+      const original = structuredClone(h.result.current.state);
+      fail = true;
+      act(() =>
+        h.result.current.dispatch({
+          type: "resolve-conflict",
+          strategy: "reapply",
+        }),
+      );
+      await tick(1000);
+      expect(h.result.current.state.resolutionError).toBeTruthy();
+      expect(h.result.current.state.resolution).toBeNull();
+      expect(h.result.current.state.status).toBe("CONFLICT");
+      for (const key of [
+        "document",
+        "acknowledged",
+        "pending",
+        "queued",
+        "history",
+      ] as const)
+        expect(h.result.current.state[key]).toEqual(original[key]);
+      expect(h.requests).toHaveLength(1);
+      h.unmount();
+      const reloaded = await harness({ storage: memory.storage });
+      expect(reloaded.result.current.state.status).toBe("CONFLICT");
+      expect(reloaded.result.current.state.pending).toEqual(original.pending);
+      expect(reloaded.result.current.state.queued).toEqual(original.queued);
+      expect(reloaded.result.current.state.document).toEqual(original.document);
+    },
+  );
+
+  it.each(["discard", "reapply"] as const)(
+    "%s can retry a failed replacement write without losing or replaying old requests",
+    async (strategy) => {
+      const memory = memoryStorage();
+      let fail = false;
+      const h = await conflict({
+        readHead: async () => ({ revision: 4, document: project("Remote") }),
+        storage: {
+          read: memory.storage.read,
+          write: async (record) => {
+            if (fail) throw new Error("quota");
+            await memory.storage.write(record);
+          },
+        },
+      });
+      fail = true;
+      act(() =>
+        h.result.current.dispatch({ type: "resolve-conflict", strategy }),
+      );
+      await tick(1000);
+      expect(h.result.current.state.status).toBe("CONFLICT");
+      expect(h.result.current.state.resolutionError).toMatch(/bộ nhớ/);
+      expect(h.result.current.state.document).toEqual(project("Later"));
+      fail = false;
+      act(() =>
+        h.result.current.dispatch({ type: "resolve-conflict", strategy }),
+      );
+      await tick(100);
+      expect(h.result.current.state.acknowledged.revision).toBe(4);
+      expect(h.result.current.state.resolutionError).toBeNull();
+      expect(h.requests).toHaveLength(strategy === "discard" ? 1 : 2);
+    },
+  );
+
+  it.each(["discard", "reapply"] as const)(
+    "%s interrupted replacement rejection restores the original conflict",
+    async (strategy) => {
+      const gate = deferred<void>();
+      const memory = memoryStorage();
+      let block = false;
+      const storage: RecoveryStorage = {
+        read: memory.storage.read,
+        write: async (record) => {
+          if (block) await gate.promise;
+          await memory.storage.write(record);
+        },
+      };
+      const h = await conflict({
+        storage,
+        readHead: async () => ({ revision: 4, document: project("Remote") }),
+      });
+      const original = structuredClone(h.result.current.state);
+      block = true;
+      act(() =>
+        h.result.current.dispatch({ type: "resolve-conflict", strategy }),
+      );
+      await tick();
+      h.unmount();
+      const reloaded = await harness({
+        storage,
+        initial: { revision: 4, document: project("Remote") },
+      });
+      expect(reloaded.result.current.state.ready).toBe(false);
+      block = false;
+      await act(async () => gate.reject(new Error("interrupted write")));
+      await tick(1000);
+      expect(reloaded.result.current.state.status).toBe("CONFLICT");
+      expect(reloaded.result.current.state.resolution).toBeNull();
+      expect(reloaded.result.current.state.document).toEqual(original.document);
+      expect(reloaded.result.current.state.acknowledged).toEqual(
+        original.acknowledged,
+      );
+      expect(reloaded.result.current.state.pending).toEqual(original.pending);
+      expect(reloaded.result.current.state.queued).toEqual(original.queued);
+      expect(reloaded.requests).toHaveLength(0);
+    },
+  );
+
+  it("replays the identical reapplied request after reload with a newer GET and lost acknowledgement", async () => {
+    const h = await conflict({
+      readHead: async () => ({ revision: 4, document: project("Remote") }),
+    });
+    act(() =>
+      h.result.current.dispatch({
+        type: "resolve-conflict",
+        strategy: "reapply",
+      }),
+    );
+    await tick(100);
+    const request = structuredClone(h.requests[1]);
+    expect(request.baseRevision).toBe(4);
+    h.unmount();
+    const reloaded = await harness({
+      storage: h.storage,
+      initial: { revision: 5, document: project("Later") },
+    });
+    await tick(100);
+    expect(reloaded.requests).toEqual([request]);
+    await act(async () =>
+      reloaded.responses[0].resolve({
+        revision: 5,
+        document: project("Later"),
+      }),
+    );
+    await tick();
+    expect(reloaded.result.current.state.status).toBe("SAVED");
+    expect(await h.storage.read(identity)).toMatchObject({
+      pending: null,
+      acknowledged: { revision: 5 },
+    });
+    await act(async () =>
+      h.responses[1].reject(new h.loaded.state.StudioConflictError(6)),
+    );
+    expect(reloaded.result.current.state.status).toBe("SAVED");
+  });
+
+  it("reapplies an exact retained queue across the 100-command boundary with bounded fresh history", async () => {
+    const h = await conflict({
+      readHead: async () => ({ revision: 4, document: project("Remote") }),
+    });
+    const extra = Array.from({ length: 99 }, (_, i) => rename(`Queued ${i}`));
+    act(() => h.result.current.dispatch({ type: "commit", mutations: extra }));
+    act(() =>
+      h.result.current.dispatch({
+        type: "resolve-conflict",
+        strategy: "reapply",
+      }),
+    );
+    await tick(100);
+    expect(h.requests[1].mutations).toEqual([
+      rename("Local"),
+      rename("Later"),
+      ...extra.slice(0, 98),
+    ]);
+    expect(h.result.current.state.queued).toEqual([rename("Queued 98")]);
+    expect(h.result.current.state.document.scenes[0].name).toBe("Queued 98");
+    expect(h.result.current.state.history.past).toHaveLength(2);
+    await act(async () =>
+      h.responses[1].resolve({ revision: 5, document: project("Queued 97") }),
+    );
+    await tick(100);
+    expect(h.requests[2]).toMatchObject({
+      baseRevision: 5,
+      mutations: [rename("Queued 98")],
+    });
+    expect(new Set(h.requests.map((batch) => batch.mutationId)).size).toBe(3);
+    await act(async () =>
+      h.responses[2].resolve({ revision: 6, document: project("Queued 98") }),
+    );
+    await tick();
+    expect(h.result.current.state.status).toBe("SAVED");
+  });
+
+  it("reapplies with fresh CAS identity, retains a second conflict and resolves explicitly again", async () => {
+    let revision = 4;
+    const h = await conflict({
+      readHead: async () => ({ revision, document: project("Remote") }),
+    });
+    act(() =>
+      h.result.current.dispatch({
+        type: "resolve-conflict",
+        strategy: "reapply",
+      }),
+    );
+    await tick(100);
+    expect(h.requests).toHaveLength(2);
+    expect(h.requests[1]).toMatchObject({
+      baseRevision: 4,
+      mutations: [rename("Local"), rename("Later")],
+    });
+    expect(h.requests[1].mutationId).not.toBe(h.requests[0].mutationId);
+    await act(async () =>
+      h.responses[1].reject(new h.loaded.state.StudioConflictError(5)),
+    );
+    await tick();
+    expect(h.result.current.state.status).toBe("CONFLICT");
+    expect(h.result.current.state.conflictRevision).toBe(5);
+    expect(h.result.current.state.document).toEqual(project("Later"));
+    expect(h.result.current.state.pending).toEqual(h.requests[1]);
+    revision = 5;
+    act(() =>
+      h.result.current.dispatch({
+        type: "resolve-conflict",
+        strategy: "reapply",
+      }),
+    );
+    await tick(100);
+    expect(h.requests[2]).toMatchObject({
+      baseRevision: 5,
+      mutations: [rename("Local"), rename("Later")],
+    });
+    expect(new Set(h.requests.map((request) => request.mutationId)).size).toBe(
+      3,
+    );
+    await act(async () =>
+      h.responses[2].resolve({ revision: 6, document: project("Later") }),
+    );
+    await tick();
+    expect(h.result.current.state.status).toBe("SAVED");
+    expect(h.result.current.state.pending).toBeNull();
+  });
+
+  it.each(["discard", "reapply"] as const)(
+    "%s interruption before fetch completion keeps original recovery and ignores late responses",
+    async (strategy) => {
+      const remote = deferred<{
+        revision: number;
+        document: ReturnType<typeof project>;
+      }>();
+      const h = await conflict({ readHead: () => remote.promise });
+      const original = structuredClone(h.result.current.state.pending);
+      act(() =>
+        h.result.current.dispatch({ type: "resolve-conflict", strategy }),
+      );
+      await tick();
+      h.unmount();
+      const reloaded = await harness({ storage: h.storage });
+      await act(async () =>
+        remote.resolve({ revision: 4, document: project("Remote") }),
+      );
+      await tick(1000);
+      expect(reloaded.result.current.state.status).toBe("CONFLICT");
+      expect(reloaded.result.current.state.pending).toEqual(original);
+      expect(await h.storage.read(identity)).toMatchObject({
+        pending: original,
+        conflict: true,
+      });
+    },
+  );
+
+  it.each(["discard", "reapply"] as const)(
+    "%s interruption during replacement storage restores only the durable outcome",
+    async (strategy) => {
+      const gate = deferred<void>();
+      const memory = memoryStorage();
+      let block = false,
+        started = false;
+      const storage: RecoveryStorage = {
+        read: memory.storage.read,
+        write: async (record) => {
+          if (block) {
+            started = true;
+            await gate.promise;
+          }
+          await memory.storage.write(record);
+        },
+      };
+      const h = await conflict({
+        storage,
+        readHead: async () => ({ revision: 4, document: project("Remote") }),
+      });
+      block = true;
+      act(() =>
+        h.result.current.dispatch({ type: "resolve-conflict", strategy }),
+      );
+      await tick();
+      expect(started).toBe(true);
+      h.unmount();
+      const reloaded = await harness({ storage });
+      expect(reloaded.result.current.state.ready).toBe(false);
+      block = false;
+      await act(async () => gate.resolve());
+      await tick();
+      expect(reloaded.result.current.state.acknowledged.revision).toBe(4);
+      expect(reloaded.result.current.state.document.scenes[0].name).toBe(
+        strategy === "discard" ? "Remote" : "Later",
+      );
+      if (strategy === "reapply") {
+        expect(reloaded.result.current.state.pending?.mutations).toEqual([
+          rename("Local"),
+          rename("Later"),
+        ]);
+        await tick(100);
+        expect(reloaded.requests[0].baseRevision).toBe(4);
+      } else expect(reloaded.result.current.state.pending).toBeNull();
+    },
+  );
+});
 
 describe("Studio reducer and history", () => {
   it("optimistically applies validated stable-ID edits without mutating the acknowledged document", async () => {
@@ -951,6 +1411,165 @@ describe("Studio autosave and recovery", () => {
 });
 
 describe("Studio browser boundaries", () => {
+  it("resolves conflicts through real browser actions, default HTTP transport and native recovery", async () => {
+    const fixture = await studioBrowser();
+    const { page } = fixture;
+    const requests: ApplyMutationBatchInput[] = [];
+    let revision = 4;
+    let remote = project("Remote");
+    let unsupported = true;
+    const response = () => ({
+      status: "SUPPORTED",
+      project: remote,
+      revision: {
+        revisionNumber: revision,
+        schemaVersion: 2,
+        contentHash: "a".repeat(64),
+        byteSize: 100,
+        retention: "STANDARD",
+        createdAt: "2026-09-09T00:00:00.000Z",
+      },
+    });
+    try {
+      await page.route("**/games/game/engine-project**", async (route) => {
+        if (route.request().method() === "GET") {
+          expect(route.request().url()).toBe(
+            "http://192.0.2.50/games/game/engine-project",
+          );
+          await route.fulfill({
+            json: unsupported
+              ? {
+                  status: "READ_ONLY",
+                  reason: "UNSUPPORTED_FUTURE_SCHEMA",
+                  raw: { schemaVersion: 99 },
+                  schemaVersion: 99,
+                  diagnostics: [],
+                }
+              : response(),
+          });
+          return;
+        }
+        const batch = route.request().postDataJSON() as ApplyMutationBatchInput;
+        requests.push(batch);
+        if (batch.baseRevision !== revision) {
+          await route.fulfill({
+            status: 409,
+            json: {
+              statusCode: 409,
+              code: "PROJECT_REVISION_CONFLICT",
+              currentRevision: revision,
+            },
+          });
+        } else {
+          revision += 1;
+          remote = project("Local");
+          await route.fulfill({ json: response() });
+        }
+      });
+      await page.evaluate(() =>
+        (window as unknown as StudioBrowserWindow).mountStudio(),
+      );
+      await page.waitForFunction(
+        () => (window as unknown as StudioBrowserWindow).studio?.state.ready,
+      );
+      await page.evaluate(
+        (mutation) =>
+          (window as unknown as StudioBrowserWindow).studio.dispatch({
+            type: "commit",
+            mutations: [mutation],
+          }),
+        rename("Local"),
+      );
+      await page
+        .getByRole("button", { name: "Áp dụng lại thay đổi của tôi" })
+        .click();
+      await page.waitForFunction(
+        () =>
+          !!(window as unknown as StudioBrowserWindow).studio.state
+            .resolutionError,
+      );
+      expect(requests).toHaveLength(1);
+      expect(
+        await page.evaluate(
+          () =>
+            (window as unknown as StudioBrowserWindow).studio.state.document
+              .scenes[0].name,
+        ),
+      ).toBe("Local");
+      unsupported = false;
+      await page
+        .getByRole("button", { name: "Áp dụng lại thay đổi của tôi" })
+        .click();
+      await page.waitForFunction(
+        () =>
+          (window as unknown as StudioBrowserWindow).studio.state.status ===
+          "SAVED",
+      );
+      expect(requests).toHaveLength(2);
+      expect(requests[1]).toMatchObject({
+        baseRevision: 4,
+        mutations: [rename("Local")],
+      });
+      expect(requests[1].mutationId).not.toBe(requests[0].mutationId);
+      revision = 6;
+      remote = project("Newest remote");
+      await page.evaluate(
+        (mutation) =>
+          (window as unknown as StudioBrowserWindow).studio.dispatch({
+            type: "commit",
+            mutations: [mutation],
+          }),
+        rename("Discard me"),
+      );
+      const discard = page.getByRole("button", {
+        name: "Bỏ thay đổi và tải bản máy chủ",
+      });
+      await discard.click();
+      const cancel = page.getByRole("button", { name: "Hủy", exact: true });
+      expect(
+        await cancel.evaluate((node) => node === document.activeElement),
+      ).toBe(true);
+      await page.keyboard.press("Escape");
+      expect(
+        await discard.evaluate((node) => node === document.activeElement),
+      ).toBe(true);
+      await discard.click();
+      await page
+        .getByRole("button", { name: "Bỏ thay đổi và tải lại", exact: true })
+        .click();
+      await page.waitForFunction(
+        () =>
+          (window as unknown as StudioBrowserWindow).studio.state.status ===
+          "SAVED",
+      );
+      await page.reload();
+      await page.waitForFunction(
+        () =>
+          typeof (window as unknown as StudioBrowserWindow).mountStudio ===
+          "function",
+      );
+      await page.evaluate(() =>
+        (window as unknown as StudioBrowserWindow).mountStudio(),
+      );
+      await page.waitForFunction(
+        () => (window as unknown as StudioBrowserWindow).studio?.state.ready,
+      );
+      expect(
+        await page.evaluate(() => {
+          const state = (window as unknown as StudioBrowserWindow).studio.state;
+          return {
+            revision: state.acknowledged.revision,
+            name: state.document.scenes[0].name,
+            pending: state.pending,
+          };
+        }),
+      ).toEqual({ revision: 6, name: "Newest remote", pending: null });
+      expect(requests).toHaveLength(3);
+    } finally {
+      await fixture.close();
+    }
+  }, 45_000);
+
   it("hands off queued native IndexedDB writes between default provider sessions", async () => {
     const { page, close } = await studioBrowser();
     try {

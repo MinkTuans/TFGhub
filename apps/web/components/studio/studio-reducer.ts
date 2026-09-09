@@ -6,13 +6,16 @@ import {
 } from "@indieforge/contracts";
 import { prepareStudioCommit, StudioMutationSizeError } from "./studio-history";
 import { restoreRecovery } from "./studio-recovery";
-import type {
-  StudioAcknowledgement,
-  StudioMutation,
-  StudioState,
+import {
+  createStudioState,
+  type StudioConflictResolution,
+  type StudioAcknowledgement,
+  type StudioMutation,
+  type StudioState,
 } from "./studio-state";
 
 export type StudioCommand =
+  | { type: "resolve-conflict"; strategy: StudioConflictResolution }
   | { type: "commit"; mutations: StudioMutation[]; gestureId?: string }
   | { type: "preview"; mutations: StudioMutation[]; gestureId?: string }
   | { type: "commit-preview" | "cancel-preview" | "undo" | "redo" | "retry" };
@@ -21,6 +24,8 @@ export type StudioAction =
   | (Exclude<StudioCommand, { type: "preview" }> & Metadata)
   | Extract<StudioCommand, { type: "preview" }>
   | { type: "restore"; recovery: unknown }
+  | { type: "conflict-resolved"; version: number; resolved: StudioState }
+  | { type: "resolution-failed"; version: number; message: string }
   | { type: "recovery-failed" }
   | { type: "persisted" | "storage-failed"; version: number }
   | { type: "save-started"; version: number }
@@ -122,6 +127,23 @@ export function studioReducer(
   action: StudioAction,
 ): StudioState {
   switch (action.type) {
+    case "resolve-conflict":
+      if (!state.ready || state.status !== "CONFLICT" || state.resolution)
+        return state;
+      return {
+        ...state,
+        resolution: action.strategy,
+        resolutionError: null,
+        preview: null,
+      };
+    case "conflict-resolved":
+      return state.resolution && action.version === state.version
+        ? action.resolved
+        : state;
+    case "resolution-failed":
+      return state.resolution && action.version === state.version
+        ? { ...state, resolution: null, resolutionError: action.message }
+        : state;
     case "restore":
       try {
         return {
@@ -167,7 +189,7 @@ export function studioReducer(
         version: state.version + 1,
       };
     case "preview": {
-      if (!state.ready) return state;
+      if (!state.ready || state.resolution) return state;
       const mutations = structuredClone(
         ApplyMutationBatchInput.shape.mutations.parse(action.mutations),
       );
@@ -192,7 +214,7 @@ export function studioReducer(
           })
         : state;
     case "commit": {
-      if (!state.ready) return state;
+      if (!state.ready || state.resolution) return state;
       const mutations = ApplyMutationBatchInput.shape.mutations.parse(
         action.mutations,
       );
@@ -215,7 +237,7 @@ export function studioReducer(
     }
     case "undo":
     case "redo": {
-      if (!state.ready) return state;
+      if (!state.ready || state.resolution) return state;
       const undo = action.type === "undo";
       const source = undo ? state.history.past : state.history.future;
       const entry = source.at(-1);
@@ -271,4 +293,58 @@ export function studioReducer(
       return queued.length ? enqueue(next, queued, action) : next;
     }
   }
+}
+
+/** Prepare the entire resolution without changing the retained conflict.
+ * Every transportable atomic prefix gets new inverses against the fetched base.
+ * Failure anywhere leaves the caller's document and exact command queue intact.
+ */
+export function prepareConflictResolution(
+  state: StudioState,
+  head: StudioAcknowledgement,
+  strategy: StudioConflictResolution,
+  meta: Metadata,
+): StudioState {
+  let next = createStudioState(state.identity, head, state.history.limit);
+  if (
+    head.revision <
+    Math.max(state.acknowledged.revision, state.conflictRevision ?? 0)
+  )
+    throw new Error("The fetched project revision is stale");
+  const commands = [...(state.pending?.mutations ?? []), ...state.queued];
+  if (strategy === "reapply") {
+    if (meta.mutationId === state.pending?.mutationId)
+      throw new Error("Reapply requires a fresh mutation ID");
+    let remaining = commands;
+    while (remaining.length) {
+      let count = validPrefix(next.document, remaining, 100);
+      let prepared;
+      while (count) {
+        try {
+          prepared = prepareStudioCommit(next, remaining.slice(0, count));
+          break;
+        } catch (error) {
+          if (!(error instanceof StudioMutationSizeError)) throw error;
+          // Compact commands can have large inverses. Keep separate, replayable
+          // history entries when combining them would exceed the request limit.
+          count = validPrefix(next.document, remaining, count - 1);
+        }
+      }
+      if (!prepared)
+        throw new Error("Local commands cannot be applied to this remote head");
+      next = {
+        ...next,
+        document: prepared.document,
+        history: prepared.history,
+      };
+      remaining = remaining.slice(count);
+    }
+    if (commands.length) next = enqueue(next, commands, meta);
+  }
+  return {
+    ...next,
+    timestamp: meta.timestamp,
+    version: state.version + 1,
+    persistedVersion: state.version + 1,
+  };
 }

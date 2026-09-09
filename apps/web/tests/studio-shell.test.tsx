@@ -240,6 +240,95 @@ test.each([
   },
 );
 
+test("conflict discard requires TFG confirmation; cancel preserves work and reapply stays explicit", async () => {
+  const remote = structuredClone(project);
+  remote.scenes[0].name = "Bản máy chủ";
+  let reads = 0;
+  const h = await shell({
+    debounceMs: 0,
+    transport: async () => {
+      throw new StudioConflictError(4);
+    },
+    readHead: async () => {
+      reads += 1;
+      return { revision: 4, document: remote };
+    },
+  });
+  act(() =>
+    h.studio.dispatch({
+      type: "commit",
+      mutations: [{ type: "scene.rename", sceneId: id(2), name: "Bản cục bộ" }],
+    }),
+  );
+  await waitFor(() => expect(h.studio.state.status).toBe("CONFLICT"));
+  const original = structuredClone(h.studio.state.pending);
+  const discard = screen.getByRole("button", {
+    name: "Bỏ thay đổi và tải bản máy chủ",
+  });
+  expect(
+    screen.getByRole("button", { name: "Áp dụng lại thay đổi của tôi" }),
+  ).toBeEnabled();
+  discard.focus();
+  fireEvent.click(discard);
+  const dialog = screen.getByRole("dialog", { name: "Bỏ thay đổi cục bộ?" });
+  expect(within(dialog).getByRole("button", { name: "Hủy" })).toHaveFocus();
+  fireEvent.keyDown(dialog, { key: "Escape" });
+  expect(screen.queryByRole("dialog")).toBeNull();
+  expect(discard).toHaveFocus();
+  expect(reads).toBe(0);
+  expect(h.studio.state.pending).toEqual(original);
+  fireEvent.click(discard);
+  fireEvent.click(
+    within(screen.getByRole("dialog")).getByRole("button", {
+      name: "Bỏ thay đổi và tải lại",
+    }),
+  );
+  await waitFor(() => expect(h.studio.state.status).toBe("SAVED"));
+  expect(reads).toBe(1);
+  expect(h.studio.state.document.scenes[0].name).toBe("Bản máy chủ");
+  expect(h.studio.state.pending).toBeNull();
+  expect(screen.queryByRole("dialog")).toBeNull();
+});
+
+test("conflict resolution feedback keeps both choices actionable after failure and disables authoring during fetch", async () => {
+  let reject!: (error: Error) => void;
+  const h = await shell({
+    debounceMs: 0,
+    transport: async () => {
+      throw new StudioConflictError(4);
+    },
+    readHead: () =>
+      new Promise((_yes, no) => {
+        reject = no;
+      }),
+  });
+  act(() =>
+    h.studio.dispatch({
+      type: "commit",
+      mutations: [{ type: "scene.rename", sceneId: id(2), name: "Giữ lại" }],
+    }),
+  );
+  await waitFor(() => expect(h.studio.state.status).toBe("CONFLICT"));
+  fireEvent.click(
+    screen.getByRole("button", { name: "Áp dụng lại thay đổi của tôi" }),
+  );
+  expect(screen.queryByRole("dialog")).toBeNull();
+  expect(
+    screen.getByRole("button", { name: "Áp dụng lại thay đổi của tôi" }),
+  ).toBeDisabled();
+  expect(
+    screen.getByRole("button", { name: "Bỏ thay đổi và tải bản máy chủ" }),
+  ).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Hoàn tác" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Thêm Scene" })).toBeDisabled();
+  await act(async () => reject(new Error("offline")));
+  expect(screen.getByRole("alert")).toHaveTextContent(/thử lại/i);
+  expect(
+    screen.getByRole("button", { name: "Áp dụng lại thay đổi của tôi" }),
+  ).toBeEnabled();
+  expect(h.studio.state.document.scenes[0].name).toBe("Giữ lại");
+});
+
 test("title submits only trimmed owner metadata, indicates pending, and preserves a failed edit for retry", async () => {
   const h = await shell();
   let resolve!: (response: Response) => void;

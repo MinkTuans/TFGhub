@@ -27,7 +27,7 @@ export function SceneManager({
   const position = scenes.findIndex((scene) => scene.id === sceneId);
   const selectedForDelete = scenes.find((scene) => scene.id === deleting);
   const commit = (mutation: unknown) => {
-    if (!state.ready || state.batchError) return false;
+    if (!state.ready || state.resolution || state.batchError) return false;
     try {
       const mutations = ApplyMutationBatchInput.shape.mutations.parse([
         mutation,
@@ -144,7 +144,7 @@ export function SceneManager({
       </nav>
       <fieldset
         className="studio-editor"
-        disabled={!state.ready || state.batchError}
+        disabled={!state.ready || !!state.resolution || state.batchError}
       >
         <legend>Quản lý Scene</legend>
         <button type="button" disabled={scenes.length >= 100} onClick={create}>
@@ -336,6 +336,7 @@ export function SceneManager({
           }}
           disabled={
             !state.ready ||
+            !!state.resolution ||
             state.batchError ||
             (state.document.entrySceneId === deleting && !replacement)
           }

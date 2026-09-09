@@ -9,6 +9,7 @@ import { ApiError, resolveApiBaseUrl } from "../../lib/api-client";
 import type { StudioHistory } from "./studio-history";
 
 export type StudioMutation = ApplyMutationBatchInput["mutations"][number];
+export type StudioConflictResolution = "discard" | "reapply";
 export type StudioStatus =
   "SAVED" | "DIRTY" | "SAVING" | "UNSYNCED" | "CONFLICT";
 export type StudioIdentity = {
@@ -38,6 +39,9 @@ export interface StudioState {
   attempted: boolean;
   status: StudioStatus;
   conflictRevision: number | null;
+  /** Transient intent: the original conflict remains durable until replacement. */
+  resolution: StudioConflictResolution | null;
+  resolutionError: string | null;
   recoveryError: boolean;
   batchError: boolean;
   commandError: string | null;
@@ -80,6 +84,8 @@ export function createStudioState(
     attempted: false,
     status: "SAVED",
     conflictRevision: null,
+    resolution: null,
+    resolutionError: null,
     recoveryError: false,
     batchError: false,
     commandError: null,
@@ -103,6 +109,34 @@ export type StudioTransport = (
   gameId: string,
   batch: ApplyMutationBatchInput,
 ) => Promise<StudioAcknowledgement>;
+export type StudioHeadReader = (
+  gameId: string,
+) => Promise<StudioAcknowledgement>;
+
+/** Owner-only current head, using the same session and uncached HTTP boundary. */
+export function createStudioHeadReader(
+  fetcher: typeof fetch = (...args) => fetch(...args),
+  baseUrl?: string,
+): StudioHeadReader {
+  return async (gameId) => {
+    const response = await fetcher(
+      `${(baseUrl ?? resolveApiBaseUrl()).replace(/\/$/, "")}/games/${encodeURIComponent(gameId)}/engine-project`,
+      { method: "GET", credentials: "include", cache: "no-store" },
+    );
+    if (!response.ok)
+      throw new ApiError(
+        response.status,
+        `Request failed (${response.status})`,
+      );
+    const result = EngineProjectReadResponse.parse(await response.json());
+    if (result.status !== "SUPPORTED" || !result.revision)
+      throw new Error("Missing supported project head");
+    return {
+      revision: result.revision.revisionNumber,
+      document: EngineProjectV2.parse(result.project),
+    };
+  };
+}
 
 export class StudioConflictError extends ApiError {
   constructor(readonly currentRevision: number | null) {
