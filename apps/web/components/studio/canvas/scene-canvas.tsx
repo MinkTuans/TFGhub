@@ -62,6 +62,7 @@ function CanvasSession({ scene, pixelArt = false, assetMetadata = [] }: Props) {
   const [tool, setTool] = useState<"select" | "pan">("select");
   const { enabled: grid, snap } = scene.settings.grid;
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState("");
   const [dropError, setDropError] = useState("");
   const [controller] = useState(() => new GestureController());
   const canvas = useRef<HTMLCanvasElement>(null);
@@ -432,6 +433,7 @@ function CanvasSession({ scene, pixelArt = false, assetMetadata = [] }: Props) {
       controller.pointerId === null
     ) {
       event.preventDefault();
+      setDeleteError("");
       setDeleting(selected.objectId);
     }
   }
@@ -618,7 +620,11 @@ function CanvasSession({ scene, pixelArt = false, assetMetadata = [] }: Props) {
             className="studio-resize-handle"
             data-studio-undo-surface=""
             aria-label="Đổi kích thước"
-            title="Đổi kích thước (phím mũi tên, Shift: 10 px)"
+            title={
+              snap
+                ? "Đổi kích thước (mũi tên: 1 ô lưới, Shift: 10 ô)"
+                : "Đổi kích thước (phím mũi tên, Shift: 10 px)"
+            }
             onPointerDown={(event) => begin(event, true)}
             onKeyDown={(event) => {
               if (
@@ -639,22 +645,20 @@ function CanvasSession({ scene, pixelArt = false, assetMetadata = [] }: Props) {
                 y: selected.height,
               });
               const step = event.shiftKey ? 10 : 1;
-              const target = transformPoint(selected.matrix, {
+              const delta = {
                 x:
-                  selected.width +
-                  (event.key === "ArrowLeft"
+                  event.key === "ArrowLeft"
                     ? -step
                     : event.key === "ArrowRight"
                       ? step
-                      : 0),
+                      : 0,
                 y:
-                  selected.height +
-                  (event.key === "ArrowUp"
+                  event.key === "ArrowUp"
                     ? -step
                     : event.key === "ArrowDown"
                       ? step
-                      : 0),
-              });
+                      : 0,
+              };
               if (
                 controller.begin(
                   scene,
@@ -665,7 +669,7 @@ function CanvasSession({ scene, pixelArt = false, assetMetadata = [] }: Props) {
                   true,
                 )
               ) {
-                controller.move(target, -1, snap, scene.settings.grid.size);
+                controller.resizeBy(delta, -1, snap, scene.settings.grid.size);
                 const mutation = controller.finish(-1);
                 if (mutation)
                   dispatch({ type: "commit", mutations: [mutation] });
@@ -698,21 +702,33 @@ function CanvasSession({ scene, pixelArt = false, assetMetadata = [] }: Props) {
           onCancel={() => setDeleting(null)}
           onConfirm={() => {
             if (
-              editable &&
-              list.some((item) => item.objectId === deleting && !item.locked)
+              !editable ||
+              !list.some((item) => item.objectId === deleting && !item.locked)
             )
+              return;
+            try {
+              const mutation = deleteObjectCommand(
+                scene,
+                deleteTarget.id,
+                true,
+              );
+              prepareStudioCommit(state, [mutation]);
               dispatch({
                 type: "commit",
-                mutations: [deleteObjectCommand(scene, deleteTarget.id, true)],
+                mutations: [mutation],
               });
-            setDeleting(null);
-            choose(null);
+              setDeleting(null);
+              choose(null);
+            } catch (error) {
+              setDeleteError(studioValidationMessage(error));
+            }
           }}
         >
           <p>
             Đối tượng và các đối tượng con sẽ bị xóa. Bạn có thể hoàn tác thay
             đổi này.
           </p>
+          {deleteError && <p role="alert">{deleteError}</p>}
         </StudioConfirmation>
       )}
     </section>

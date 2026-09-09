@@ -10,6 +10,7 @@ import { useEffect, useState } from "react";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import {
   applyProjectMutations,
+  buildRenderList,
   EngineProjectV2,
   v2ComponentRegistry,
   type EngineProjectV2Type,
@@ -22,6 +23,7 @@ import type { StudioMutation } from "../components/studio/studio-state";
 import { recordingContext } from "./canvas-context";
 import { SceneManager } from "../components/studio/scene-manager";
 import { useStudioSelection } from "../components/studio/studio-selection";
+import { GestureController } from "../components/studio/canvas/gesture-controller";
 
 type Scene = EngineProjectV2Type["scenes"][number];
 const id = (n: number) =>
@@ -594,6 +596,206 @@ test("resize handle supports keyboard arrows with one history entry", async () =
   });
   expect(transform(app.studio)).toMatchObject({ width: 50, height: 30 });
   expect(app.studio.state.history.past).toHaveLength(1);
+});
+
+test.each([
+  [true, 64, 96, "ArrowRight", 96, 96, 384, 96],
+  [true, 64, 96, "ArrowLeft", 32, 96, 1, 96],
+  [true, 64, 96, "ArrowDown", 64, 128, 64, 416],
+  [true, 64, 96, "ArrowUp", 64, 64, 64, 1],
+  [true, 40, 30, "ArrowRight", 64, 30, 352, 30],
+  [true, 40, 30, "ArrowLeft", 32, 30, 1, 30],
+  [true, 40, 30, "ArrowDown", 40, 32, 40, 320],
+  [true, 40, 30, "ArrowUp", 40, 1, 40, 1],
+  [false, 40, 30, "ArrowRight", 41, 30, 50, 30],
+  [false, 40, 30, "ArrowLeft", 39, 30, 30, 30],
+  [false, 40, 30, "ArrowDown", 40, 31, 40, 40],
+  [false, 40, 30, "ArrowUp", 40, 29, 40, 20],
+] as const)(
+  "directional keyboard resize snap=%s from %s×%s with %s preserves the untouched axis, Shift and history",
+  async (
+    snap,
+    width,
+    height,
+    key,
+    nextWidth,
+    nextHeight,
+    shiftWidth,
+    shiftHeight,
+  ) => {
+    const doc = project();
+    doc.scenes[0].settings.grid.snap = snap;
+    Object.assign(doc.scenes[0].objects[0].components[0].properties, {
+      width,
+      height,
+    });
+    const app = await mount(doc);
+    clickCanvas(app.canvas());
+    const handle = screen.getByRole("button", { name: "Đổi kích thước" });
+    handle.focus();
+    const original = transform(app.studio);
+    fireEvent.keyDown(handle, { key });
+    expect(transform(app.studio)).toEqual({
+      ...original,
+      width: nextWidth,
+      height: nextHeight,
+    });
+    expect(app.studio.state.history.past).toHaveLength(1);
+    expect(handle).toHaveFocus();
+    fireEvent.keyDown(handle, { key: "z", ctrlKey: true });
+    expect(transform(app.studio)).toEqual(original);
+    fireEvent.keyDown(handle, { key: "y", ctrlKey: true });
+    expect(transform(app.studio)).toEqual({
+      ...original,
+      width: nextWidth,
+      height: nextHeight,
+    });
+    fireEvent.keyDown(handle, { key: "z", ctrlKey: true });
+    fireEvent.keyDown(handle, { key, shiftKey: true });
+    expect(transform(app.studio)).toEqual({
+      ...original,
+      width: shiftWidth,
+      height: shiftHeight,
+    });
+    expect(app.studio.state.history.past).toHaveLength(1);
+    expect(app.studio.state.history.future).toHaveLength(0);
+    expect(handle).toHaveFocus();
+  },
+);
+
+test.each([1, 0.5])(
+  "directional keyboard resize respects minimum %s without changing the other subpixel dimension",
+  async (width) => {
+    const doc = project();
+    doc.scenes[0].settings.grid.snap = true;
+    Object.assign(doc.scenes[0].objects[0].components[0].properties, {
+      width,
+      height: 0.75,
+    });
+    const app = await mount(doc);
+    pointer(app.canvas(), "down", 40.25, 40.25);
+    pointer(app.canvas(), "up", 40.25, 40.25);
+    const handle = screen.getByRole("button", { name: "Đổi kích thước" });
+    const before = app.studio.state.document;
+    for (const key of ["ArrowLeft", "ArrowUp"])
+      for (const shiftKey of [false, true])
+        fireEvent.keyDown(handle, { key, shiftKey });
+    expect(app.studio.state.document).toBe(before);
+    expect(app.studio.state.history.past).toHaveLength(0);
+    expect(app.batches).toHaveLength(0);
+    fireEvent.keyDown(handle, { key: "ArrowRight" });
+    expect(transform(app.studio)).toMatchObject({ width: 32, height: 0.75 });
+  },
+);
+
+test("directional keyboard resize rejects schema overflow without history or autosave", async () => {
+  const doc = project();
+  doc.scenes[0].settings.grid.snap = true;
+  // A left pivot keeps this very wide, scaled object inside the viewport.
+  Object.assign(doc.scenes[0].objects[0].components[0].properties, {
+    width: 65536,
+    scaleX: 0.001,
+    pivot: { x: 0, y: 0 },
+  });
+  const app = await mount(doc);
+  clickCanvas(app.canvas());
+  const handle = screen.getByRole("button", { name: "Đổi kích thước" });
+  const before = app.studio.state.document;
+  fireEvent.keyDown(handle, { key: "ArrowRight" });
+  fireEvent.keyDown(handle, { key: "ArrowRight", shiftKey: true });
+  expect(app.studio.state.document).toBe(before);
+  expect(app.studio.state.history.past).toHaveLength(0);
+  expect(app.batches).toHaveLength(0);
+});
+
+test.each([NaN, Infinity, -Infinity])(
+  "directional keyboard resize rejects nonfinite local step %s",
+  (step) => {
+    const scene = project().scenes[0];
+    const controller = new GestureController();
+    const list = buildRenderList(scene);
+    expect(
+      controller.begin(scene, list, id(10), { x: 0, y: 0 }, -1, true),
+    ).toBe(true);
+    controller.resizeBy({ x: step, y: 0 }, -1, true, 32);
+    expect(controller.previewList(list)).toBe(list);
+    expect(controller.finish(-1)).toBeNull();
+  },
+);
+
+test("directional keyboard resize preserves a custom pivot under a rotated negative-scale parent", async () => {
+  const parent = object(11, 200, 120);
+  parent.objectType = "GROUP";
+  parent.components.splice(1);
+  Object.assign(parent.components[0].properties, {
+    rotation: 90,
+    scaleX: 2,
+    scaleY: -1,
+    pivot: { x: 0, y: 0 },
+  });
+  const child = object(10, 10, 20);
+  child.parentId = parent.id;
+  Object.assign(child.components[0].properties, {
+    rotation: 90,
+    scaleX: -2,
+    scaleY: 1,
+    pivot: { x: 0.25, y: 0.75 },
+  });
+  const doc = project([child, parent]);
+  doc.scenes[0].settings.grid.snap = true;
+  const app = await mount(doc);
+  clickCanvas(app.canvas(), 222.5, 175);
+  const handle = screen.getByRole("button", { name: "Đổi kích thước" });
+  fireEvent.keyDown(handle, { key: "ArrowRight" });
+  const resized = transform(app.studio);
+  expect(resized).toMatchObject({
+    width: 64,
+    height: 30,
+    rotation: 90,
+    scaleX: -2,
+    scaleY: 1,
+    pivot: { x: 0.25, y: 0.75 },
+  });
+  expect(resized.x).toBeCloseTo(4);
+  expect(resized.y).toBeCloseTo(8);
+  expect(transform(app.studio, parent.id)).toEqual(
+    parent.components[0].properties,
+  );
+  fireEvent.keyDown(handle, { key: "z", ctrlKey: true });
+  expect(app.studio.state.document).toEqual(doc);
+});
+
+test("directional keyboard resize saves exactly one typed mutation per accepted key and no minimum no-op", async () => {
+  const doc = project();
+  doc.scenes[0].settings.grid.snap = true;
+  const app = await mount(doc);
+  clickCanvas(app.canvas());
+  const handle = screen.getByRole("button", { name: "Đổi kích thước" });
+  for (const [index, width] of [64, 96, 128].entries()) {
+    fireEvent.keyDown(handle, { key: "ArrowRight" });
+    await waitFor(() => expect(app.batches).toHaveLength(index + 1));
+    expect(app.batches[index]).toEqual([
+      {
+        type: "component.update",
+        sceneId: id(2),
+        objectId: id(10),
+        componentId: id(110),
+        properties: {
+          ...doc.scenes[0].objects[0].components[0].properties,
+          width,
+        },
+      },
+    ]);
+    expect(app.studio.state.history.past).toHaveLength(index + 1);
+  }
+  fireEvent.keyDown(handle, { key: "ArrowUp" });
+  await waitFor(() => expect(app.batches).toHaveLength(4));
+  const before = app.studio.state.document;
+  fireEvent.keyDown(handle, { key: "ArrowUp" });
+  await frame();
+  expect(app.studio.state.document).toBe(before);
+  expect(app.studio.state.history.past).toHaveLength(4);
+  expect(app.batches).toHaveLength(4);
 });
 
 test.each(["space", "tool"])(

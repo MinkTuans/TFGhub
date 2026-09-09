@@ -197,6 +197,7 @@ async function mount(
     storage?: RecoveryStorage;
     transport?: boolean;
     fixtures?: unknown[];
+    beforeAcknowledgement?: Promise<void>;
   } = {},
 ) {
   let studio!: ReturnType<typeof useStudio>;
@@ -228,6 +229,7 @@ async function mount(
       debounceMs={options.transport ? 20 : 60_000}
       transport={async (_game, batch) => {
         batches.push(structuredClone(batch.mutations));
+        await options.beforeAcknowledgement;
         server = applyProjectMutations(server, batch.mutations);
         return { document: server, revision: batch.baseRevision + 1 };
       }}
@@ -752,6 +754,134 @@ test.each(["Delete", "Backspace"])(
   },
 );
 
+test.each([
+  ["canvas", "root"],
+  ["tree", "root"],
+  ["canvas", "descendant"],
+  ["tree", "descendant"],
+] as const)(
+  "%s confirmed delete rejects a referenced %s without losing Studio state and can cancel, fix and retry",
+  async (surface, reference) => {
+    const doc = project();
+    const target = doc.scenes[0].objects.find((item) => item.id === id(10))!;
+    // Give the subtree root visible geometry so both canvas and tree can pick it.
+    target.components.push({
+      id: id(410),
+      type: "UIPanel",
+      version: 1,
+      properties: v2ComponentRegistry.UIPanel.defaults(),
+    });
+    doc.scenes[0].layers.push({
+      id: id(9),
+      name: "Camera layer",
+      type: "WORLD",
+      order: 2,
+      visible: true,
+      locked: false,
+    });
+    const source = doc.scenes[0].objects.find((item) => item.id === id(12))!;
+    source.layerId = id(9);
+    source.objectType = "GROUP";
+    source.components.splice(1);
+    source.components.push({
+      id: id(400),
+      type: "Camera",
+      version: 1,
+      properties: {
+        followObjectId: reference === "root" ? id(10) : id(11),
+        bounds: null,
+        smoothing: 0,
+      },
+    });
+    const h = await mount(EngineProjectV2.parse(doc), {
+      transport: true,
+      beforeAcknowledgement: new Promise<void>(() => {}),
+    });
+    const nativeConfirm = vi.spyOn(window, "confirm");
+    const nativeAlert = vi.spyOn(window, "alert");
+    // Keep actual pending work and redo history, so rejection cannot silently reset them.
+    for (const name of ["Pending one", "Pending two"])
+      await act(async () =>
+        h.studio.dispatch({
+          type: "commit",
+          mutations: [
+            {
+              type: "object.update",
+              sceneId: id(2),
+              objectId: id(12),
+              changes: { name },
+            },
+          ],
+        }),
+      );
+    await act(async () => h.studio.dispatch({ type: "undo" }));
+    await waitFor(() => expect(h.batches).toHaveLength(1));
+    expect(h.studio.state.pending).not.toBeNull();
+    const openDelete = () => {
+      if (surface === "canvas") {
+        clickCanvas(10, 10);
+        fireEvent.keyDown(document.activeElement!, { key: "Enter" });
+        expect(canvas()).toHaveFocus();
+      } else {
+        select("Group");
+        expect(row("Group")).toHaveFocus();
+      }
+      fireEvent.keyDown(document.activeElement!, { key: "Delete" });
+      return screen.getByRole("dialog", { name: /Xóa “Group”/ });
+    };
+    const before = h.studio.state;
+    let dialog = openDelete();
+    const selectedPreference = { ...sessionStorage };
+    const confirm = within(dialog).getByRole("button", {
+      name: "Xác nhận xóa",
+    });
+    expect(within(dialog).getByRole("button", { name: "Hủy" })).toHaveFocus();
+    confirm.focus();
+    fireEvent.click(confirm);
+    expect(screen.getByRole("dialog")).toBe(dialog);
+    expect(within(dialog).getByRole("alert")).toHaveTextContent(/referenc/i);
+    expect(confirm).toHaveFocus();
+    expect(h.studio.state.document).toBe(before.document);
+    expect(h.studio.state.history).toBe(before.history);
+    expect(h.studio.state.pending).toBe(before.pending);
+    expect(h.studio.state.queued).toBe(before.queued);
+    expect(h.studio.state.version).toBe(before.version);
+    expect(canvas()).toHaveAttribute("data-selected-object-id", id(10));
+    expect({ ...sessionStorage }).toEqual(selectedPreference);
+    expect(h.batches).toHaveLength(1);
+    fireEvent.click(confirm); // A retry still rejects without consuming history.
+    expect(h.studio.state.history).toBe(before.history);
+    fireEvent.keyDown(dialog, { key: "Escape" });
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(surface === "canvas" ? canvas() : row("Group")).toHaveFocus();
+    expect(canvas()).toHaveAttribute("data-selected-object-id", id(10));
+    select("Pending one");
+    const camera = screen.getByRole("group", { name: "Camera" });
+    fireEvent.change(
+      within(camera).getByRole("textbox", { name: "followObjectId" }),
+      { target: { value: "" } },
+    );
+    fireEvent.click(within(camera).getByRole("button", { name: "Lưu Camera" }));
+    const fixed = h.studio.state.document;
+    const historyLength = h.studio.state.history.past.length;
+    dialog = openDelete();
+    expect(within(dialog).queryByRole("alert")).toBeNull();
+    fireEvent.click(
+      within(dialog).getByRole("button", { name: "Xác nhận xóa" }),
+    );
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(
+      h.studio.state.document.scenes[0].objects.map((item) => item.id),
+    ).toEqual([id(12)]);
+    expect(h.studio.state.history.past).toHaveLength(historyLength + 1);
+    expect(canvas()).not.toHaveAttribute("data-selected-object-id");
+    await act(async () => h.studio.dispatch({ type: "undo" }));
+    expect(h.studio.state.document).toEqual(fixed);
+    expect(nativeConfirm).not.toHaveBeenCalled();
+    expect(nativeAlert).not.toHaveBeenCalled();
+  },
+);
+
 test("tree-focused Escape clears selection without changing canonical data", async () => {
   const h = await mount();
   clickCanvas();
@@ -762,6 +892,41 @@ test("tree-focused Escape clears selection without changing canonical data", asy
   expect(canvas()).not.toHaveAttribute("data-selected-object-id");
   expect(h.studio.state.history.past).toHaveLength(0);
 });
+
+test.each(["canvas", "tree"])(
+  "%s confirmed delete uses canonical event reference rejection",
+  async (surface) => {
+    const doc = project();
+    doc.events.push({
+      id: id(500),
+      version: 1,
+      name: "Click child",
+      enabled: true,
+      order: 0,
+      trigger: { type: "ON_CLICK", objectId: id(11) },
+      condition: null,
+      steps: [{ id: id(501), version: 1, type: "COMPLETE_GAME" }],
+    });
+    const h = await mount(EngineProjectV2.parse(doc));
+    clickCanvas();
+    if (surface === "canvas")
+      fireEvent.keyDown(document.activeElement!, { key: "Enter" });
+    const before = h.studio.state;
+    fireEvent.keyDown(document.activeElement!, { key: "Delete" });
+    const dialog = screen.getByRole("dialog");
+    fireEvent.click(
+      within(dialog).getByRole("button", { name: "Xác nhận xóa" }),
+    );
+    expect(within(dialog).getByRole("alert")).toHaveTextContent(/referenc/i);
+    expect(h.studio.state.document).toBe(before.document);
+    expect(h.studio.state.history).toBe(before.history);
+    expect(h.studio.state.pending).toBe(before.pending);
+    expect(h.studio.state.queued).toBe(before.queued);
+    expect(canvas()).toHaveAttribute("data-selected-object-id", id(11));
+    fireEvent.keyDown(dialog, { key: "Escape" });
+    expect(surface === "canvas" ? canvas() : row("Child")).toHaveFocus();
+  },
+);
 
 test("tree-focused held Space pans without moving objects or handing focus back, and blur releases Space", async () => {
   const h = await mount();

@@ -143,28 +143,8 @@ export class GestureController {
         width = Math.round(width / gridSize) * gridSize;
         height = Math.round(height / gridSize) * gridSize;
       }
-      width = Math.max(1, width);
-      height = Math.max(1, height);
-      const px = (width - original.width) * original.pivot.x;
-      const py = (height - original.height) * original.pivot.y;
-      const angle = (original.rotation * Math.PI) / 180;
-      // Changing size moves the normalized pivot. Compensate local position so
-      // the opposite local corner stays fixed without changing scale/rotation.
-      next = {
-        ...original,
-        width,
-        height,
-        x:
-          original.x +
-          Math.cos(angle) * original.scaleX * px -
-          Math.sin(angle) * original.scaleY * py -
-          px,
-        y:
-          original.y +
-          Math.sin(angle) * original.scaleX * px +
-          Math.cos(angle) * original.scaleY * py -
-          py,
-      };
+      this.resizeTo(Math.max(1, width), Math.max(1, height));
+      return;
     } else {
       if (snap) {
         const origin = transformPoint(parent, original);
@@ -177,6 +157,70 @@ export class GestureController {
       if (!local) return;
       next = { ...original, x: original.x + local.x, y: original.y + local.y };
     }
+    if (v2ComponentRegistry.Transform.schema.safeParse(next).success)
+      gesture.next = next;
+  }
+
+  /** Keyboard deltas are local size steps: one pixel without snap, one grid
+   * boundary with snap (ten for Shift). Directional rounding cannot stall or
+   * reverse, and a zero axis bypasses all rounding and minimum clamping.
+   */
+  resizeBy(
+    delta: Point,
+    pointerId: number,
+    snap: boolean,
+    gridSize: number,
+  ): void {
+    const gesture = this.gesture;
+    if (
+      !gesture?.resize ||
+      gesture.pointerId !== pointerId ||
+      !Number.isFinite(delta.x) ||
+      !Number.isFinite(delta.y)
+    )
+      return;
+    const size = (original: number, step: number) => {
+      if (step === 0) return original;
+      const next = snap
+        ? ((step > 0
+            ? Math.floor(original / gridSize)
+            : Math.ceil(original / gridSize)) +
+            step) *
+          gridSize
+        : original + step;
+      // Existing legal subpixel sizes below the editor minimum must not grow
+      // when a negative arrow is pressed.
+      return Math.max(step < 0 ? Math.min(1, original) : 1, next);
+    };
+    this.resizeTo(
+      size(gesture.original.width, delta.x),
+      size(gesture.original.height, delta.y),
+    );
+  }
+
+  private resizeTo(width: number, height: number): void {
+    const gesture = this.gesture!;
+    const { original } = gesture;
+    const px = (width - original.width) * original.pivot.x;
+    const py = (height - original.height) * original.pivot.y;
+    const angle = (original.rotation * Math.PI) / 180;
+    // Changing size moves the normalized pivot. Compensate local position so
+    // the opposite local corner stays fixed without changing scale/rotation.
+    const next = {
+      ...original,
+      width,
+      height,
+      x:
+        original.x +
+        Math.cos(angle) * original.scaleX * px -
+        Math.sin(angle) * original.scaleY * py -
+        px,
+      y:
+        original.y +
+        Math.sin(angle) * original.scaleX * px +
+        Math.cos(angle) * original.scaleY * py -
+        py,
+    };
     if (v2ComponentRegistry.Transform.schema.safeParse(next).success)
       gesture.next = next;
   }

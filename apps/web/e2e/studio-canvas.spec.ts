@@ -13,7 +13,11 @@ test.skip(
 );
 test.use({ deviceScaleFactor: 2 });
 type Scene = EngineProjectV2Type["scenes"][number];
-async function setup(page: Page, mainName = "Editable panel") {
+async function setup(
+  page: Page,
+  mainName = "Editable panel",
+  options: { snap?: boolean; reference?: "root" | "descendant" } = {},
+) {
   const register = await page.request.post("/api/auth/register", {
     data: {
       email: `canvas-${randomUUID()}@example.test`,
@@ -97,6 +101,23 @@ async function setup(page: Page, mainName = "Editable panel") {
   child.parentId = parent.id;
   Object.assign(child.components[0].properties, { width: 20, height: 10 });
   const objects = [child, disabled, hidden, locked, parent, main];
+  if (options.reference) {
+    const camera = panel("Incoming camera", 0, 0);
+    camera.objectType = "GROUP";
+    camera.layerId = scene.layers[0].id;
+    camera.components.splice(1);
+    camera.components.push({
+      id: randomUUID(),
+      type: "Camera",
+      version: 1,
+      properties: {
+        followObjectId: options.reference === "root" ? main.id : child.id,
+        bounds: null,
+        smoothing: 0,
+      },
+    });
+    objects.push(camera);
+  }
   objects.forEach((object, order) => {
     object.order = order;
     object.renderOrder = order;
@@ -117,7 +138,7 @@ async function setup(page: Page, mainName = "Editable panel") {
               height: 240,
               settings: {
                 ...scene.settings,
-                grid: { enabled: false, size: 32, snap: false },
+                grid: { enabled: false, size: 32, snap: options.snap ?? false },
               },
             },
           },
@@ -166,8 +187,161 @@ async function setup(page: Page, mainName = "Editable panel") {
       await page.request.get(`/api/games/${gameId}/engine-project`)
     ).json();
   const baseline = await head();
-  return { canvas, main, locked, child, requests, head, baseline };
+  return { canvas, main, locked, child, parent, requests, head, baseline };
 }
+
+for (const [surface, reference] of [
+  ["canvas", "root"],
+  ["tree", "descendant"],
+] as const) {
+  test(`native ${surface} confirmed delete preserves a referenced ${reference} and allows repair and retry`, async ({
+    page,
+  }) => {
+    const app = await setup(page, "Editable panel", { reference });
+    const errors: string[] = [];
+    const nativeDialogs: string[] = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    page.on("dialog", async (dialog) => {
+      nativeDialogs.push(dialog.type());
+      await dialog.dismiss();
+    });
+    const target = reference === "root" ? app.main : app.parent;
+    const targetRow = page.getByRole("treeitem", {
+      name: target.name,
+      exact: true,
+    });
+    const openDelete = async () => {
+      if (surface === "canvas") {
+        const point = await client(app.canvas, 50, 50);
+        await page.mouse.click(point.x, point.y);
+        await expect(targetRow).toBeFocused();
+        await page.keyboard.press("Enter");
+        await expect(app.canvas).toBeFocused();
+      } else {
+        await targetRow.click();
+        await expect(targetRow).toBeFocused();
+      }
+      await page.keyboard.press("Delete");
+      return page.getByRole("dialog", { name: `Xóa “${target.name}”?` });
+    };
+    let dialog = await openDelete();
+    await expect(dialog.getByRole("button", { name: "Hủy" })).toBeFocused();
+    const confirm = dialog.getByRole("button", { name: "Xác nhận xóa" });
+    await confirm.click();
+    await expect(dialog.getByRole("alert")).toContainText(/referenc/i);
+    await expect(confirm).toBeFocused();
+    await expect(app.canvas).toHaveAttribute(
+      "data-selected-object-id",
+      target.id,
+    );
+    await confirm.click();
+    expect(app.requests).toHaveLength(0);
+    expect(await app.head()).toEqual(app.baseline);
+    await page.keyboard.press("Escape");
+    await expect(dialog).toHaveCount(0);
+    await expect(surface === "canvas" ? app.canvas : targetRow).toBeFocused();
+    await page
+      .getByRole("treeitem", { name: "Incoming camera", exact: true })
+      .click();
+    await page
+      .getByRole("textbox", { name: "followObjectId", exact: true })
+      .fill("");
+    await page.getByRole("button", { name: "Lưu Camera", exact: true }).click();
+    await expect(
+      page.getByRole("status", { name: "Trạng thái dự án" }),
+    ).toHaveText("Đã lưu");
+    const repaired = await app.head();
+    dialog = await openDelete();
+    await expect(dialog.getByRole("alert")).toHaveCount(0);
+    await dialog.getByRole("button", { name: "Xác nhận xóa" }).click();
+    await expect(dialog).toHaveCount(0);
+    await expect(targetRow).toHaveCount(0);
+    await page.getByRole("button", { name: "Hoàn tác", exact: true }).click();
+    await expect(targetRow).toBeVisible();
+    await expect(
+      page.getByRole("status", { name: "Trạng thái dự án" }),
+    ).toHaveText("Đã lưu");
+    expect((await app.head()).project).toEqual(repaired.project);
+    await page.reload();
+    await expect(app.canvas).toBeVisible();
+    expect((await app.head()).project).toEqual(repaired.project);
+    expect(errors).toEqual([]);
+    expect(nativeDialogs).toEqual([]);
+  });
+}
+
+test("native directional keyboard resize with canonical snap persists every accepted key and undo/redo", async ({
+  page,
+}) => {
+  const app = await setup(page, "Editable panel", { snap: true });
+  const point = await client(app.canvas, 50, 50);
+  await page.mouse.click(point.x, point.y);
+  await expect(
+    page.getByRole("treeitem", { name: "Editable panel", exact: true }),
+  ).toBeFocused();
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("Tab");
+  const handle = page.getByRole("button", {
+    name: "Đổi kích thước",
+    exact: true,
+  });
+  await expect(handle).toBeFocused();
+  const initial = app.main.components[0].properties;
+  for (const [key, width, height] of [
+    ["ArrowRight", 64, 30],
+    ["ArrowRight", 96, 30],
+    ["ArrowDown", 96, 32],
+    ["ArrowUp", 96, 1],
+    ["ArrowLeft", 64, 1],
+    ["Control+z", 96, 1],
+    ["Control+y", 64, 1],
+    ["Shift+ArrowLeft", 1, 1],
+  ] as const) {
+    const requests = app.requests.length;
+    await page.keyboard.press(key);
+    await expect(
+      page.getByRole("spinbutton", { name: "width", exact: true }),
+    ).toHaveValue(String(width));
+    await expect(
+      page.getByRole("spinbutton", { name: "height", exact: true }),
+    ).toHaveValue(String(height));
+    await expect(
+      page.getByRole("status", { name: "Trạng thái dự án" }),
+    ).toHaveText("Đã lưu");
+    expect(app.requests).toHaveLength(requests + 1);
+    expect(app.requests.at(-1)?.mutations).toEqual([
+      {
+        type: "component.update",
+        sceneId: app.baseline.project.scenes[0].id,
+        objectId: app.main.id,
+        componentId: app.main.components[0].id,
+        properties: { ...initial, width, height },
+      },
+    ]);
+    await expect(handle).toBeFocused();
+  }
+  const saved = await app.head();
+  const requests = app.requests.length;
+  await page.keyboard.press("ArrowLeft");
+  await page.keyboard.press("Shift+ArrowUp");
+  expect(app.requests).toHaveLength(requests);
+  expect(await app.head()).toEqual(saved);
+  await page.reload();
+  await expect(app.canvas).toHaveAttribute(
+    "data-selected-object-id",
+    app.main.id,
+  );
+  await expect(
+    page.getByRole("button", { name: "Bám lưới", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(
+    page.getByRole("spinbutton", { name: "width", exact: true }),
+  ).toHaveValue("1");
+  await expect(
+    page.getByRole("spinbutton", { name: "height", exact: true }),
+  ).toHaveValue("1");
+  expect((await app.head()).project).toEqual(saved.project);
+});
 async function client(canvas: Locator, x: number, y: number) {
   return canvas.evaluate(
     (element, world) => {
