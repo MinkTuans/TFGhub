@@ -114,6 +114,10 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+/* Presence-based scoping also restores site chrome after client navigation. */
+body:has(.studio-shell) > .site-header,
+body:has(.studio-shell) > footer { display: none; }
+
 a { color: var(--primary); text-underline-offset: 0.25em; }
 a:hover { color: var(--primary-hover); }
 :focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
