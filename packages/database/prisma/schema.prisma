@@ -36,6 +36,7 @@ enum GameSourceType {
   CODE
   STORY
   PLATFORMER
+  ENGINE
 }
 
 enum GameReviewState {

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const GameSourceType = z.enum(['UPLOAD', 'CODE', 'STORY', 'PLATFORMER']);
+export const GameSourceType = z.enum(['UPLOAD', 'CODE', 'STORY', 'PLATFORMER', 'ENGINE']);
 export const GameReviewState = z.enum(['DRAFT', 'PENDING', 'APPROVED', 'REJECTED']);
 const CoverContentType = z.enum(['image/jpeg', 'image/png', 'image/webp']);
 

@@ -50,6 +50,31 @@ describeDatabase('engine lifecycle PostgreSQL constraints', () => {
     ).rejects.toThrow();
   });
 
+  it('preserves the four legacy source types and persists ENGINE without changing the default', async () => {
+    await execute(`
+      INSERT INTO "Game" ("id", "ownerId", "slug", "title", "sourceType", "updatedAt") VALUES
+        ('source-upload', 'user-1', 'source-upload', 'Upload', 'UPLOAD', CURRENT_TIMESTAMP),
+        ('source-code', 'user-1', 'source-code', 'Code', 'CODE', CURRENT_TIMESTAMP),
+        ('source-story', 'user-1', 'source-story', 'Story', 'STORY', CURRENT_TIMESTAMP),
+        ('source-platformer', 'user-1', 'source-platformer', 'Platformer', 'PLATFORMER', CURRENT_TIMESTAMP),
+        ('source-engine', 'user-1', 'source-engine', 'Engine', 'ENGINE', CURRENT_TIMESTAMP),
+        ('source-default', 'user-1', 'source-default', 'Default', DEFAULT, CURRENT_TIMESTAMP)
+    `);
+
+    const rows = await database!.$queryRawUnsafe<Array<{ id: string; sourceType: string }>>(
+      'SELECT "id", "sourceType"::text AS "sourceType" FROM "Game" WHERE "id" LIKE \'source-%\' ORDER BY "id"',
+    );
+
+    expect(rows).toEqual([
+      { id: 'source-code', sourceType: 'CODE' },
+      { id: 'source-default', sourceType: 'UPLOAD' },
+      { id: 'source-engine', sourceType: 'ENGINE' },
+      { id: 'source-platformer', sourceType: 'PLATFORMER' },
+      { id: 'source-story', sourceType: 'STORY' },
+      { id: 'source-upload', sourceType: 'UPLOAD' },
+    ]);
+  });
+
   it('enforces revision identity and exactly one build source', async () => {
     await execute(`
       INSERT INTO "EngineProjectRevision"

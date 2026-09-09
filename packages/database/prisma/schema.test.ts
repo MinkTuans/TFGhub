@@ -13,6 +13,9 @@ const coverMigrationPath = fileURLToPath(
 const engineCoreMigrationPath = fileURLToPath(
   new URL('./migrations/20260909090000_engine_core_phase_1/migration.sql', import.meta.url),
 );
+const engineGameSourceMigrationPath = fileURLToPath(
+  new URL('./migrations/20260909093000_engine_game_source/migration.sql', import.meta.url),
+);
 
 describe('database schema', () => {
   it('is accepted by the Prisma schema validator', () => {
@@ -91,5 +94,18 @@ describe('database schema', () => {
     expect(migration).not.toMatch(
       /CREATE UNIQUE INDEX[^;]*currentPublishedReleaseId|UNIQUE \("currentPublishedReleaseId"\)/,
     );
+  });
+
+  it('adds ENGINE without changing the legacy source type default', () => {
+    const schema = readFileSync(schemaPath, 'utf8');
+    const migration = readFileSync(engineGameSourceMigrationPath, 'utf8');
+
+    expect(schema).toMatch(
+      /enum GameSourceType \{\s+UPLOAD\s+CODE\s+STORY\s+PLATFORMER\s+ENGINE\s+\}/,
+    );
+    expect(schema).toMatch(/sourceType\s+GameSourceType\s+@default\(UPLOAD\)/);
+    expect(migration).toContain('ALTER TYPE "GameSourceType" ADD VALUE \'ENGINE\';');
+    expect(migration).not.toContain('UPDATE "Game"');
+    expect(migration).not.toContain('ALTER COLUMN "sourceType" SET DEFAULT');
   });
 });

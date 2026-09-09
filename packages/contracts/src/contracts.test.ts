@@ -105,14 +105,20 @@ describe('contracts', () => {
     });
   });
 
-  it.each(['UPLOAD', 'CODE', 'STORY', 'PLATFORMER'] as const)(
-    'retains %s as the selected game source type',
+  it.each(['UPLOAD', 'CODE', 'STORY', 'PLATFORMER', 'ENGINE'] as const)(
+    'accepts %s as the selected game source type',
     (sourceType) => {
       expect(
         CreateGameInput.parse({ title: 'Demo', slug: 'demo', sourceType }),
       ).toMatchObject({ sourceType });
     },
   );
+
+  it('keeps UPLOAD as the default source type', () => {
+    expect(CreateGameInput.parse({ title: 'Demo', slug: 'demo' })).toMatchObject({
+      sourceType: 'UPLOAD',
+    });
+  });
 
   it('rejects a story choice whose target scene does not exist', () => {
     expect(

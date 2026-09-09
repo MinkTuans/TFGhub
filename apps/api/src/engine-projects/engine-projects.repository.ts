@@ -1,3 +1,5 @@
+import type { GameSourceType } from '@indieforge/contracts';
+
 export type StoredEngineRevision = {
   id: string;
   projectId: string;
@@ -13,7 +15,7 @@ export type StoredEngineRevision = {
 export type EngineProjectRecord = {
   gameId: string;
   ownerId: string;
-  sourceType: 'UPLOAD' | 'CODE' | 'STORY' | 'PLATFORMER';
+  sourceType: GameSourceType;
   gameUpdatedAt: Date;
   projectData: unknown;
   project: null | {
