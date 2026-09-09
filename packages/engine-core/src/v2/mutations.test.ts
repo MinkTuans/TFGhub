@@ -80,6 +80,57 @@ describe("V2 mutation batches", () => {
     expect(input.scenes[0]!.layers[0]!.name).toBe("World");
   });
 
+  it.each([
+    { label: "empty", commands: [] },
+    { label: "non-empty", commands: [rename("Renamed")] },
+  ])(
+    "detaches nested Custom prefab config for $label batches",
+    ({ commands }) => {
+      const input = project();
+      input.prefabs.push({
+        id: id("0006"),
+        name: "Custom prefab",
+        objectType: "CUSTOM",
+        components: [
+          {
+            id: id("0007"),
+            type: "Transform",
+            version: 1,
+            properties: {
+              x: 0,
+              y: 0,
+              width: 32,
+              height: 32,
+              rotation: 0,
+              scaleX: 1,
+              scaleY: 1,
+            },
+          },
+          {
+            id: id("0008"),
+            type: "Custom",
+            version: 1,
+            properties: {
+              definitionKey: "custom.settings",
+              config: { nested: { value: 1 }, items: [{ value: 1 }] },
+            },
+          },
+        ],
+      });
+      const before = structuredClone(input);
+
+      const result = reducer()(input, commands);
+      const { config } = result.prefabs[0]!.components[1]!.properties as {
+        config: { nested: { value: number }; items: Array<{ value: number }> };
+      };
+      config.nested.value = 2;
+      config.items[0]!.value = 3;
+
+      expect(input).toEqual(before);
+      expect(config).toEqual({ nested: { value: 2 }, items: [{ value: 3 }] });
+    },
+  );
+
   it("rejects missing targets atomically, including a failure after a valid command", () => {
     const apply = reducer();
     const input = project();

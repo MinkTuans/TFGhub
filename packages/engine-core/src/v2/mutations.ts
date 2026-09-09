@@ -26,7 +26,8 @@ export function applyProjectMutations(
   project: EngineProjectV2,
   mutations: ProjectMutation[],
 ): EngineProjectV2 {
-  const next = EngineProjectV2.parse(project);
+  // Zod's unknown Custom config values can retain nested input references.
+  const next = structuredClone(EngineProjectV2.parse(project));
   const commands = z.array(ProjectMutation).parse(mutations);
   for (const command of commands) {
     switch (command.type) {
