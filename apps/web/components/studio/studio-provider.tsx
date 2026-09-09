@@ -47,7 +47,7 @@ const StudioContext = createContext<{
   dispatch: (command: StudioCommand) => void;
 } | null>(null);
 
-function createMutationId(): string {
+export function createStudioId(): string {
   // getRandomValues also works on ordinary HTTP/IP origins. UUID v4 keeps
   // 122 random bits after setting its version and variant.
   const bytes = crypto.getRandomValues(new Uint8Array(16));
@@ -80,7 +80,7 @@ function StudioSession(props: StudioProviderProps) {
       clearTimeout: (timer: ReturnType<typeof setTimeout>) =>
         clearTimeout(timer),
     },
-    newMutationId: props.newMutationId ?? createMutationId,
+    newMutationId: props.newMutationId ?? createStudioId,
     debounceMs: props.debounceMs ?? 500,
   }));
   const { storage, transport, clock, newMutationId, debounceMs } = dependencies;

@@ -4,6 +4,7 @@ export { DeveloperProfileInput } from './developers.js';
 export {
   EngineProjectV2,
   applyProjectMutations,
+  applyProjectMutationsWithHistory,
   type EngineProjectV2Type,
 } from '@indieforge/engine-core';
 export { CreateEngineGameInput } from './studio-projects.js';

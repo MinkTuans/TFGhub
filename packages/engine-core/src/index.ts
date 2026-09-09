@@ -125,4 +125,5 @@ export {
   ProjectMutation,
   ProjectMutationTargetError,
   applyProjectMutations,
+  applyProjectMutationsWithHistory,
 } from "./v2/mutations.js";

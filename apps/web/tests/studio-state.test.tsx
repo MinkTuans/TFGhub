@@ -395,7 +395,9 @@ describe("Studio autosave and recovery", () => {
       const storage: RecoveryStorage = {
         read: memory.storage.read,
         async write(envelope) {
-          const name = envelope.pending?.mutations.at(-1)?.name;
+          const mutation = envelope.pending?.mutations.at(-1);
+          const name =
+            mutation?.type === "scene.rename" ? mutation.name : undefined;
           if (name === "First") {
             await firstGate.promise;
             if (rejectEarlier) throw new Error("first write failed");
@@ -970,7 +972,9 @@ describe("Studio browser boundaries", () => {
         };
         const write = fixture.nativeStorage.write;
         fixture.nativeStorage.write = async (envelope) => {
-          const name = envelope.pending?.mutations.at(-1)?.name;
+          const mutation = envelope.pending?.mutations.at(-1);
+          const name =
+            mutation?.type === "scene.rename" ? mutation.name : undefined;
           if (name === "First") {
             await write(envelope);
             fixture.handoff.firstPersisted = true;
@@ -1070,10 +1074,13 @@ describe("Studio browser boundaries", () => {
             .request()
             .postDataJSON() as ApplyMutationBatchInput;
           requests.push(batch);
+          const last = batch.mutations.at(-1)!;
+          if (last.type !== "scene.rename")
+            throw new Error("Expected rename fixture");
           await route.fulfill({
             json: {
               status: "SUPPORTED",
-              project: project(batch.mutations.at(-1)!.name),
+              project: project(last.name),
               revision: {
                 revisionNumber: batch.baseRevision + 1,
                 schemaVersion: 2,

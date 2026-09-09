@@ -39,6 +39,7 @@ export interface StudioState {
   status: StudioStatus;
   conflictRevision: number | null;
   recoveryError: boolean;
+  batchError: boolean;
   ready: boolean;
   timestamp: number;
   /** Only durable transitions advance this counter; pointer previews do not. */
@@ -79,6 +80,7 @@ export function createStudioState(
     status: "SAVED",
     conflictRevision: null,
     recoveryError: false,
+    batchError: false,
     ready: true,
     timestamp: 0,
     version: 0,

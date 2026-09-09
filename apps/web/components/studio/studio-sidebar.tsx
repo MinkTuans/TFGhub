@@ -1,5 +1,6 @@
 import type { EngineProjectV2Type } from "@indieforge/contracts";
 import { StudioButton } from "./studio-topbar";
+import { SceneManager } from "./scene-manager";
 
 export function StudioSidebar({
   scenes,
@@ -32,25 +33,7 @@ export function StudioSidebar({
           {open ? "‹" : "›"}
         </StudioButton>
       </div>
-      {open && (
-        <nav id="studio-scene-list" aria-label="Danh sách Scene">
-          {[...scenes]
-            .sort((a, b) => a.order - b.order)
-            .map((scene, index) => (
-              <button
-                key={scene.id}
-                type="button"
-                aria-pressed={scene.id === sceneId}
-                onClick={() => onSceneChange(scene.id)}
-              >
-                <span className="studio-scene-number" aria-hidden="true">
-                  {String(index + 1).padStart(2, "0")}
-                </span>
-                <span>{scene.name}</span>
-              </button>
-            ))}
-        </nav>
-      )}
+      {open && <SceneManager sceneId={sceneId} onSceneChange={onSceneChange} />}
     </aside>
   );
 }

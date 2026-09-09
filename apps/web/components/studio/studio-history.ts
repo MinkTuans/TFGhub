@@ -1,4 +1,3 @@
-import type { EngineProjectV2Type } from "@indieforge/contracts";
 import type { StudioMutation } from "./studio-state";
 
 export type HistoryEntry = {
@@ -12,28 +11,14 @@ export type StudioHistory = {
   limit: number;
 };
 
-// Rename is the only authoring command in Task 10. New commands must add their
-// inverse here alongside the engine reducer, rather than falling back to paths.
-export function historyEntry(
-  before: EngineProjectV2Type,
-  after: EngineProjectV2Type,
-  gestureId?: string,
-): HistoryEntry {
-  const undo: StudioMutation[] = [];
-  const redo: StudioMutation[] = [];
-  for (const scene of before.scenes) {
-    const next = after.scenes.find(({ id }) => id === scene.id)!;
-    if (scene.name !== next.name) {
-      undo.push({ type: "scene.rename", sceneId: scene.id, name: scene.name });
-      redo.push({ type: "scene.rename", sceneId: scene.id, name: next.name });
-    }
-  }
-  return { undo, redo, gestureId };
-}
-
 function lastRenames(commands: StudioMutation[]): StudioMutation[] {
+  // Only pure rename gestures can collapse by scene ID. Mixed commands must
+  // retain their complete reverse/forward execution order.
+  if (commands.some((command) => command.type !== "scene.rename"))
+    return commands;
   const last = new Map<string, StudioMutation>();
-  for (const command of commands) last.set(command.sceneId, command);
+  for (const command of commands)
+    if (command.type === "scene.rename") last.set(command.sceneId, command);
   return [...last.values()];
 }
 

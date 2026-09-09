@@ -363,6 +363,55 @@
 .studio-mobile {
   display: none;
 }
+.studio-editor {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  min-width: 0;
+}
+.studio-editor fieldset,
+.studio-editor form {
+  display: grid;
+  gap: 0.625rem;
+  min-width: 0;
+}
+.studio-editor label {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.875rem;
+}
+.studio-editor input:not([type="checkbox"]),
+.studio-editor select {
+  width: 100%;
+  min-width: 0;
+}
+.studio-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.studio-confirmation {
+  position: fixed;
+  width: min(32rem, calc(100vw - 2rem));
+  max-height: calc(100dvh - 2rem);
+  overflow: auto;
+  padding: 1.5rem;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--control-border);
+  border-radius: 0.75rem;
+}
+.studio-confirmation::backdrop {
+  background: #000a;
+}
+.studio-confirmation > * + * {
+  margin-top: 1rem;
+}
+.studio-confirmation select {
+  width: 100%;
+}
 @media (max-width: 63.99rem) {
   .studio-shell .studio-desktop {
     display: none;

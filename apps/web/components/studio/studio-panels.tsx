@@ -1,5 +1,6 @@
 import type { EngineProjectV2Type } from "@indieforge/contracts";
 import { StudioButton } from "./studio-topbar";
+import { LayerList } from "./layer-list";
 
 type Scene = EngineProjectV2Type["scenes"][number];
 
@@ -83,6 +84,7 @@ export function StudioInspector({
               <dd>{scene.objects.length}</dd>
             </div>
           </dl>
+          <LayerList key={scene.id} sceneId={scene.id} />
         </section>
       )}
     </aside>

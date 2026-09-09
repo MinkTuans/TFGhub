@@ -1,8 +1,9 @@
 import {
   ApplyMutationBatchInput,
   applyProjectMutations,
+  applyProjectMutationsWithHistory,
 } from "@indieforge/contracts";
-import { appendHistory, historyEntry } from "./studio-history";
+import { appendHistory } from "./studio-history";
 import { restoreRecovery } from "./studio-recovery";
 import type {
   StudioAcknowledgement,
@@ -35,6 +36,22 @@ export type StudioAction =
       timestamp: number;
     };
 
+function validPrefix(
+  base: StudioAcknowledgement["document"],
+  commands: StudioMutation[],
+  limit: number,
+) {
+  for (let count = Math.min(commands.length, limit); count > 0; count -= 1) {
+    try {
+      applyProjectMutations(base, commands.slice(0, count));
+      return count;
+    } catch {
+      /* A later command may complete an otherwise invalid edit. */
+    }
+  }
+  return 0;
+}
+
 function enqueue(
   state: StudioState,
   commands: StudioMutation[],
@@ -43,19 +60,27 @@ function enqueue(
   let pending = state.pending;
   let queued = [...state.queued, ...commands];
   if (!pending) {
-    pending = ApplyMutationBatchInput.parse({
-      baseRevision: state.acknowledged.revision,
-      mutationId: meta.mutationId,
-      mutations: queued.slice(0, 100),
-    });
-    queued = queued.slice(100);
+    const count = validPrefix(state.acknowledged.document, queued, 100);
+    if (count) {
+      pending = ApplyMutationBatchInput.parse({
+        baseRevision: state.acknowledged.revision,
+        mutationId: meta.mutationId,
+        mutations: queued.slice(0, count),
+      });
+      queued = queued.slice(count);
+    }
   } else if (!state.attempted) {
     const available = 100 - pending.mutations.length;
+    const base = applyProjectMutations(
+      state.acknowledged.document,
+      pending.mutations,
+    );
+    const count = validPrefix(base, queued, available);
     pending = {
       ...pending,
-      mutations: [...pending.mutations, ...queued.slice(0, available)],
+      mutations: [...pending.mutations, ...queued.slice(0, count)],
     };
-    queued = queued.slice(available);
+    queued = queued.slice(count);
   }
   return {
     ...state,
@@ -64,9 +89,13 @@ function enqueue(
     preview: null,
     timestamp: meta.timestamp,
     version: state.version + 1,
-    status: ["CONFLICT", "UNSYNCED", "SAVING"].includes(state.status)
-      ? state.status
-      : "DIRTY",
+    batchError: !pending && queued.length > 0,
+    status:
+      !pending && queued.length > 0
+        ? "UNSYNCED"
+        : ["CONFLICT", "UNSYNCED", "SAVING"].includes(state.status)
+          ? state.status
+          : "DIRTY",
   };
 }
 
@@ -112,6 +141,7 @@ export function studioReducer(
       if (!state.ready)
         return { ...state, recoveryAttempt: state.recoveryAttempt + 1 };
       if (state.status !== "UNSYNCED") return state;
+      if (state.batchError) return state;
       return {
         ...state,
         status: state.pending ? "DIRTY" : "SAVED",
@@ -148,9 +178,13 @@ export function studioReducer(
       const mutations = ApplyMutationBatchInput.shape.mutations.parse(
         action.mutations,
       );
-      const document = applyProjectMutations(state.document, mutations);
-      const entry = historyEntry(state.document, document, action.gestureId);
-      if (!entry.redo.length) return { ...state, preview: null };
+      const { document, undo, redo } = applyProjectMutationsWithHistory(
+        state.document,
+        mutations,
+      );
+      if (JSON.stringify(document) === JSON.stringify(state.document))
+        return { ...state, preview: null };
+      const entry = { undo, redo, gestureId: action.gestureId };
       return {
         ...enqueue(state, mutations, action),
         document,

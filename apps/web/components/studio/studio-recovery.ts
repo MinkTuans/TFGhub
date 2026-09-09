@@ -108,7 +108,7 @@ export function restoreRecovery(
     .array()
     .parse(record.queued);
   if (
-    (!pending && (queued.length || record.conflict)) ||
+    (!pending && record.conflict) ||
     (!record.conflict && record.conflictRevision !== null) ||
     (pending && pending.baseRevision !== recovered.acknowledged.revision)
   )
@@ -117,6 +117,7 @@ export function restoreRecovery(
   // is newer. The server's idempotency record decides whether it already saved.
   if (
     !pending &&
+    !queued.length &&
     initial.acknowledged.revision >= recovered.acknowledged.revision
   )
     return { ...initial, ready: true, recoveryError: false, status: "SAVED" };
@@ -129,7 +130,14 @@ export function restoreRecovery(
       ...(pending?.mutations ?? []),
       ...queued,
     ]),
-    status: record.conflict ? "CONFLICT" : pending ? "DIRTY" : "SAVED",
+    status: record.conflict
+      ? "CONFLICT"
+      : pending
+        ? "DIRTY"
+        : queued.length
+          ? "UNSYNCED"
+          : "SAVED",
+    batchError: !pending && queued.length > 0,
     conflictRevision: record.conflictRevision,
     timestamp: record.timestamp,
   };

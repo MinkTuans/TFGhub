@@ -44,6 +44,100 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
+test("scene and layer edits autosave canonical revisions, survive reload, and undo confirmed deletion", async ({
+  page,
+}) => {
+  const { gameId } = await createProject(page);
+  const status = page.getByRole("status", { name: "Trạng thái dự án" });
+  const read = async () =>
+    (
+      await (
+        await page.request.get(`/api/games/${gameId}/engine-project`)
+      ).json()
+    ).project;
+  const before = await read();
+  await page.getByRole("button", { name: "Thêm Scene", exact: true }).click();
+  await page
+    .getByRole("textbox", { name: "Tên Scene", exact: true })
+    .fill("Island");
+  await page.getByRole("combobox", { name: "Loại Scene" }).selectOption("MAP");
+  await page.getByRole("spinbutton", { name: "Chiều rộng Scene" }).fill("1200");
+  await page.getByRole("spinbutton", { name: "Trọng lực Y" }).fill("250");
+  await page.getByRole("checkbox", { name: "Bật lưới" }).check();
+  await page.getByRole("button", { name: "Lưu Scene", exact: true }).click();
+  await page.getByRole("button", { name: "Đặt làm Scene bắt đầu" }).click();
+  await page.getByRole("button", { name: "Đưa Scene lên" }).click();
+  await page.getByRole("button", { name: "Thêm lớp", exact: true }).click();
+  const layer = page.getByRole("group", { name: "Lớp mới", exact: true });
+  await layer.getByRole("textbox", { name: "Tên lớp" }).fill("HUD");
+  await layer.getByRole("combobox", { name: "Loại lớp" }).selectOption("UI");
+  await layer.getByRole("checkbox", { name: "Hiện lớp" }).uncheck();
+  await layer.getByRole("checkbox", { name: "Khóa lớp" }).check();
+  await layer.getByRole("button", { name: "Lưu lớp" }).click();
+  await page
+    .getByRole("group", { name: "HUD", exact: true })
+    .getByRole("button", { name: "Đưa lớp lên" })
+    .click();
+  await expect(status).toHaveText("Đã lưu");
+  const saved = await read();
+  expect(saved.scenes).toHaveLength(2);
+  const island = saved.scenes.find(
+    (scene: { name: string }) => scene.name === "Island",
+  );
+  expect(island).toMatchObject({
+    type: "MAP",
+    width: 1200,
+    order: 0,
+    settings: { gravityY: 250, grid: { enabled: true } },
+  });
+  expect(saved.entrySceneId).toBe(island.id);
+  expect(
+    island.layers.find((layer: { name: string }) => layer.name === "HUD"),
+  ).toMatchObject({ type: "UI", visible: false, locked: true, order: 0 });
+  await page.reload();
+  await expect(status).toHaveText("Đã lưu");
+  expect(await read()).toEqual(saved);
+  await expect(
+    page.getByRole("textbox", { name: "Tên Scene", exact: true }),
+  ).toHaveValue("Island");
+  await page
+    .getByRole("button", { name: "Nhân bản Scene", exact: true })
+    .click();
+  await expect(status).toHaveText("Đã lưu");
+  const duplicated = await read();
+  expect(duplicated.scenes).toHaveLength(3);
+  expect(duplicated.scenes[2].layers[0].id).not.toBe(island.layers[0].id);
+  await page.getByRole("button", { name: "Hoàn tác", exact: true }).click();
+  await expect(status).toHaveText("Đã lưu");
+  expect(await read()).toEqual(saved);
+  await page.getByRole("button", { name: "Làm lại", exact: true }).click();
+  await expect(status).toHaveText("Đã lưu");
+  expect(await read()).toEqual(duplicated);
+  await page
+    .getByRole("combobox", { name: "Scene hiện tại" })
+    .selectOption(island.id);
+  await page.getByRole("button", { name: "Xóa Scene", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Xóa Scene", exact: true });
+  await expect(dialog.getByRole("button", { name: "Hủy" })).toBeFocused();
+  await expect(
+    dialog.getByRole("button", { name: "Xác nhận xóa" }),
+  ).toBeDisabled();
+  await dialog
+    .getByRole("combobox", { name: "Scene bắt đầu thay thế" })
+    .selectOption(before.entrySceneId);
+  await dialog.getByRole("button", { name: "Xác nhận xóa" }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(status).toHaveText("Đã lưu");
+  expect((await read()).scenes).toHaveLength(2);
+  await page.getByRole("button", { name: "Hoàn tác", exact: true }).click();
+  await expect(status).toHaveText("Đã lưu");
+  expect(await read()).toEqual(duplicated);
+  await page.reload();
+  await expect(status).toHaveText("Đã lưu");
+  expect(await read()).toEqual(duplicated);
+  await expectNoOverflow(page);
+});
+
 test("desktop opens a full-width dark shell, reads the saved Scene, collapses panels and saves the title", async ({
   page,
 }, testInfo) => {
@@ -63,7 +157,6 @@ test("desktop opens a full-width dark shell, reads the saved Scene, collapses pa
     }),
   ).toHaveCount(0);
 
-  // Task 10 currently supports rename; Scene creation belongs to Task 13.
   // Read a saved rename through the real API and confirm local navigation
   // does not advance the revision. Two-Scene selection is covered in unit tests.
   const read = await (
