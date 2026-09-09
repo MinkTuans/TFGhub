@@ -1,0 +1,177 @@
+import {
+  ApplyMutationBatchInput,
+  applyProjectMutations,
+} from "@indieforge/contracts";
+import {
+  createStudioState,
+  type StudioAcknowledgement,
+  type StudioIdentity,
+  type StudioMutation,
+  type StudioState,
+} from "./studio-state";
+
+export interface RecoveryEnvelope extends StudioIdentity {
+  version: 1;
+  acknowledged: StudioAcknowledgement;
+  pending: ApplyMutationBatchInput | null;
+  queued: StudioMutation[];
+  conflict: boolean;
+  conflictRevision: number | null;
+  timestamp: number;
+}
+export interface RecoveryStorage {
+  read(identity: StudioIdentity): Promise<unknown>;
+  write(envelope: RecoveryEnvelope): Promise<void>;
+}
+
+export function recoveryEnvelope(state: StudioState): RecoveryEnvelope {
+  return structuredClone({
+    version: 1,
+    ...state.identity,
+    acknowledged: state.acknowledged,
+    pending: state.pending,
+    queued: state.queued,
+    conflict: state.status === "CONFLICT",
+    conflictRevision:
+      state.status === "CONFLICT" ? state.conflictRevision : null,
+    timestamp: state.timestamp,
+  });
+}
+
+/** Invalid/foreign records are preserved in storage and block edits, never erased. */
+export function restoreRecovery(
+  initial: StudioState,
+  raw: unknown,
+): StudioState {
+  if (raw === null)
+    return { ...initial, ready: true, recoveryError: false, status: "SAVED" };
+  if (!raw || typeof raw !== "object")
+    throw new Error("Invalid recovery envelope");
+  const record = raw as RecoveryEnvelope;
+  if (
+    record.version !== 1 ||
+    record.userId !== initial.identity.userId ||
+    record.projectId !== initial.identity.projectId ||
+    record.gameId !== initial.identity.gameId ||
+    typeof record.conflict !== "boolean" ||
+    !Number.isFinite(record.timestamp) ||
+    record.timestamp < 0 ||
+    (record.conflictRevision !== null &&
+      (!Number.isInteger(record.conflictRevision) ||
+        record.conflictRevision < 0))
+  )
+    throw new Error("Invalid recovery envelope identity or version");
+  const recovered = createStudioState(
+    initial.identity,
+    record.acknowledged,
+    initial.history.limit,
+  );
+  const pending =
+    record.pending === null
+      ? null
+      : ApplyMutationBatchInput.parse(record.pending);
+  const queued = ApplyMutationBatchInput.shape.mutations.element
+    .array()
+    .parse(record.queued);
+  if (
+    (!pending && (queued.length || record.conflict)) ||
+    (!record.conflict && record.conflictRevision !== null) ||
+    (pending && pending.baseRevision !== recovered.acknowledged.revision)
+  )
+    throw new Error("Invalid recovery batch base");
+  // A lost response must replay against its original base even if the fresh GET
+  // is newer. The server's idempotency record decides whether it already saved.
+  if (
+    !pending &&
+    initial.acknowledged.revision >= recovered.acknowledged.revision
+  )
+    return { ...initial, ready: true, recoveryError: false, status: "SAVED" };
+  return {
+    ...recovered,
+    pending,
+    queued,
+    attempted: pending !== null,
+    document: applyProjectMutations(recovered.document, [
+      ...(pending?.mutations ?? []),
+      ...queued,
+    ]),
+    status: record.conflict ? "CONFLICT" : pending ? "DIRTY" : "SAVED",
+    conflictRevision: record.conflictRevision,
+    timestamp: record.timestamp,
+  };
+}
+
+/** Opens lazily, so importing or server-rendering the provider needs no browser APIs. */
+export function createIndexedDbRecoveryStorage(
+  options: {
+    factory?: IDBFactory;
+    databaseName?: string;
+  } = {},
+): RecoveryStorage {
+  const databaseName = options.databaseName ?? "tfg-studio-recovery";
+  const storeName = "projects";
+  function transaction<T>(
+    identity: StudioIdentity,
+    envelope?: RecoveryEnvelope,
+  ): Promise<T> {
+    return new Promise((resolve, reject) => {
+      const factory = options.factory ?? globalThis.indexedDB;
+      if (!factory) {
+        reject(new Error("IndexedDB is unavailable"));
+        return;
+      }
+      const opening = factory.open(databaseName, 1);
+      let abandoned = false;
+      opening.onupgradeneeded = () => {
+        if (!opening.result.objectStoreNames.contains(storeName))
+          opening.result.createObjectStore(storeName);
+      };
+      opening.onerror = () =>
+        reject(opening.error ?? new Error("Recovery database failed to open"));
+      opening.onblocked = () => {
+        abandoned = true;
+        reject(new Error("Recovery database is blocked"));
+      };
+      opening.onsuccess = () => {
+        const database = opening.result;
+        if (abandoned) {
+          database.close();
+          return;
+        }
+        database.onversionchange = () => database.close();
+        try {
+          const tx = database.transaction(
+            storeName,
+            envelope ? "readwrite" : "readonly",
+          );
+          const store = tx.objectStore(storeName);
+          const key = JSON.stringify([identity.userId, identity.projectId]);
+          const request = envelope ? store.put(envelope, key) : store.get(key);
+          tx.oncomplete = () => {
+            database.close();
+            resolve((envelope ? undefined : (request.result ?? null)) as T);
+          };
+          tx.onabort = () => {
+            database.close();
+            reject(tx.error ?? new Error("Recovery transaction aborted"));
+          };
+          tx.onerror = () => {
+            database.close();
+            reject(
+              tx.error ??
+                request.error ??
+                new Error("Recovery transaction failed"),
+            );
+          };
+        } catch (error) {
+          database.close();
+          reject(error);
+        }
+      };
+    });
+  }
+  return {
+    read: (identity) => transaction<unknown>(identity),
+    write: (envelope) => transaction<void>(envelope, envelope),
+  };
+}

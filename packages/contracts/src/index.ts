@@ -1,5 +1,11 @@
 export { LoginInput, RegisterInput } from './auth.js';
 export { DeveloperProfileInput } from './developers.js';
+// Studio uses the same canonical validation and mutation reducer as the API.
+export {
+  EngineProjectV2,
+  applyProjectMutations,
+  type EngineProjectV2Type,
+} from '@indieforge/engine-core';
 export { CreateEngineGameInput } from './studio-projects.js';
 export type { CreateEngineGameResponse } from './studio-projects.js';
 export {
