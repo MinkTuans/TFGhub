@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { describe, expect, it } from 'vitest';
+import { Prisma } from '../generated/client/index.js';
 
 const require = createRequire(import.meta.url);
 const prismaCliPath = require.resolve('prisma/build/index.js');
@@ -18,6 +19,21 @@ const engineGameSourceMigrationPath = fileURLToPath(
 );
 
 describe('database schema', () => {
+  it('exposes project-scoped mutation identities and their exact revision relation in the generated client', () => {
+    const model = Prisma.dmmf.datamodel.models.find(
+      ({ name }) => name === 'EngineProjectMutation',
+    );
+    expect(model).toBeDefined();
+    expect(model!.primaryKey?.fields).toEqual(['projectId', 'mutationId']);
+    expect(
+      model!.fields.find(({ name }) => name === 'resultRevision'),
+    ).toMatchObject({
+      type: 'EngineProjectRevision',
+      relationFromFields: ['projectId', 'resultRevisionNumber'],
+      relationToFields: ['projectId', 'revisionNumber'],
+      relationOnDelete: 'NoAction',
+    });
+  });
   it('is accepted by the Prisma schema validator', () => {
     expect(() => {
       execFileSync(process.execPath, [prismaCliPath, 'validate', '--schema', schemaPath], {

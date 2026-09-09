@@ -120,3 +120,9 @@ export {
   type PrefabV2 as PrefabV2Type,
 } from "./v2/project-schema.js";
 export { upgradeEngineProjectV1 } from "./v2/upgrade-v1.js";
+export {
+  SceneMutation,
+  ProjectMutation,
+  ProjectMutationTargetError,
+  applyProjectMutations,
+} from "./v2/mutations.js";

@@ -163,6 +163,9 @@ importers:
 
   packages/contracts:
     dependencies:
+      '@indieforge/engine-core':
+        specifier: workspace:^
+        version: link:../engine-core
       zod:
         specifier: ^3.24.1
         version: 3.25.76

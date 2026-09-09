@@ -25,6 +25,45 @@ function gameProjectInput() {
 }
 
 describe('contracts', () => {
+  it('validates bounded stable-ID mutation batches and rejects unknown commands or fields', () => {
+    const input = requiredContract('ApplyMutationBatchInput');
+    const batch = {
+      baseRevision: 0,
+      mutationId: '550e8400-e29b-41d4-a716-446655440001',
+      mutations: [
+        {
+          type: 'scene.rename',
+          sceneId: '550e8400-e29b-41d4-a716-446655440002',
+          name: '  Opening  ',
+        },
+      ],
+    };
+    expect(input.parse(batch)).toEqual({
+      ...batch,
+      mutations: [{ ...batch.mutations[0], name: 'Opening' }],
+    });
+    for (const invalid of [
+      { ...batch, baseRevision: -1 },
+      { ...batch, baseRevision: 0.5 },
+      { ...batch, baseRevision: 2_147_483_647 },
+      { ...batch, mutationId: '' },
+      { ...batch, mutationId: ' '.repeat(4) },
+      { ...batch, mutationId: 'x'.repeat(129) },
+      { ...batch, mutations: [] },
+      { ...batch, mutations: Array(101).fill(batch.mutations[0]) },
+      { ...batch, project: {} },
+      { ...batch, mutations: [{ ...batch.mutations[0], sceneId: 'index:0' }] },
+      { ...batch, mutations: [{ ...batch.mutations[0], name: ' ' }] },
+      {
+        ...batch,
+        mutations: [{ ...batch.mutations[0], name: 'x'.repeat(81) }],
+      },
+      { ...batch, mutations: [{ ...batch.mutations[0], objectId: 'ignored' }] },
+      { ...batch, mutations: [{ type: 'object.create', object: {} }] },
+    ])
+      expect(input.safeParse(invalid).success).toBe(false);
+  });
+
   it('defaults and trims unified draft titles while rejecting invalid titles', () => {
     const input = requiredContract('CreateEngineGameInput');
     expect(input.parse({})).toEqual({ title: 'Game chưa có tên' });

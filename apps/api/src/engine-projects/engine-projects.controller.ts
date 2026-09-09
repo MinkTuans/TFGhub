@@ -8,7 +8,10 @@ import {
   Put,
   UseGuards,
 } from '@nestjs/common';
-import { SaveEngineProjectInput } from '@indieforge/contracts';
+import {
+  ApplyMutationBatchInput,
+  SaveEngineProjectInput,
+} from '@indieforge/contracts';
 import type { AuthenticatedUser } from '../auth/auth.service.js';
 import { CurrentUser } from '../auth/current-user.decorator.js';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard.js';
@@ -42,5 +45,16 @@ export class EngineProjectsController {
     if (!input.success)
       throw new BadRequestException('Invalid engine project input');
     return this.projects.save(gameId, user.id, input.data);
+  }
+
+  @Post('mutations')
+  applyMutationBatch(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') gameId: string,
+    @Body() body: unknown,
+  ) {
+    const input = ApplyMutationBatchInput.safeParse(body);
+    if (!input.success) throw new BadRequestException('Invalid mutation batch');
+    return this.projects.applyMutationBatch(gameId, user.id, input.data);
   }
 }

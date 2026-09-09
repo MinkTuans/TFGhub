@@ -6,6 +6,7 @@ import {
   Injectable,
 } from '@nestjs/common';
 import {
+  ApplyMutationBatchInput,
   EngineProjectReadResponse,
   type EngineProjectReadResponse as EngineProjectReadResponseType,
   EngineProjectRevisionSummary,
@@ -14,6 +15,8 @@ import {
 import {
   adaptLegacyProject,
   EngineProjectV1,
+  EngineProjectV2,
+  applyProjectMutations,
   readEngineProject,
 } from '@indieforge/engine-core';
 import { createHash } from 'node:crypto';
@@ -21,6 +24,7 @@ import { canonicalize } from './canonicalize.js';
 import {
   EngineProjectsRepository,
   EngineProjectWriteForbiddenError,
+  EngineProjectAssetReferenceError,
   type EngineProjectRecord,
   type StoredEngineRevision,
 } from './engine-projects.repository.js';
@@ -38,8 +42,8 @@ function summary(revision: StoredEngineRevision): EngineProjectRevisionSummary {
   };
 }
 
-function snapshot(project: EngineProjectV1) {
-  const document = canonicalize(project) as EngineProjectV1;
+function snapshot(project: EngineProjectV1 | EngineProjectV2) {
+  const document = canonicalize(project) as EngineProjectV1 | EngineProjectV2;
   const serialized = JSON.stringify(document);
   return {
     schemaVersion: project.schemaVersion,
@@ -248,5 +252,72 @@ export class EngineProjectsService {
       // Saving succeeded in an earlier transaction; cleanup remains best effort.
     }
     return summary(result.revision);
+  }
+
+  async applyMutationBatch(
+    gameId: string,
+    userId: string,
+    input: ApplyMutationBatchInput,
+  ): Promise<EngineProjectReadResponseType> {
+    const record = await this.owned(gameId, userId);
+    if (!record.project)
+      throw new ConflictException('Materialize the project before saving');
+    const parsed = ApplyMutationBatchInput.safeParse(input);
+    if (!parsed.success)
+      throw new BadRequestException('Invalid mutation batch');
+    let result: Awaited<
+      ReturnType<EngineProjectsRepository['applyMutationBatch']>
+    >;
+    try {
+      result = await this.projects.applyMutationBatch(
+        {
+          gameId,
+          projectId: record.project.id,
+          authorId: userId,
+          baseRevision: parsed.data.baseRevision,
+          mutationId: parsed.data.mutationId,
+        },
+        (revision) => {
+          let document: EngineProjectV2;
+          try {
+            document = applyProjectMutations(
+              EngineProjectV2.parse(revision.document),
+              parsed.data.mutations,
+            );
+          } catch {
+            throw new BadRequestException('Invalid V2 project mutation');
+          }
+          if (document.projectId !== record.project!.id)
+            throw new BadRequestException('Project identity cannot be changed');
+          return snapshot(document);
+        },
+      );
+    } catch (error) {
+      if (error instanceof EngineProjectWriteForbiddenError)
+        throw new ForbiddenException('You do not own this game');
+      if (error instanceof EngineProjectAssetReferenceError)
+        throw new BadRequestException(error.message);
+      throw error;
+    }
+    if (result.status === 'CONFLICT') {
+      throw new ConflictException({
+        statusCode: 409,
+        code: 'PROJECT_REVISION_CONFLICT',
+        currentRevision: result.currentRevision,
+      });
+    }
+    try {
+      await this.projects.compactStandardRevisions(
+        record.project.id,
+        STANDARD_REVISION_LIMIT,
+      );
+    } catch {
+      // The authoritative result has committed; cleanup remains best effort.
+    }
+    return EngineProjectReadResponse.parse({
+      status: 'SUPPORTED',
+      project: result.revision.document,
+      revision: summary(result.revision),
+    });
   }
 }

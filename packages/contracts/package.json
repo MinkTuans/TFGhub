@@ -8,11 +8,12 @@
     "default": "./dist/index.js"
   },
   "scripts": {
-    "build": "tsc --module NodeNext --moduleResolution NodeNext --target ES2023 --strict --declaration --outDir dist src/index.ts",
-    "test": "vitest run",
+    "build": "pnpm --filter @indieforge/engine-core build && tsc --module NodeNext --moduleResolution NodeNext --target ES2023 --strict --declaration --outDir dist src/index.ts",
+    "test": "pnpm --filter @indieforge/engine-core build && vitest run",
     "typecheck": "tsc --noEmit --module ESNext --moduleResolution bundler --target ES2023 --strict src/*.ts"
   },
   "dependencies": {
+    "@indieforge/engine-core": "workspace:^",
     "zod": "^3.24.1"
   },
   "devDependencies": {

@@ -1,4 +1,16 @@
 import { z } from 'zod';
+import { ProjectMutation } from '@indieforge/engine-core';
+
+export const ApplyMutationBatchInput = z
+  .object({
+    // Leave room for the next PostgreSQL Int revision number.
+    baseRevision: z.number().int().nonnegative().max(2_147_483_646),
+    mutationId: z.string().min(1).max(128).regex(/^\S+$/),
+    mutations: z.array(ProjectMutation).min(1).max(100),
+  })
+  .strict();
+
+export type ApplyMutationBatchInput = z.infer<typeof ApplyMutationBatchInput>;
 
 const RequiredUnknown = z.unknown().refine((value) => value !== undefined, {
   message: 'A project document is required',

@@ -1,6 +1,10 @@
 import { ConflictException, ForbiddenException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
 import {
+  EngineProjectV1,
+  upgradeEngineProjectV1,
+} from '@indieforge/engine-core';
+import {
   EngineProjectsRepository,
   type EngineProjectRecord,
 } from './engine-projects.repository.js';
@@ -72,6 +76,90 @@ function setup(
 }
 
 describe('EngineProjectsService', () => {
+  it('returns the stored mutation result instead of the later project head, even if compaction fails', async () => {
+    const document = upgradeEngineProjectV1(
+      EngineProjectV1.parse(canonicalProject),
+    );
+    const authoritative = { ...revision(document), schemaVersion: 2 };
+    const { service, repository } = setup({
+      gameId: 'game-1',
+      ownerId: 'owner-1',
+      sourceType: 'ENGINE',
+      projectData: null,
+      project: {
+        id: ids.project,
+        headRevisionNumber: 5,
+        headRevision: { ...authoritative, revisionNumber: 5 },
+      },
+    });
+    Object.assign(repository, {
+      applyMutationBatch: async () => ({
+        status: 'SAVED',
+        revision: authoritative,
+      }),
+    });
+    vi.mocked(repository.compactStandardRevisions).mockRejectedValue(
+      new Error('cleanup failed'),
+    );
+    expect(service.applyMutationBatch).toBeTypeOf('function');
+    await expect(
+      service.applyMutationBatch('game-1', 'owner-1', {
+        mutationId: 'replay',
+        baseRevision: 0,
+        mutations: [
+          { type: 'scene.rename', sceneId: ids.scene, name: 'Ignored replay' },
+        ],
+      }),
+    ).resolves.toEqual({
+      status: 'SUPPORTED',
+      project: document,
+      revision: {
+        revisionNumber: 1,
+        schemaVersion: 2,
+        contentHash: 'a'.repeat(64),
+        byteSize: 100,
+        retention: 'STANDARD',
+        createdAt: '2026-09-09T00:00:00.000Z',
+      },
+    });
+  });
+
+  it('maps a stale mutation batch to the existing machine-readable conflict shape', async () => {
+    const { service, repository } = setup({
+      gameId: 'game-1',
+      ownerId: 'owner-1',
+      sourceType: 'ENGINE',
+      projectData: null,
+      project: {
+        id: ids.project,
+        headRevisionNumber: 1,
+        headRevision: revision(),
+      },
+    });
+    Object.assign(repository, {
+      applyMutationBatch: async () => ({
+        status: 'CONFLICT',
+        currentRevision: 7,
+      }),
+    });
+    expect(service.applyMutationBatch).toBeTypeOf('function');
+    await expect(
+      service.applyMutationBatch('game-1', 'owner-1', {
+        mutationId: 'stale',
+        baseRevision: 0,
+        mutations: [
+          { type: 'scene.rename', sceneId: ids.scene, name: 'Changed' },
+        ],
+      }),
+    ).rejects.toMatchObject({
+      response: {
+        statusCode: 409,
+        code: 'PROJECT_REVISION_CONFLICT',
+        currentRevision: 7,
+      },
+    });
+  });
+
   it('rejects a non-owner before reading project data', async () => {
     const { service } = setup({
       gameId: 'game-1',

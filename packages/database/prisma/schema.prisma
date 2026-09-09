@@ -140,6 +140,7 @@ model EngineProject {
   game               Game                    @relation(fields: [gameId], references: [id], onDelete: Cascade)
   revisions          EngineProjectRevision[]
   assets             GameAsset[]
+  mutations          EngineProjectMutation[]
 }
 
 model EngineProjectRevision {
@@ -157,8 +158,22 @@ model EngineProjectRevision {
   author         User                  @relation("RevisionAuthor", fields: [authorId], references: [id], onDelete: Restrict)
   assets         EngineRevisionAsset[]
   builds         GameBuild[]
+  mutations      EngineProjectMutation[]
 
   @@unique([projectId, revisionNumber])
+}
+
+model EngineProjectMutation {
+  projectId            String
+  mutationId           String                @db.VarChar(128)
+  baseRevisionNumber   Int
+  resultRevisionNumber Int
+  createdAt            DateTime              @default(now())
+  project              EngineProject         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  resultRevision       EngineProjectRevision @relation(fields: [projectId, resultRevisionNumber], references: [projectId, revisionNumber], onDelete: NoAction, onUpdate: Restrict, map: "EngineProjectMutation_resultRevision_fkey")
+
+  @@id([projectId, mutationId])
+  @@index([projectId, resultRevisionNumber])
 }
 
 model GameAsset {

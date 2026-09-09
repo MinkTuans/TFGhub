@@ -3,6 +3,7 @@ export { DeveloperProfileInput } from './developers.js';
 export { CreateEngineGameInput } from './studio-projects.js';
 export type { CreateEngineGameResponse } from './studio-projects.js';
 export {
+  ApplyMutationBatchInput,
   EngineProjectReadResponse,
   EngineProjectRevisionSummary,
   ProjectRevisionConflictResponse,

@@ -44,6 +44,21 @@ export type MaterializeWrite = Omit<RevisionWrite, 'baseRevision'> & {
   expectedGameUpdatedAt: Date;
 };
 
+export type MutationBatchWrite = Pick<
+  RevisionWrite,
+  'gameId' | 'projectId' | 'authorId' | 'baseRevision'
+> & {
+  mutationId: string;
+};
+
+export type RevisionSnapshot = Pick<
+  RevisionWrite,
+  'schemaVersion' | 'document' | 'contentHash' | 'byteSize' | 'assetIds'
+>;
+type RevisionWriteResult =
+  | { status: 'SAVED'; revision: StoredEngineRevision }
+  | { status: 'CONFLICT'; currentRevision: number };
+
 export abstract class EngineProjectsRepository {
   abstract findGameProject(gameId: string): Promise<EngineProjectRecord | null>;
   abstract materialize(input: MaterializeWrite): Promise<StoredEngineRevision>;
@@ -53,6 +68,10 @@ export abstract class EngineProjectsRepository {
     | { status: 'SAVED'; revision: StoredEngineRevision }
     | { status: 'CONFLICT'; currentRevision: number }
   >;
+  abstract applyMutationBatch(
+    input: MutationBatchWrite,
+    mutate: (base: StoredEngineRevision) => RevisionSnapshot,
+  ): Promise<RevisionWriteResult>;
   abstract compactStandardRevisions(
     projectId: string,
     keep: number,
@@ -60,6 +79,7 @@ export abstract class EngineProjectsRepository {
 }
 
 export class EngineProjectWriteForbiddenError extends Error {}
+export class EngineProjectAssetReferenceError extends Error {}
 
 type DatabaseClient = typeof database;
 
@@ -91,7 +111,9 @@ async function assetReferences(
     select: { id: true, contentHash: true },
   });
   if (assets.length !== assetIds.length) {
-    throw new Error('Project contains unavailable or foreign asset references');
+    throw new EngineProjectAssetReferenceError(
+      'Project contains unavailable or foreign asset references',
+    );
   }
   const hashes = new Map(assets.map((asset) => [asset.id, asset.contentHash]));
   return assetIds.map((assetId) => ({
@@ -286,10 +308,101 @@ export class PrismaEngineProjectsRepository extends EngineProjectsRepository {
              SELECT 1 FROM "GameBuild" build
              WHERE build."engineRevisionId" = revision."id"
            )
+           AND NOT EXISTS (
+             SELECT 1 FROM "EngineProjectMutation" mutation
+             WHERE mutation."projectId" = revision."projectId"
+               AND mutation."resultRevisionNumber" = revision."revisionNumber"
+           )
          ORDER BY revision."revisionNumber" DESC
          OFFSET ${keep}
        )
     `;
+  }
+
+  applyMutationBatch(
+    input: MutationBatchWrite,
+    mutate: (base: StoredEngineRevision) => RevisionSnapshot,
+  ): Promise<RevisionWriteResult> {
+    return this.client.$transaction(async (transaction) => {
+      // Match the legacy whole-document writer's lock order, including ownership.
+      await lockOwnedGame(
+        transaction as DatabaseClient,
+        input.gameId,
+        input.authorId,
+      );
+      const current = await exactProject(
+        transaction as DatabaseClient,
+        input.gameId,
+      );
+      if (!current || current.id !== input.projectId)
+        throw new EngineProjectWriteForbiddenError();
+
+      // Replay precedes CAS and semantic validation: the key identifies the first result.
+      const replay = await transaction.engineProjectMutation.findUnique({
+        where: {
+          projectId_mutationId: {
+            projectId: input.projectId,
+            mutationId: input.mutationId,
+          },
+        },
+        include: { resultRevision: true },
+      });
+      if (replay)
+        return {
+          status: 'SAVED',
+          revision: storedRevision(replay.resultRevision),
+        };
+      if (current.headRevisionNumber !== input.baseRevision) {
+        return {
+          status: 'CONFLICT',
+          currentRevision: current.headRevisionNumber,
+        };
+      }
+
+      const data = mutate(current.headRevision);
+      const revisionNumber = input.baseRevision + 1;
+      const advanced = await transaction.engineProject.updateMany({
+        where: {
+          id: input.projectId,
+          gameId: input.gameId,
+          headRevisionNumber: input.baseRevision,
+        },
+        data: { headRevisionNumber: revisionNumber },
+      });
+      if (advanced.count !== 1) {
+        const head = await transaction.engineProject.findUniqueOrThrow({
+          where: { id: input.projectId },
+        });
+        return { status: 'CONFLICT', currentRevision: head.headRevisionNumber };
+      }
+      const references = await assetReferences(
+        transaction as DatabaseClient,
+        input.projectId,
+        data.assetIds,
+      );
+      const revision = await transaction.engineProjectRevision.create({
+        data: {
+          projectId: input.projectId,
+          revisionNumber,
+          schemaVersion: data.schemaVersion,
+          document: data.document as never,
+          contentHash: data.contentHash,
+          byteSize: BigInt(data.byteSize),
+          retention: 'STANDARD',
+          authorId: input.authorId,
+          assets: { create: references },
+        },
+      });
+      await transaction.engineProjectMutation.create({
+        data: {
+          projectId: input.projectId,
+          mutationId: input.mutationId,
+          baseRevisionNumber: input.baseRevision,
+          resultRevisionNumber: revisionNumber,
+        },
+      });
+      return { status: 'SAVED', revision: storedRevision(revision) };
+    });
   }
 }
 import { database } from '@indieforge/database';
