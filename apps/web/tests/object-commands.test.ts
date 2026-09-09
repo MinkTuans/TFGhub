@@ -79,6 +79,129 @@ const commit = (
   });
 
 describe("shared object command primitives", () => {
+  it.each(["create", "duplicate"])(
+    "review: transports exact layer %s ownership through undo/redo",
+    (kind) => {
+      const input = project();
+      const allocate = newIds();
+      let document = applyProjectMutations(input, [
+        api.createObjectCommand(
+          input.scenes[0],
+          { objectType: "CUSTOM", name: "Moved", layerId: id(3) },
+          allocate,
+        ),
+      ]);
+      document = applyProjectMutations(document, [
+        api.createObjectCommand(
+          document.scenes[0],
+          { objectType: "CUSTOM", name: "Source", layerId: id(3) },
+          allocate,
+        ),
+      ]);
+      const before = createStudioState(identity, { revision: 0, document });
+      const layerId = id(500);
+      const layer: StudioMutation =
+        kind === "create"
+          ? {
+              type: "layer.create",
+              sceneId: id(2),
+              layer: {
+                ...document.scenes[0].layers[0],
+                id: layerId,
+                order: 10,
+              },
+              objects: [],
+              beforeLayerId: null,
+            }
+          : {
+              type: "layer.duplicate",
+              sceneId: id(2),
+              layerId: id(3),
+              newId: layerId,
+              name: "Copy",
+            };
+      const state = commit(before, [
+        api.updateObjectCommand(id(2), id(100), { layerId, order: 0 }),
+        layer,
+      ]);
+      const inverse = ApplyMutationBatchInput.parse({
+        baseRevision: 1,
+        mutationId: "undo",
+        mutations: state.history.past.at(-1)!.undo,
+      });
+      expect(inverse.mutations.length).toBeLessThanOrEqual(100);
+      expect(mutationBatchRequestBytes(inverse.mutations)).toBeLessThanOrEqual(
+        JSON_REQUEST_BYTE_LIMIT,
+      );
+      expect(applyProjectMutations(state.document, inverse.mutations)).toEqual(
+        document,
+      );
+      const undone = studioReducer(state, {
+        type: "undo",
+        mutationId: "undo",
+        timestamp: 2,
+      });
+      expect(undone.document).toEqual(document);
+      expect(
+        studioReducer(undone, {
+          type: "redo",
+          mutationId: "redo",
+          timestamp: 3,
+        }).document,
+      ).toEqual(state.document);
+      expect(
+        restoreRecovery(
+          createStudioState(identity, { revision: 0, document }),
+          recoveryEnvelope(undone),
+        ).document,
+      ).toEqual(document);
+    },
+  );
+
+  it("review: rejects duplicate/remove ID collisions before optimistic state or history changes", () => {
+    const input = project();
+    const allocate = newIds();
+    let document = applyProjectMutations(input, [
+      api.createObjectCommand(
+        input.scenes[0],
+        { objectType: "CUSTOM", name: "Source", layerId: id(3) },
+        allocate,
+      ),
+    ]);
+    document = applyProjectMutations(document, [
+      api.createObjectCommand(
+        document.scenes[0],
+        { objectType: "CUSTOM", name: "Existing", layerId: id(3) },
+        allocate,
+      ),
+    ]);
+    const state = createStudioState(identity, { revision: 0, document });
+    const commands = [
+      api.duplicateObjectCommand(id(2), id(100), id(103), "Collision"),
+      api.deleteObjectCommand(document.scenes[0], id(103), true),
+    ];
+    const before = structuredClone({ state, commands });
+    expect(() => commit(state, commands)).toThrow(/Stable ID already exists/);
+    expect({ state, commands }).toEqual(before);
+  });
+
+  it.each([
+    "name",
+    "parentId",
+    "layerId",
+    "enabled",
+    "visible",
+    "locked",
+    "order",
+    "renderOrder",
+  ])("review: command creators reject explicit undefined %s", (field) => {
+    const changes = { [field]: undefined };
+    expect(() => api.updateObjectCommand(id(2), id(100), changes)).toThrow(
+      /undefined|defined/,
+    );
+    expect(changes).toHaveProperty(field, undefined);
+  });
+
   it.each([
     [
       "PLAYER",

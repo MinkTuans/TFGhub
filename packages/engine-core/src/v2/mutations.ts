@@ -16,9 +16,28 @@ const orders = z
   .array(z.object({ id: StableId, order }).strict())
   .min(1)
   .max(100);
-const sceneChanges = SceneV2.innerType()
-  .omit({ id: true, order: true, layers: true, objects: true })
-  .partial();
+function definedChanges<Shape extends z.ZodRawShape>(
+  schema: z.ZodObject<Shape, "strict">,
+) {
+  return schema.partial().superRefine((changes, context) => {
+    for (const [key, value] of Object.entries(changes)) {
+      if (value === undefined)
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [key],
+          message: "Update fields must not be undefined",
+        });
+    }
+  });
+}
+const sceneChanges = definedChanges(
+  SceneV2.innerType().omit({
+    id: true,
+    order: true,
+    layers: true,
+    objects: true,
+  }),
+);
 const sceneVariables =
   EngineProjectV2.innerType().shape.variables.shape.scene.valueSchema;
 
@@ -111,7 +130,7 @@ export const ProjectMutation = z.discriminatedUnion("type", [
       type: z.literal("layer.update"),
       sceneId: StableId,
       layerId: StableId,
-      changes: LayerV2.omit({ id: true, order: true }).partial(),
+      changes: definedChanges(LayerV2.omit({ id: true, order: true })),
     })
     .strict(),
   z
@@ -131,6 +150,9 @@ export const ProjectMutation = z.discriminatedUnion("type", [
       type: z.literal("layer.delete"),
       sceneId: StableId,
       layerId: StableId,
+      // Inverse carriers remove only objects inserted by their create command.
+      // Omission retains ordinary whole-layer deletion semantics.
+      objectIds: z.array(StableId).max(transitionLimits.objects).optional(),
       confirmed: z.literal(true),
     })
     .strict(),
@@ -146,11 +168,13 @@ export const ProjectMutation = z.discriminatedUnion("type", [
       type: z.literal("object.update"),
       sceneId: StableId,
       objectId: StableId,
-      changes: GameObjectV2.omit({
-        id: true,
-        objectType: true,
-        components: true,
-      }).partial(),
+      changes: definedChanges(
+        GameObjectV2.omit({
+          id: true,
+          objectType: true,
+          components: true,
+        }),
+      ),
     })
     .strict(),
   z
@@ -380,6 +404,37 @@ function copyIds(
   return ids;
 }
 
+// Canonical ownership uses `id`, except projectId and the declared asset list.
+// Non-Dialogue component properties and CUSTOM event config are opaque, not
+// ownership. Reference fields never reserve an ID (including forward refs).
+function* ownedIds(root: unknown): Generator<string> {
+  const pending: unknown[] = [root];
+  while (pending.length) {
+    const value = pending.pop();
+    if (Array.isArray(value)) {
+      for (const child of value) pending.push(child);
+    } else if (value && typeof value === "object") {
+      const record = value as Record<string, unknown>;
+      if (typeof record.id === "string") yield record.id;
+      for (const [key, child] of Object.entries(record)) {
+        if (key === "properties" && record.type !== "Dialogue") continue;
+        if (key === "config" && record.type === "CUSTOM") continue;
+        if (child && typeof child === "object") pending.push(child);
+      }
+    }
+  }
+}
+
+function assertFreshDuplicateIds(project: EngineProjectV2, copies: unknown) {
+  const ids = new Set(ownedIds(project));
+  ids.add(project.projectId);
+  for (const id of project.assetIds) ids.add(id);
+  for (const id of ownedIds(copies)) {
+    if (ids.has(id)) throw new Error("Stable ID already exists");
+    ids.add(id);
+  }
+}
+
 function subtree(scene: SceneV2, rootId: string) {
   target(scene.objects, rootId);
   const children = new Map<string, string[]>();
@@ -423,6 +478,24 @@ function duplicateObjects(
     if (object.id === newId) object.name = name;
   }
   return copies;
+}
+
+function deletedLayerObjectIds(
+  scene: SceneV2,
+  command: Extract<ProjectMutation, { type: "layer.delete" }>,
+) {
+  const objects = scene.objects.filter(
+    (object) => object.layerId === command.layerId,
+  );
+  if (command.objectIds === undefined)
+    return new Set(objects.map((object) => object.id));
+  const ids = new Set(command.objectIds);
+  if (ids.size !== command.objectIds.length)
+    throw new Error("Duplicate object ID");
+  const owned = new Set(objects.map((object) => object.id));
+  for (const id of ids)
+    if (!owned.has(id)) throw new ProjectMutationTargetError(id);
+  return ids;
 }
 
 /** Applies an ordered batch to a detached document, or throws without changing either input. */
@@ -478,12 +551,13 @@ function applyBatch(
           layer.id = ids.get(layer.id)!;
         });
         copy.objects = copyObjects(scene.objects, ids);
+        const copiedVariables = variables?.map((variable) => ({
+          ...variable,
+          id: ids.get(variable.id)!,
+        }));
+        assertFreshDuplicateIds(next, [copy, copiedVariables]);
         insert(next.scenes, copy, null);
-        if (variables)
-          next.variables.scene[copy.id] = variables.map((variable) => ({
-            ...variable,
-            id: ids.get(variable.id)!,
-          }));
+        if (copiedVariables) next.variables.scene[copy.id] = copiedVariables;
         break;
       }
       case "scene.delete":
@@ -537,17 +611,16 @@ function applyBatch(
           (object) => object.layerId === layer.id,
         );
         const ids = copyIds(layer.id, command.newId, objects);
-        insert(
-          scene.layers,
-          {
-            ...layer,
-            id: command.newId,
-            name: command.name,
-            order: nextOrder(scene.layers),
-          },
-          null,
-        );
-        scene.objects.push(...copyObjects(objects, ids));
+        const copy = {
+          ...layer,
+          id: command.newId,
+          name: command.name,
+          order: nextOrder(scene.layers),
+        };
+        const copiedObjects = copyObjects(objects, ids);
+        assertFreshDuplicateIds(next, [copy, copiedObjects]);
+        insert(scene.layers, copy, null);
+        for (const object of copiedObjects) scene.objects.push(object);
         break;
       }
       case "layer.delete": {
@@ -555,11 +628,12 @@ function applyBatch(
         target(scene.layers, command.layerId);
         if (scene.layers.length === 1)
           throw new Error("At least one layer is required");
+        const ids = deletedLayerObjectIds(scene, command);
         scene.layers = scene.layers.filter(
           (layer) => layer.id !== command.layerId,
         );
         scene.objects = scene.objects.filter(
-          (object) => object.layerId !== command.layerId,
+          (object) => object.layerId !== command.layerId || !ids.has(object.id),
         );
         break;
       }
@@ -592,6 +666,7 @@ function applyBatch(
           command.newId,
           command.name,
         );
+        assertFreshDuplicateIds(next, copies);
         // Avoid spread argument limits for bounded transitional scene carriers.
         for (const object of copies) scene.objects.push(object);
         break;
@@ -813,15 +888,22 @@ function inverse(
         type: "layer.delete",
         sceneId: command.sceneId,
         layerId: command.layer.id,
+        objectIds: command.objects.map(({ object }) => object.id),
         confirmed: true,
       };
-    case "layer.duplicate":
+    case "layer.duplicate": {
+      const objects = scene!.objects.filter(
+        (object) => object.layerId === command.layerId,
+      );
+      const ids = copyIds(command.layerId, command.newId, objects);
       return {
         type: "layer.delete",
         sceneId: command.sceneId,
         layerId: command.newId,
+        objectIds: objects.map((object) => ids.get(object.id)!),
         confirmed: true,
       };
+    }
     case "layer.reorder":
       return { ...command, orders: savedOrders(scene!.layers) };
     case "layer.update": {
@@ -836,14 +918,15 @@ function inverse(
         ),
       };
     }
-    case "layer.delete":
+    case "layer.delete": {
+      const ids = deletedLayerObjectIds(scene!, command);
       return {
         type: "layer.create",
         sceneId: command.sceneId,
         layer: target(scene!.layers, command.layerId),
         beforeLayerId: nextId(scene!.layers, command.layerId),
         objects: scene!.objects.flatMap((object, index) =>
-          object.layerId === command.layerId
+          object.layerId === command.layerId && ids.has(object.id)
             ? [
                 {
                   object,
@@ -853,5 +936,6 @@ function inverse(
             : [],
         ),
       };
+    }
   }
 }

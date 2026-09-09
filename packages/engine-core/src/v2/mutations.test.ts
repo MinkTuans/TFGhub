@@ -164,6 +164,468 @@ describe("object and component authoring", () => {
     return result;
   }
 
+  it.each(["create", "duplicate"])(
+    "review: layer %s inverses preserve objects moved to the future layer",
+    (kind) => {
+      const input = populated();
+      const layerId = id("0090");
+      const owned = { ...object("0030", 5), layerId };
+      owned.components.push(
+        component("0032", "Custom", {
+          definitionKey: "custom.nested",
+          config: { nested: { value: "original" } },
+        }),
+      );
+      const command =
+        kind === "create"
+          ? {
+              type: "layer.create",
+              sceneId,
+              layer: { ...input.scenes[0]!.layers[0]!, id: layerId, order: 10 },
+              objects: [{ object: owned, beforeObjectId: id("0020") }],
+              beforeLayerId: id("0006"),
+            }
+          : {
+              type: "layer.duplicate",
+              sceneId,
+              layerId: id("0004"),
+              newId: layerId,
+              name: "Copy",
+            };
+      const before = structuredClone({ input, command });
+      const result = roundTrip(input, [update({ layerId, order: 0 }), command]);
+      expect(
+        result.document.scenes[0]!.objects.find(
+          (value) => value.id === id("0010"),
+        )!.layerId,
+      ).toBe(layerId);
+      expect({ input, command }).toEqual(before);
+      if (kind === "create") {
+        const config = result.document.scenes[0]!.objects.find(
+          (value) => value.id === owned.id,
+        )!.components[1]!.properties as {
+          config: { nested: { value: string } };
+        };
+        config.config.nested.value = "changed document";
+        expect({ input, command }).toEqual(before);
+        expect(result.redo[1]).toEqual(command);
+      }
+    },
+  );
+
+  it("review: exact layer inverse ownership keeps the bounded carrier capacity", () => {
+    const command = {
+      type: "layer.delete",
+      sceneId,
+      layerId: id("0004"),
+      objectIds: Array.from({ length: 100_000 }, () => id("0010")),
+      confirmed: true,
+    };
+    expect(engine.ProjectMutation.safeParse(command).success).toBe(true);
+    command.objectIds.push(id("0020"));
+    expect(engine.ProjectMutation.safeParse(command).success).toBe(false);
+  });
+
+  it.each([[id("0010"), id("0010")], [id("0099")], [id("0020")]])(
+    "review: exact layer ownership rejects duplicate, missing, or foreign IDs %j",
+    (...objectIds) => {
+      const input = populated();
+      input.scenes[0]!.objects[1]!.layerId = id("0006");
+      const commands = [
+        {
+          type: "layer.delete",
+          sceneId,
+          layerId: id("0004"),
+          objectIds,
+          confirmed: true,
+        },
+      ];
+      const before = structuredClone({ input, commands });
+      expect(() => history(input, commands)).toThrow();
+      expect(() => apply(input, commands)).toThrow();
+      expect({ input, commands }).toEqual(before);
+    },
+  );
+
+  it.each([false, true])(
+    "review: layer deletion stays scoped during temporary cross-layer ID collisions (exact %s)",
+    (exact) => {
+      const input = project();
+      const layer = input.scenes[0]!.layers[0]!;
+      const survivor = {
+        ...object("0040", 0),
+        id: id("0030"),
+        layerId: id("0092"),
+      };
+      const scene = {
+        ...input.scenes[0]!,
+        id: id("0090"),
+        key: "carrier",
+        order: 2,
+        layers: [
+          { ...layer, id: id("0091"), order: 0 },
+          { ...layer, id: id("0092"), order: 1 },
+        ],
+        objects: [{ ...object("0030", 0), layerId: id("0091") }, survivor],
+      };
+      const commands = [
+        {
+          type: "scene.create",
+          scene,
+          variables: null,
+          beforeSceneId: null,
+          entry: false,
+        },
+        {
+          type: "layer.delete",
+          sceneId: scene.id,
+          layerId: id("0091"),
+          ...(exact ? { objectIds: [id("0030")] } : {}),
+          confirmed: true,
+        },
+      ];
+      const before = structuredClone({ input, commands });
+      expect(apply(input, commands).scenes.at(-1)!.objects).toEqual([survivor]);
+      expect({ input, commands }).toEqual(before);
+    },
+  );
+
+  function namespaceProject() {
+    const input = populated();
+    input.assetIds = [id("0060")];
+    input.scenes[0]!.objects[0]!.components.push(
+      component("0012", "Dialogue", {
+        startNodeId: id("0013"),
+        nodes: [
+          {
+            id: id("0013"),
+            speakerName: "NPC",
+            text: "",
+            avatarAssetId: null,
+            choices: [
+              { id: id("0014"), text: "Go", eventId: null, conditionId: null },
+            ],
+          },
+        ],
+      }),
+    );
+    input.prefabs = [
+      {
+        id: id("0061"),
+        name: "Prefab",
+        objectType: "CUSTOM",
+        components: [
+          component("0062", "Transform"),
+          component("0076", "Dialogue", {
+            startNodeId: id("0077"),
+            nodes: [
+              {
+                id: id("0077"),
+                speakerName: "",
+                text: "",
+                avatarAssetId: null,
+                choices: [
+                  {
+                    id: id("0078"),
+                    text: "Go",
+                    eventId: null,
+                    conditionId: null,
+                  },
+                ],
+              },
+            ],
+          }),
+        ],
+      },
+    ];
+    input.variables.global = [
+      { id: id("0063"), name: "Global", type: "BOOLEAN", initialValue: true },
+    ];
+    input.variables.player = [
+      { id: id("0064"), name: "Player", type: "BOOLEAN", initialValue: true },
+    ];
+    input.variables.scene[sceneId] = [
+      { id: id("0065"), name: "Scene", type: "BOOLEAN", initialValue: true },
+    ];
+    input.events = [
+      {
+        id: id("0066"),
+        name: "Event",
+        version: 1,
+        order: 0,
+        enabled: true,
+        trigger: { type: "ON_START" },
+        condition: {
+          id: id("0067"),
+          version: 1,
+          type: "NOT",
+          condition: {
+            id: id("0068"),
+            version: 1,
+            type: "OBJECT_EXISTS",
+            objectId: id("0010"),
+          },
+        },
+        steps: [
+          {
+            id: id("0069"),
+            version: 1,
+            type: "SEQUENCE",
+            steps: [{ id: id("0070"), version: 1, type: "COMPLETE_GAME" }],
+          },
+        ],
+      },
+    ];
+    input.modules = [
+      {
+        id: id("0071"),
+        name: "Quiz",
+        version: 1,
+        type: "QUIZ",
+        config: {
+          questions: [
+            {
+              id: id("0072"),
+              prompt: "Question",
+              choices: [{ id: id("0073"), text: "Answer" }],
+              correctChoiceId: id("0073"),
+              points: 1,
+            },
+          ],
+          passScore: 1,
+          shuffleQuestions: false,
+          timeLimitMs: null,
+        },
+      },
+    ];
+    input.scripts = [
+      {
+        id: id("0074"),
+        name: "Script",
+        version: 1,
+        language: "JAVASCRIPT",
+        source: "",
+        capabilities: [],
+        attachments: [{ id: id("0075"), type: "SCENE", sceneId }],
+      },
+    ];
+    return engine.EngineProjectV2.parse(input);
+  }
+
+  it.each([
+    "0001",
+    "0002",
+    "0004",
+    "0020",
+    "0021",
+    "0012",
+    "0013",
+    "0014",
+    "0060",
+    "0061",
+    "0062",
+    "0063",
+    "0064",
+    "0065",
+    "0066",
+    "0067",
+    "0068",
+    "0069",
+    "0070",
+    "0071",
+    "0072",
+    "0073",
+    "0074",
+    "0075",
+    "0076",
+    "0077",
+    "0078",
+  ])(
+    "review: rejects duplicate root collisions with project-owned ID %s before later deletion",
+    (suffix) => {
+      const input = namespaceProject();
+      const commands = [
+        {
+          type: "object.duplicate",
+          sceneId,
+          objectId: id("0010"),
+          newId: id(suffix),
+          name: "Collision",
+        },
+        remove(id(suffix)),
+      ];
+      const before = structuredClone({ input, commands });
+      expect(() => history(input, commands)).toThrow(
+        /Stable ID already exists/,
+      );
+      expect(() => apply(input, commands)).toThrow(/Stable ID already exists/);
+      expect({ input, commands }).toEqual(before);
+    },
+  );
+
+  it.each(["0020", "0011", "0012", "0013", "0014"])(
+    "review: rejects a derived subtree collision for owned ID %s",
+    (suffix) => {
+      const input = namespaceProject();
+      input.scenes[0]!.objects[1]!.parentId = id("0010");
+      const newId = id("0090");
+      const collision = engine.uuidV5(id(suffix), newId);
+      input.assetIds.push(collision);
+      const before = structuredClone(input);
+      expect(() =>
+        history(input, [
+          {
+            type: "object.duplicate",
+            sceneId,
+            objectId: id("0010"),
+            newId,
+            name: "Collision",
+          },
+          remove(newId, engine.uuidV5(id("0020"), newId)),
+        ]),
+      ).toThrow(/Stable ID already exists/);
+      expect(input).toEqual(before);
+    },
+  );
+
+  it.each(["scene", "layer"])(
+    "review: rejects derived %s duplicate IDs even when later removed",
+    (kind) => {
+      const input = namespaceProject();
+      const newId = id("0090");
+      input.assetIds.push(engine.uuidV5(id("0014"), newId));
+      const duplicate =
+        kind === "scene"
+          ? {
+              type: "scene.duplicate",
+              sceneId,
+              newId,
+              name: "Collision",
+              key: "collision",
+            }
+          : {
+              type: "layer.duplicate",
+              sceneId,
+              layerId: id("0004"),
+              newId,
+              name: "Collision",
+            };
+      const cleanup =
+        kind === "scene"
+          ? {
+              type: "scene.delete",
+              sceneId: newId,
+              replacementSceneId: null,
+              confirmed: true,
+            }
+          : { type: "layer.delete", sceneId, layerId: newId, confirmed: true };
+      expect(() => history(input, [duplicate, cleanup])).toThrow(
+        /Stable ID already exists/,
+      );
+    },
+  );
+
+  it("review: opaque Custom IDs do not reserve the project namespace", () => {
+    const input = populated();
+    input.scenes[0]!.objects[0]!.components.push(
+      component("0012", "Custom", {
+        definitionKey: "custom.ids",
+        config: {
+          id: id("0090"),
+          nested: { id: engine.uuidV5(id("0011"), id("0090")) },
+        },
+      }),
+    );
+    const result = roundTrip(input, [
+      {
+        type: "object.duplicate",
+        sceneId,
+        objectId: id("0010"),
+        newId: id("0090"),
+        name: "Copy",
+      },
+    ]);
+    expect(
+      result.document.scenes[0]!.objects[2]!.components[1]!.properties,
+    ).toEqual(input.scenes[0]!.objects[0]!.components[1]!.properties);
+  });
+
+  it.each([
+    "name",
+    "parentId",
+    "layerId",
+    "enabled",
+    "visible",
+    "locked",
+    "order",
+    "renderOrder",
+  ])(
+    "review: rejects explicit undefined object %s before delete can hide it",
+    (field) => {
+      const input = populated();
+      const command = update({ [field]: undefined });
+      const before = structuredClone({ input, command });
+      expect(() => history(input, [command, remove(id("0010"))])).toThrow(
+        /undefined|defined/,
+      );
+      expect(engine.ProjectMutation.safeParse(command).success).toBe(false);
+      expect({ input, command }).toEqual(before);
+    },
+  );
+
+  it.each([
+    ...["name", "type", "visible", "locked"].map((field) => ({
+      type: "layer.update",
+      field,
+    })),
+    ...["name", "key", "type", "width", "height", "background", "settings"].map(
+      (field) => ({ type: "scene.update", field }),
+    ),
+  ])(
+    "review: rejects explicit undefined $type field $field",
+    ({ type, field }) => {
+      const input = populated();
+      const command = {
+        type,
+        sceneId,
+        ...(type === "layer.update" ? { layerId: id("0004") } : {}),
+        changes: { [field]: undefined },
+      };
+      const cleanup = {
+        type: "scene.delete",
+        sceneId,
+        replacementSceneId: id("0003"),
+        confirmed: true,
+      };
+      expect(() => history(input, [command, cleanup])).toThrow(
+        /undefined|defined/,
+      );
+      expect(engine.ProjectMutation.safeParse(command).success).toBe(false);
+    },
+  );
+
+  it("review: component property spreads cannot store undefined and omission stays replayable", () => {
+    const input = populated();
+    const commands = [
+      editComponent(id("0011"), {
+        ...(engine.v2ComponentRegistry.Transform.defaults() as object),
+        x: undefined,
+      }),
+      remove(id("0010")),
+    ];
+    const before = structuredClone({ input, commands });
+    expect(() => history(input, commands)).toThrow();
+    expect(
+      engine.ProjectMutation.safeParse(editComponent(id("0011"), undefined))
+        .success,
+    ).toBe(false);
+    expect({ input, commands }).toEqual(before);
+    roundTrip(input, [
+      update({}),
+      update({ name: "Explicit", parentId: null }),
+    ]);
+  });
+
   it.each([
     ["PLAYER", ["Movement", "Health", "SpriteRenderer"]],
     ["NPC", ["Dialogue", "Interactable"]],
