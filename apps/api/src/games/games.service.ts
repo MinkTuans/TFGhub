@@ -15,6 +15,7 @@ import type {
 } from '@indieforge/contracts';
 import { EngineProjectV2 } from '@indieforge/engine-core';
 import { createHash, randomUUID } from 'node:crypto';
+import { canonicalize } from '../engine-projects/canonicalize.js';
 import type { StoredEngineRevision } from '../engine-projects/engine-projects.repository.js';
 
 type CreateGameInput = {
@@ -386,17 +387,4 @@ export class GamesService {
     if (!submitted) throw new ConflictException('Game cannot be submitted');
     return gameSummary(submitted);
   }
-}
-
-// Match canonical revision hashing used by the engine project save repository.
-function canonicalize(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(canonicalize);
-  if (value && typeof value === 'object') {
-    return Object.fromEntries(
-      Object.entries(value)
-        .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
-        .map(([key, child]) => [key, canonicalize(child)]),
-    );
-  }
-  return value;
 }

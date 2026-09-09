@@ -17,6 +17,7 @@ import {
   readEngineProject,
 } from '@indieforge/engine-core';
 import { createHash } from 'node:crypto';
+import { canonicalize } from './canonicalize.js';
 import {
   EngineProjectsRepository,
   EngineProjectWriteForbiddenError,
@@ -47,18 +48,6 @@ function snapshot(project: EngineProjectV1) {
     byteSize: Buffer.byteLength(serialized),
     assetIds: project.assetIds,
   };
-}
-
-function canonicalize(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(canonicalize);
-  if (value && typeof value === 'object') {
-    return Object.fromEntries(
-      Object.entries(value)
-        .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
-        .map(([key, child]) => [key, canonicalize(child)]),
-    );
-  }
-  return value;
 }
 
 function readOnly(
