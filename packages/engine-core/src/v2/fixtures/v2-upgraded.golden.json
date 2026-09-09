@@ -1,0 +1,175 @@
+{
+  "schemaVersion": 2,
+  "projectId": "550e8400-e29b-41d4-a716-446655440001",
+  "engineFamily": "TFG_ENGINE",
+  "entrySceneId": "550e8400-e29b-41d4-a716-446655440002",
+  "settings": {
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    },
+    "pixelArt": false
+  },
+  "assetIds": [
+    "550e8400-e29b-41d4-a716-446655440003"
+  ],
+  "scenes": [
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440002",
+      "name": "Opening",
+      "key": "scene-1",
+      "order": 0,
+      "type": "MIXED",
+      "width": 1280,
+      "height": 720,
+      "background": {
+        "color": "#102030",
+        "assetId": null
+      },
+      "settings": {
+        "gravityX": 0,
+        "gravityY": 0,
+        "grid": {
+          "enabled": false,
+          "size": 32,
+          "snap": false
+        }
+      },
+      "layers": [
+        {
+          "id": "7cb9fa99-c433-5e50-9089-d3586ceb7f1f",
+          "name": "World",
+          "order": 0,
+          "type": "WORLD",
+          "visible": true,
+          "locked": false
+        }
+      ],
+      "objects": [
+        {
+          "id": "550e8400-e29b-41d4-a716-446655440004",
+          "name": "Guide",
+          "objectType": "NPC",
+          "parentId": null,
+          "layerId": "7cb9fa99-c433-5e50-9089-d3586ceb7f1f",
+          "enabled": true,
+          "visible": true,
+          "locked": false,
+          "order": 0,
+          "renderOrder": 0,
+          "components": [
+            {
+              "id": "f7e7675d-621a-5b4b-9e94-adabb09c5a7f",
+              "type": "Transform",
+              "version": 1,
+              "properties": {
+                "x": 0,
+                "y": 0,
+                "width": 32,
+                "height": 32,
+                "rotation": 0,
+                "scaleX": 1,
+                "scaleY": 1
+              }
+            },
+            {
+              "id": "550e8400-e29b-41d4-a716-446655440005",
+              "type": "Dialogue",
+              "version": 1,
+              "properties": {
+                "startNodeId": "eaf0ce57-8b68-5a05-8ba4-adef7eb4ef3a",
+                "nodes": [
+                  {
+                    "id": "eaf0ce57-8b68-5a05-8ba4-adef7eb4ef3a",
+                    "speakerName": "Guide",
+                    "avatarAssetId": null,
+                    "text": "Welcome.",
+                    "choices": [
+                      {
+                        "id": "550e8400-e29b-41d4-a716-446655440006",
+                        "text": "Continue",
+                        "conditionId": null,
+                        "eventId": "550e8400-e29b-41d4-a716-446655440008"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "variables": {
+    "global": [
+      {
+        "id": "550e8400-e29b-41d4-a716-446655440007",
+        "name": "Score",
+        "type": "NUMBER",
+        "initialValue": 0
+      }
+    ],
+    "player": [],
+    "scene": {}
+  },
+  "prefabs": [
+    {
+      "id": "550e8400-e29b-41d4-a716-44665544000b",
+      "name": "Marker",
+      "objectType": "CUSTOM",
+      "components": [
+        {
+          "id": "550e8400-e29b-41d4-a716-44665544000c",
+          "type": "Transform",
+          "version": 1,
+          "properties": {
+            "x": 1,
+            "y": 2,
+            "rotation": 0,
+            "scaleX": 1,
+            "scaleY": 1,
+            "width": 32,
+            "height": 32
+          }
+        }
+      ]
+    }
+  ],
+  "events": [
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440008",
+      "version": 1,
+      "name": "Continue",
+      "enabled": true,
+      "order": 0,
+      "trigger": {
+        "type": "ON_CHOICE_SELECTED",
+        "objectId": "550e8400-e29b-41d4-a716-446655440004",
+        "componentId": "550e8400-e29b-41d4-a716-446655440005",
+        "choiceId": "550e8400-e29b-41d4-a716-446655440006"
+      },
+      "condition": {
+        "id": "550e8400-e29b-41d4-a716-446655440009",
+        "version": 1,
+        "type": "VARIABLE_COMPARE",
+        "variable": {
+          "scope": "GLOBAL",
+          "variableId": "550e8400-e29b-41d4-a716-446655440007"
+        },
+        "operator": "GREATER_THAN_OR_EQUAL",
+        "value": 0
+      },
+      "steps": [
+        {
+          "id": "550e8400-e29b-41d4-a716-44665544000a",
+          "version": 1,
+          "type": "CHANGE_SCENE",
+          "sceneId": "550e8400-e29b-41d4-a716-446655440002"
+        }
+      ]
+    }
+  ],
+  "modules": [],
+  "scripts": []
+}

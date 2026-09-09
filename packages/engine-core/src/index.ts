@@ -119,3 +119,4 @@ export {
   type EngineProjectV2 as EngineProjectV2Type,
   type PrefabV2 as PrefabV2Type,
 } from "./v2/project-schema.js";
+export { upgradeEngineProjectV1 } from "./v2/upgrade-v1.js";

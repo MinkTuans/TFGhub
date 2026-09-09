@@ -1,0 +1,108 @@
+{
+  "schemaVersion": 1,
+  "projectId": "550e8400-e29b-41d4-a716-446655440001",
+  "engineFamily": "TFG_ENGINE",
+  "entrySceneId": "550e8400-e29b-41d4-a716-446655440002",
+  "settings": { "viewport": { "width": 1280, "height": 720 } },
+  "assetIds": ["550e8400-e29b-41d4-a716-446655440003"],
+  "scenes": [
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440002",
+      "name": "Opening",
+      "order": 0,
+      "backgroundColor": "#102030",
+      "objects": [
+        {
+          "id": "550e8400-e29b-41d4-a716-446655440004",
+          "parentId": null,
+          "name": "Guide",
+          "enabled": true,
+          "order": 0,
+          "components": [
+            {
+              "id": "550e8400-e29b-41d4-a716-446655440005",
+              "type": "Dialogue",
+              "version": 1,
+              "properties": {
+                "speaker": "Guide",
+                "text": "Welcome.",
+                "choices": [
+                  {
+                    "id": "550e8400-e29b-41d4-a716-446655440006",
+                    "text": "Continue"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "variables": {
+    "global": [
+      {
+        "id": "550e8400-e29b-41d4-a716-446655440007",
+        "name": "Score",
+        "type": "NUMBER",
+        "initialValue": 0
+      }
+    ],
+    "player": [],
+    "scene": {}
+  },
+  "events": [
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440008",
+      "version": 1,
+      "name": "Continue",
+      "enabled": true,
+      "order": 0,
+      "trigger": {
+        "type": "CHOICE_SELECTED",
+        "objectId": "550e8400-e29b-41d4-a716-446655440004",
+        "componentId": "550e8400-e29b-41d4-a716-446655440005",
+        "choiceId": "550e8400-e29b-41d4-a716-446655440006"
+      },
+      "condition": {
+        "id": "550e8400-e29b-41d4-a716-446655440009",
+        "version": 1,
+        "type": "COMPARE_VARIABLE",
+        "variable": {
+          "scope": "GLOBAL",
+          "variableId": "550e8400-e29b-41d4-a716-446655440007"
+        },
+        "operator": "GREATER_THAN_OR_EQUAL",
+        "value": 0
+      },
+      "actions": [
+        {
+          "id": "550e8400-e29b-41d4-a716-44665544000a",
+          "version": 1,
+          "type": "CHANGE_SCENE",
+          "sceneId": "550e8400-e29b-41d4-a716-446655440002"
+        }
+      ]
+    }
+  ],
+  "prefabs": [
+    {
+      "id": "550e8400-e29b-41d4-a716-44665544000b",
+      "name": "Marker",
+      "components": [
+        {
+          "id": "550e8400-e29b-41d4-a716-44665544000c",
+          "type": "Transform",
+          "version": 1,
+          "properties": {
+            "x": 1,
+            "y": 2,
+            "rotation": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        }
+      ]
+    }
+  ]
+}
