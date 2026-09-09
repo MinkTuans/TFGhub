@@ -114,6 +114,47 @@ const publicGameSelect = {
     {
       provide: GamesRepository,
       useFactory: (): GamesRepository => ({
+        createEngineProject: (input) =>
+          database.$transaction(async (tx) => {
+            const game = await tx.game.create({
+              data: {
+                ownerId: input.ownerId,
+                slug: input.slug,
+                title: input.title,
+                sourceType: 'ENGINE',
+                visibility: 'DRAFT',
+                reviewState: 'DRAFT',
+                moderationState: 'CLEAR',
+                viewportWidth: input.document.settings.viewport.width,
+                viewportHeight: input.document.settings.viewport.height,
+              },
+              select: gameSummarySelect,
+            });
+            const project = await tx.engineProject.create({
+              data: {
+                id: input.document.projectId,
+                gameId: game.id,
+                headRevisionNumber: 0,
+                revisions: {
+                  create: {
+                    revisionNumber: 0,
+                    schemaVersion: 2,
+                    document: input.document as never,
+                    contentHash: input.contentHash,
+                    byteSize: BigInt(input.byteSize),
+                    retention: 'PINNED',
+                    authorId: input.ownerId,
+                  },
+                },
+              },
+              include: { revisions: true },
+            });
+            const revision = project.revisions[0]!;
+            return {
+              game,
+              revision: { ...revision, byteSize: Number(revision.byteSize) },
+            };
+          }),
         updateCover: (
           id,
           ownerId,

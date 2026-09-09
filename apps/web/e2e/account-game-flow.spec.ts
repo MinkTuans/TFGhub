@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { expect, test as base, type Browser, type BrowserContext, type BrowserContextOptions, type Locator, type Request } from "@playwright/test";
+import { expect, test as base, type Browser, type BrowserContext, type BrowserContextOptions, type Locator, type Page, type Request } from "@playwright/test";
 
 function auditGoogleRequests(context: BrowserContext) {
   const requests: string[] = [];
@@ -65,6 +65,16 @@ async function expectLoadedCover(cover: Locator) {
 const externalServices = process.env.E2E_EXTERNAL_SERVICES === "1";
 const moderatorEmail = process.env.E2E_MODERATOR_EMAIL ?? (externalServices ? "" : "moderator@example.com");
 const moderatorPassword = process.env.E2E_MODERATOR_PASSWORD ?? (externalServices ? "" : "moderator-password123");
+
+// Legacy editor journeys seed through the retained API; new-game UI creates ENGINE drafts.
+async function createLegacyDraft(page: Page, title: string, slug: string, sourceType = "UPLOAD") {
+  const response = await page.request.post("/api/games", {
+    data: { title, slug, sourceType, description: "A game in progress." },
+  });
+  expect(response.status()).toBe(201);
+  expect(await response.json()).toMatchObject({ title, slug, sourceType, visibility: "DRAFT" });
+  await page.goto("/studio");
+}
 
 test("manual browser contexts audit forbidden image requests before teardown without external network", async ({ browser }) => {
   for (const javaScriptEnabled of [false, true]) {
@@ -326,11 +336,7 @@ test("register, save a profile, create a private draft, and sign back in", async
   await expect(page.getByLabel("Tên hiển thị")).toHaveValue("New developer");
   await navigation.getByRole("link", { name: "Xưởng sáng tạo" }).click();
   await expect(page).toHaveURL("/studio");
-  await page.getByRole("link", { name: "Tạo game", exact: true }).click();
-  await page.getByLabel("Tên game").fill(title);
-  await page.getByLabel("Đường dẫn").fill(`first-game-${suffix}`);
-  await page.getByLabel("Mô tả").fill("A game in progress.");
-  await page.getByRole("button", { name: "Tạo bản nháp" }).click();
+  await createLegacyDraft(page, title, `first-game-${suffix}`);
   await expect(page).toHaveURL("/studio");
   await expect(page.getByRole("heading", { name: title })).toBeVisible();
   await expect(page.locator('[data-state="DRAFT"]')).toHaveText("Bản nháp");
@@ -413,11 +419,8 @@ test("an HTML5 upload can be retried, previewed, and submitted for review", asyn
   await page.getByLabel("Email").fill(`upload-${suffix}@example.com`);
   await page.getByLabel("Mật khẩu").fill("password123");
   await page.getByRole("button", { name: "Tạo tài khoản" }).click();
-  await page.getByRole("link", { name: "Tạo game", exact: true }).click();
-  await page.getByLabel("Tên game").fill(title);
-  await page.getByLabel("Đường dẫn").fill(`html5-upload-${suffix}`);
-  await page.getByLabel("Cách tạo game").selectOption("UPLOAD");
-  await page.getByRole("button", { name: "Tạo bản nháp" }).click();
+  await expect(page).toHaveURL("/studio");
+  await createLegacyDraft(page, title, `html5-upload-${suffix}`, "UPLOAD");
 
   await page.getByRole("link", { name: title }).click();
   await expect(page).toHaveURL(/\/studio\/games\//);
@@ -472,11 +475,7 @@ test("moderation requires a rejection note and publishes the approved artifact a
   await page.goto("/moderation");
   await expect(page).toHaveURL("/");
 
-  await page.goto("/studio/games/new");
-  await page.getByLabel("Tên game").fill(title);
-  await page.getByLabel("Đường dẫn").fill(slug);
-  await page.getByLabel("Cách tạo game").selectOption("CODE");
-  await page.getByRole("button", { name: "Tạo bản nháp" }).click();
+  await createLegacyDraft(page, title, slug, "CODE");
   await page.getByRole("link", { name: title }).click();
   await expect(page).toHaveURL(/\/studio\/games\/[^/]+$/);
   const gameId = new URL(page.url()).pathname.split("/").at(-1)!;
@@ -598,11 +597,8 @@ test("a code game saves source, rebuilds its sandboxed preview, and submits the 
   await page.getByLabel("Email").fill(`code-${suffix}@example.com`);
   await page.getByLabel("Mật khẩu").fill("password123");
   await page.getByRole("button", { name: "Tạo tài khoản" }).click();
-  await page.getByRole("link", { name: "Tạo game", exact: true }).click();
-  await page.getByLabel("Tên game").fill(title);
-  await page.getByLabel("Đường dẫn").fill(`code-game-${suffix}`);
-  await page.getByLabel("Cách tạo game").selectOption("CODE");
-  await page.getByRole("button", { name: "Tạo bản nháp" }).click();
+  await expect(page).toHaveURL("/studio");
+  await createLegacyDraft(page, title, `code-game-${suffix}`, "CODE");
 
   await page.getByRole("link", { name: title }).click();
   await expect(page).toHaveURL(/\/studio\/games\//);
@@ -638,11 +634,8 @@ test("a story game builds a sandboxed branching preview that reaches the selecte
   await page.getByLabel("Email").fill(`story-${suffix}@example.com`);
   await page.getByLabel("Mật khẩu").fill("password123");
   await page.getByRole("button", { name: "Tạo tài khoản" }).click();
-  await page.getByRole("link", { name: "Tạo game", exact: true }).click();
-  await page.getByLabel("Tên game").fill(title);
-  await page.getByLabel("Đường dẫn").fill(`story-game-${suffix}`);
-  await page.getByLabel("Cách tạo game").selectOption("STORY");
-  await page.getByRole("button", { name: "Tạo bản nháp" }).click();
+  await expect(page).toHaveURL("/studio");
+  await createLegacyDraft(page, title, `story-game-${suffix}`, "STORY");
 
   await page.getByRole("link", { name: title }).click();
   const opening = page.getByRole("group", { name: "Cảnh 1" });
@@ -679,11 +672,8 @@ test("a platformer game builds a collision-safe preview that reaches its goal by
   await page.getByLabel("Email").fill(`platformer-${suffix}@example.com`);
   await page.getByLabel("Mật khẩu").fill("password123");
   await page.getByRole("button", { name: "Tạo tài khoản" }).click();
-  await page.getByRole("link", { name: "Tạo game", exact: true }).click();
-  await page.getByLabel("Tên game").fill(title);
-  await page.getByLabel("Đường dẫn").fill(`platformer-game-${suffix}`);
-  await page.getByLabel("Cách tạo game").selectOption("PLATFORMER");
-  await page.getByRole("button", { name: "Tạo bản nháp" }).click();
+  await expect(page).toHaveURL("/studio");
+  await createLegacyDraft(page, title, `platformer-game-${suffix}`, "PLATFORMER");
 
   await page.getByRole("link", { name: title }).click();
   await page.getByLabel("Vị trí X đích đến").fill("205");

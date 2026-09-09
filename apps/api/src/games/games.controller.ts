@@ -8,7 +8,11 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
-import { CreateGameInput, UpdateGameInput } from '@indieforge/contracts';
+import {
+  CreateEngineGameInput,
+  CreateGameInput,
+  UpdateGameInput,
+} from '@indieforge/contracts';
 import { type AuthenticatedUser } from '../auth/auth.service.js';
 import { CurrentUser } from '../auth/current-user.decorator.js';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard.js';
@@ -18,6 +22,16 @@ import { GamesService } from './games.service.js';
 @UseGuards(JwtAuthGuard)
 export class GamesController {
   constructor(private readonly games: GamesService) {}
+
+  @Post('engine-projects')
+  createEngineProject(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() body: unknown,
+  ) {
+    const input = CreateEngineGameInput.safeParse(body);
+    if (!input.success) throw new BadRequestException('Invalid game input');
+    return this.games.createEngineProject(user.id, input.data);
+  }
 
   @Post()
   create(@CurrentUser() user: AuthenticatedUser, @Body() body: unknown) {

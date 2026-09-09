@@ -1,4 +1,4 @@
-import { GameForm } from "../../../../components/game-form";
+import { CreateEngineGame } from "../../../../components/create-engine-game";
 import { privateGet } from "../../../../lib/session";
 
 export default async function NewGamePage() {
@@ -9,7 +9,7 @@ export default async function NewGamePage() {
         <h1>Tạo bản nháp game</h1>
       </header>
       <p>Bản nháp được giữ riêng tư và chưa xuất hiện trong Khám phá.</p>
-      <GameForm />
+      <CreateEngineGame />
     </main>
   );
 }

@@ -10,7 +10,12 @@ import type {
   GameReviewState,
   GameProjectInput,
   UpdateGameInput,
+  CreateEngineGameInput,
+  CreateEngineGameResponse,
 } from '@indieforge/contracts';
+import { EngineProjectV2 } from '@indieforge/engine-core';
+import { createHash, randomUUID } from 'node:crypto';
+import type { StoredEngineRevision } from '../engine-projects/engine-projects.repository.js';
 
 type CreateGameInput = {
   title: string;
@@ -86,6 +91,14 @@ export type ModerationActionSummary = Omit<GameSummary, 'projectData'>;
 export type SubmittedRevision = { artifactVersion: number; submittedAt: Date };
 
 export abstract class GamesRepository {
+  abstract createEngineProject(input: {
+    ownerId: string;
+    slug: string;
+    title: string;
+    document: EngineProjectV2;
+    contentHash: string;
+    byteSize: number;
+  }): Promise<{ game: StoredGame; revision: StoredEngineRevision }>;
   abstract updateCover(
     id: string,
     ownerId: string,
@@ -200,6 +213,100 @@ export class GamesService {
     @Inject(GamesRepository) private readonly games: GamesRepository,
   ) {}
 
+  async createEngineProject(
+    userId: string,
+    input: CreateEngineGameInput,
+  ): Promise<CreateEngineGameResponse> {
+    const sceneId = randomUUID();
+    const document = canonicalize(
+      EngineProjectV2.parse({
+        schemaVersion: 2,
+        projectId: randomUUID(),
+        engineFamily: 'TFG_ENGINE',
+        entrySceneId: sceneId,
+        settings: { viewport: { width: 1280, height: 720 }, pixelArt: false },
+        assetIds: [],
+        scenes: [
+          {
+            id: sceneId,
+            name: 'Cảnh 1',
+            key: 'scene-1',
+            order: 0,
+            type: 'MIXED',
+            width: 1280,
+            height: 720,
+            background: { color: '#102040', assetId: null },
+            settings: {
+              gravityX: 0,
+              gravityY: 0,
+              grid: { enabled: true, size: 32, snap: true },
+            },
+            layers: [
+              {
+                id: randomUUID(),
+                name: 'World',
+                order: 0,
+                type: 'WORLD',
+                visible: true,
+                locked: false,
+              },
+            ],
+            objects: [],
+          },
+        ],
+        variables: { global: [], player: [], scene: {} },
+        prefabs: [],
+        events: [],
+        modules: [],
+        scripts: [],
+      }),
+    ) as EngineProjectV2;
+    const serialized = JSON.stringify(document);
+    const snapshot = {
+      document,
+      contentHash: createHash('sha256').update(serialized).digest('hex'),
+      byteSize: Buffer.byteLength(serialized),
+    };
+    for (let attempt = 0; attempt < 5; attempt++) {
+      try {
+        const { game, revision } = await this.games.createEngineProject({
+          ownerId: userId,
+          title: input.title,
+          slug: `game-chua-co-ten-${randomUUID()}`,
+          ...snapshot,
+        });
+        return {
+          game: gameSummary(game),
+          project: {
+            status: 'SUPPORTED',
+            project: EngineProjectV2.parse(revision.document),
+            revision: {
+              revisionNumber: revision.revisionNumber,
+              schemaVersion: revision.schemaVersion,
+              contentHash: revision.contentHash,
+              byteSize: revision.byteSize,
+              retention: revision.retention,
+              createdAt: revision.createdAt.toISOString(),
+            },
+          },
+        };
+      } catch (error) {
+        const failure = error as {
+          code?: unknown;
+          meta?: { target?: unknown };
+        } | null;
+        if (
+          failure?.code !== 'P2002' ||
+          !Array.isArray(failure.meta?.target) ||
+          !failure.meta.target.includes('slug')
+        )
+          throw error;
+        // A unique collision aborts the entire transaction; retry in a fresh one.
+      }
+    }
+    throw new ConflictException('Could not allocate a game slug; try again');
+  }
+
   async create(userId: string, input: CreateGameInput): Promise<GameSummary> {
     try {
       const game = await this.games.create({
@@ -279,4 +386,17 @@ export class GamesService {
     if (!submitted) throw new ConflictException('Game cannot be submitted');
     return gameSummary(submitted);
   }
+}
+
+// Match canonical revision hashing used by the engine project save repository.
+function canonicalize(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonicalize);
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value)
+        .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
+        .map(([key, child]) => [key, canonicalize(child)]),
+    );
+  }
+  return value;
 }

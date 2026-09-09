@@ -1,6 +1,8 @@
 import { ConflictException, ForbiddenException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
 import { GamesService, type GamesRepository } from './games.service.js';
+import { EngineProjectV2 } from '@indieforge/engine-core';
+import { createHash } from 'node:crypto';
 
 const storedGame = {
   id: 'game-1',
@@ -29,6 +31,26 @@ const storedGame = {
 
 function fixture() {
   const games: GamesRepository = {
+    createEngineProject: vi.fn(async (input) => ({
+      game: {
+        ...storedGame,
+        ownerId: input.ownerId,
+        title: input.title,
+        slug: input.slug,
+        sourceType: 'ENGINE',
+      },
+      revision: {
+        id: 'revision-1',
+        projectId: input.document.projectId,
+        revisionNumber: 0,
+        schemaVersion: 2,
+        document: input.document,
+        contentHash: input.contentHash,
+        byteSize: input.byteSize,
+        retention: 'PINNED',
+        createdAt: storedGame.createdAt,
+      },
+    })),
     updateCover: vi.fn(),
     create: vi.fn().mockResolvedValue(storedGame),
     findManyByOwner: vi.fn().mockResolvedValue([storedGame]),
@@ -46,6 +68,80 @@ function fixture() {
 }
 
 describe('GamesService', () => {
+  it('creates a valid empty V2 snapshot with matching bytes, hash and owner', async () => {
+    const { service, games } = fixture();
+    expect(service.createEngineProject).toBeTypeOf('function');
+    const result = await service.createEngineProject('owner-1', {
+      title: 'Game chưa có tên',
+    });
+    expect(result.game).toMatchObject({
+      sourceType: 'ENGINE',
+      title: 'Game chưa có tên',
+      projectData: null,
+    });
+    const document = EngineProjectV2.parse(result.project.project);
+    expect(document.projectId).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+    );
+    expect(document).toMatchObject({
+      schemaVersion: 2,
+      assetIds: [],
+      events: [],
+      prefabs: [],
+      modules: [],
+      scripts: [],
+      variables: { global: [], player: [], scene: {} },
+    });
+    expect(document.scenes).toHaveLength(1);
+    expect(document.scenes[0].id).toBe(document.entrySceneId);
+    expect(document.scenes[0].objects).toEqual([]);
+    const write = vi.mocked(games.createEngineProject).mock.calls[0][0];
+    expect(write.ownerId).toBe('owner-1');
+    expect(write.slug).toMatch(/^game-chua-co-ten-[a-z0-9-]+$/);
+    const serialized = JSON.stringify(write.document);
+    expect(result.project.revision).toMatchObject({
+      revisionNumber: 0,
+      schemaVersion: 2,
+      retention: 'PINNED',
+      byteSize: Buffer.byteLength(serialized),
+      contentHash: createHash('sha256').update(serialized).digest('hex'),
+    });
+  });
+
+  it('retries a slug collision with a new slug and the same project identity', async () => {
+    const { service, games } = fixture();
+    expect(service.createEngineProject).toBeTypeOf('function');
+    vi.mocked(games.createEngineProject).mockRejectedValueOnce({
+      code: 'P2002',
+      meta: { target: ['slug'] },
+    });
+    const result = await service.createEngineProject('owner-1', {
+      title: 'Draft',
+    });
+    const [first, second] = vi
+      .mocked(games.createEngineProject)
+      .mock.calls.map(([input]) => input);
+    expect(first.slug).not.toBe(second.slug);
+    expect(first.document).toEqual(second.document);
+    expect(result.game.slug).toBe(second.slug);
+  });
+
+  it.each([
+    new Error('Revision insert failed'),
+    { code: 'P2002', meta: { target: ['projectId', 'revisionNumber'] } },
+  ])(
+    'propagates non-slug creation failures without retrying',
+    async (error) => {
+      const { service, games } = fixture();
+      expect(service.createEngineProject).toBeTypeOf('function');
+      vi.mocked(games.createEngineProject).mockRejectedValueOnce(error);
+      await expect(
+        service.createEngineProject('owner-1', { title: 'Draft' }),
+      ).rejects.toBe(error);
+      expect(games.createEngineProject).toHaveBeenCalledTimes(1);
+    },
+  );
+
   it('creates a draft with clear moderation regardless of client-supplied protected fields', async () => {
     const { service, games } = fixture();
 

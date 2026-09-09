@@ -1,10 +1,40 @@
-import { render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 import StudioPage from "../app/studio/page";
 import { privateGet } from "../lib/session";
+import NewGamePage from "../app/studio/games/new/page";
+
+const { replace } = vi.hoisted(() => ({ replace: vi.fn() }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ replace, refresh: vi.fn() }) }));
 
 vi.mock("../lib/session", () => ({ privateGet: vi.fn() }));
-afterEach(() => vi.resetAllMocks());
+afterEach(() => { vi.resetAllMocks(); vi.unstubAllGlobals(); });
+
+test("one Create click posts a blank draft once and replaces the route with its Studio workspace", async () => {
+  let finish!: (response: Response) => void;
+  const fetch = vi.fn(() => new Promise<Response>((resolve) => { finish = resolve; }));
+  vi.stubGlobal("fetch", fetch);
+  render(await NewGamePage());
+  expect(screen.queryAllByRole("combobox")).toHaveLength(0);
+  const button = screen.getByRole("button", { name: "Tạo bản nháp" });
+  fireEvent.click(button);
+  fireEvent.click(button);
+  expect(button).toBeDisabled();
+  expect(fetch).toHaveBeenCalledTimes(1);
+  expect(fetch).toHaveBeenCalledWith(expect.stringMatching(/\/games\/engine-projects$/), expect.objectContaining({ method: "POST", body: "{}", credentials: "include" }));
+  await act(async () => finish(new Response(JSON.stringify({ game: { id: "returned-game" }, project: { status: "SUPPORTED" } }))));
+  await waitFor(() => expect(replace).toHaveBeenCalledWith("/studio/games/returned-game"));
+  expect(button).toBeDisabled();
+});
+
+test("a failed draft creation shows an error and lets the creator retry", async () => {
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("{}", { status: 500 })));
+  render(await NewGamePage());
+  fireEvent.click(screen.getByRole("button", { name: "Tạo bản nháp" }));
+  expect(await screen.findByRole("alert")).toBeVisible();
+  expect(screen.getByRole("button", { name: "Tạo bản nháp" })).toBeEnabled();
+  expect(replace).not.toHaveBeenCalled();
+});
 
 test.each([
   { states: [], counts: [0, 0, 0, 0] },

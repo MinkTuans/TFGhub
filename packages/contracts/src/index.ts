@@ -1,5 +1,7 @@
 export { LoginInput, RegisterInput } from './auth.js';
 export { DeveloperProfileInput } from './developers.js';
+export { CreateEngineGameInput } from './studio-projects.js';
+export type { CreateEngineGameResponse } from './studio-projects.js';
 export {
   EngineProjectReadResponse,
   EngineProjectRevisionSummary,

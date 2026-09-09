@@ -25,6 +25,16 @@ function gameProjectInput() {
 }
 
 describe('contracts', () => {
+  it('defaults and trims unified draft titles while rejecting invalid titles', () => {
+    const input = requiredContract('CreateEngineGameInput');
+    expect(input.parse({})).toEqual({ title: 'Game chưa có tên' });
+    expect(input.parse({ title: '  New world  ', sourceType: 'CODE' })).toEqual({ title: 'New world' });
+    for (const title of ['', '   ', 'a'.repeat(81), null, 1]) {
+      expect(input.safeParse({ title }).success).toBe(false);
+    }
+    expect(input.safeParse({ title: 'a'.repeat(80) }).success).toBe(true);
+  });
+
   it('accepts supported and future-schema read-only engine project responses', () => {
     const response = requiredContract('EngineProjectReadResponse');
     const summary = {
