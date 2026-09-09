@@ -1,6 +1,18 @@
 export { LoginInput, RegisterInput } from './auth.js';
 export { DeveloperProfileInput } from './developers.js';
 export {
+  EngineProjectReadResponse,
+  EngineProjectRevisionSummary,
+  ProjectRevisionConflictResponse,
+  SaveEngineProjectInput,
+} from './engine-projects.js';
+export type {
+  EngineProjectReadResponse as EngineProjectReadResponseType,
+  EngineProjectRevisionSummary as EngineProjectRevisionSummaryType,
+  ProjectRevisionConflictResponse as ProjectRevisionConflictResponseType,
+  SaveEngineProjectInput as SaveEngineProjectInputType,
+} from './engine-projects.js';
+export {
   CodeProjectInput,
   CreateGameInput,
   DiscoverGamesInput,

@@ -9,6 +9,15 @@ const {
   UpdateGameInput,
 } = contracts;
 
+function requiredContract(name: string) {
+  const schema = (contracts as Record<string, unknown>)[name];
+  expect(schema).toBeDefined();
+  return schema as {
+    parse(value: unknown): unknown;
+    safeParse(value: unknown): { success: boolean };
+  };
+}
+
 function gameProjectInput() {
   const schema = (contracts as Record<string, unknown>).GameProjectInput;
   expect(schema).toBeDefined();
@@ -16,6 +25,66 @@ function gameProjectInput() {
 }
 
 describe('contracts', () => {
+  it('accepts supported and future-schema read-only engine project responses', () => {
+    const response = requiredContract('EngineProjectReadResponse');
+    const summary = {
+      revisionNumber: 3,
+      schemaVersion: 1,
+      contentHash: 'a'.repeat(64),
+      byteSize: 42,
+      retention: 'STANDARD',
+      createdAt: '2026-09-09T00:00:00.000Z',
+    };
+
+    expect(response.safeParse({
+      status: 'SUPPORTED',
+      project: { schemaVersion: 1 },
+      revision: summary,
+    }).success).toBe(true);
+    expect(response.safeParse({
+      status: 'READ_ONLY',
+      reason: 'UNSUPPORTED_FUTURE_SCHEMA',
+      raw: { schemaVersion: 2, untouched: true },
+      schemaVersion: 2,
+      diagnostics: [],
+    }).success).toBe(true);
+  });
+
+  it('requires a nonnegative base revision and canonical document when saving', () => {
+    const input = requiredContract('SaveEngineProjectInput');
+
+    expect(input.safeParse({ baseRevision: 0, project: { schemaVersion: 1 } }).success).toBe(true);
+    expect(input.safeParse({ baseRevision: -1, project: { schemaVersion: 1 } }).success).toBe(false);
+    expect(input.safeParse({ baseRevision: 0 }).success).toBe(false);
+  });
+
+  it('defines the stable revision-conflict response', () => {
+    const conflict = requiredContract('ProjectRevisionConflictResponse');
+
+    expect(conflict.parse({
+      statusCode: 409,
+      code: 'PROJECT_REVISION_CONFLICT',
+      currentRevision: 7,
+    })).toEqual({
+      statusCode: 409,
+      code: 'PROJECT_REVISION_CONFLICT',
+      currentRevision: 7,
+    });
+  });
+
+  it('rejects malformed engine revision summaries', () => {
+    const summary = requiredContract('EngineProjectRevisionSummary');
+
+    expect(summary.safeParse({
+      revisionNumber: 1,
+      schemaVersion: 1,
+      contentHash: 'not-a-sha256',
+      byteSize: 10,
+      retention: 'STANDARD',
+      createdAt: '2026-09-09T00:00:00.000Z',
+    }).success).toBe(false);
+  });
+
   it('normalizes registration email', () => {
     expect(RegisterInput.parse({ email: ' DEV@EXAMPLE.COM ', password: 'password123' }).email)
       .toBe('dev@example.com');
