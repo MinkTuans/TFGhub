@@ -283,6 +283,14 @@
   border-bottom: 1px solid var(--border);
   background: #111a2a;
 }
+.studio-overview__heading > output {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  text-align: right;
+}
 .studio-kicker {
   color: var(--primary);
   font-size: 0.875rem;
@@ -305,6 +313,46 @@
   display: block;
   width: 100%;
   height: 100%;
+  touch-action: none;
+  outline-offset: -3px;
+}
+.studio-canvas-stage[data-tool="pan"] canvas {
+  cursor: grab;
+}
+.studio-canvas-tools {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+  padding: 0.5rem;
+  border-bottom: 1px solid var(--border);
+  background: #111a2a;
+}
+.studio-canvas-tools button {
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 0.25rem;
+  font-size: 0.8rem;
+}
+.studio-canvas-tools button[aria-pressed="true"] {
+  border-color: #65c9ff;
+  background: #19354a;
+}
+.studio-canvas-tools output {
+  min-width: 3rem;
+  text-align: center;
+  font-size: 0.8rem;
+}
+.studio-canvas-stage .studio-resize-handle {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  padding: 0;
+  transform: translate(-50%, -50%);
+  border: 2px solid #102030;
+  background: #65c9ff;
+  cursor: nwse-resize;
+  touch-action: none;
 }
 .studio-canvas-caption {
   padding: 0.75rem 1.5rem;

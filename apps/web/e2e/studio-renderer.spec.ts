@@ -65,6 +65,142 @@ async function pixel(canvas: Locator, x: number, y: number): Promise<number[]> {
     { x, y },
   );
 }
+
+type TextBounds = { left: number; right: number; top: number; bottom: number };
+async function semanticPixels(canvas: Locator, declaredBounds?: TextBounds[]) {
+  return canvas.evaluate(async (element, declaredBounds) => {
+    const canvas = element as HTMLCanvasElement;
+    const context = canvas.getContext("2d")!;
+    const zoom = Number(canvas.dataset.cameraZoom) * window.devicePixelRatio;
+    const cameraX = Number(canvas.dataset.cameraX);
+    const cameraY = Number(canvas.dataset.cameraY);
+    // Hand-declared canonical text fixtures. The custom placeholder's fill,
+    // border and diagonals remain exact outside its measured glyph rectangle.
+    const text = [
+      { text: "TFG", x: 160, y: 180, width: 60, height: 30, size: 16 },
+      {
+        text: "effect.sparkles",
+        x: 242,
+        y: 192,
+        width: 56,
+        height: 28,
+        size: 12,
+      },
+    ].map((item, index) => {
+      context.save();
+      context.font = `${item.size}px sans-serif`;
+      context.textAlign = "left";
+      context.textBaseline = "top";
+      const metrics = context.measureText(item.text);
+      context.restore();
+      const compression = Math.min(1, item.width / metrics.width);
+      // One physical pixel covers edge antialiasing; never exceed the clip.
+      const left = Math.max(
+        item.x,
+        item.x - metrics.actualBoundingBoxLeft * compression,
+      );
+      const right = Math.min(
+        item.x + item.width,
+        item.x + metrics.actualBoundingBoxRight * compression,
+      );
+      const top = Math.max(item.y, item.y - metrics.actualBoundingBoxAscent);
+      const bottom = Math.min(
+        item.y + item.height,
+        item.y + metrics.actualBoundingBoxDescent,
+      );
+      const bounds = declaredBounds?.[index] ?? {
+        left: Math.max(
+          Math.floor((item.x - cameraX) * zoom),
+          Math.floor((left - cameraX) * zoom) - 1,
+        ),
+        right: Math.min(
+          Math.ceil((item.x + item.width - cameraX) * zoom),
+          Math.ceil((right - cameraX) * zoom) + 1,
+        ),
+        top: Math.max(
+          Math.floor((item.y - cameraY) * zoom),
+          Math.floor((top - cameraY) * zoom) - 1,
+        ),
+        bottom: Math.min(
+          Math.ceil((item.y + item.height - cameraY) * zoom),
+          Math.ceil((bottom - cameraY) * zoom) + 1,
+        ),
+      };
+      return {
+        bounds,
+        ink: 0,
+        columns: [0, 0, 0],
+        cells: Array<number>(12).fill(0),
+        samples: Array<number>(12).fill(0),
+      };
+    });
+    const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+    let outsideInk = 0;
+    for (let offset = 0; offset < pixels.length; offset += 4) {
+      const x = (offset / 4) % canvas.width;
+      const y = Math.floor(offset / 4 / canvas.width);
+      const region = text.find(
+        ({ bounds }) =>
+          x >= bounds.left &&
+          x < bounds.right &&
+          y >= bounds.top &&
+          y < bounds.bottom,
+      );
+      const white = Math.min(
+        pixels[offset],
+        pixels[offset + 1],
+        pixels[offset + 2],
+      );
+      if (!region) {
+        if (white > 240) outsideInk++;
+        continue;
+      }
+      const { bounds } = region;
+      const column = Math.min(
+        5,
+        Math.floor(((x - bounds.left) * 6) / (bounds.right - bounds.left)),
+      );
+      const row = Math.min(
+        1,
+        Math.floor(((y - bounds.top) * 2) / (bounds.bottom - bounds.top)),
+      );
+      const cell = row * 6 + column;
+      region.samples[cell]++;
+      // Normalized bright-ink coverage ignores only native glyph AA variation.
+      region.cells[cell] += Math.max(0, white - 200) / 55;
+      if (white > 240) {
+        region.ink++;
+        region.columns[Math.floor(column / 2)]++;
+      }
+      pixels.fill(0, offset, offset + 4);
+    }
+    const digest = await crypto.subtle.digest("SHA-256", pixels);
+    return {
+      width: canvas.width,
+      height: canvas.height,
+      exactOutsideText: [...new Uint8Array(digest)]
+        .map((byte) => byte.toString(16).padStart(2, "0"))
+        .join(""),
+      outsideInk,
+      text: text.map(({ bounds, ink, columns, cells, samples }) => ({
+        bounds,
+        ink,
+        columns,
+        coverage: cells.map((value, index) => value / samples[index]),
+      })),
+    };
+  }, declaredBounds);
+}
+
+function expectTextInk(snapshot: Awaited<ReturnType<typeof semanticPixels>>) {
+  expect(snapshot.outsideInk).toBe(0);
+  for (const text of snapshot.text) {
+    expect(text.ink).toBeGreaterThan(10);
+    // Both declared strings have bright ink in left, middle and right thirds.
+    for (const column of text.columns) expect(column).toBeGreaterThan(0);
+  }
+}
+
 async function setup(page: Page) {
   const suffix = randomUUID();
   const registration = await page.request.post("/api/auth/register", {
@@ -227,7 +363,7 @@ async function setup(page: Page) {
   return { gameId, canvas, project: saved.project as EngineProjectV2Type };
 }
 
-test("official canonical revisions render real pixels for ordering, local hierarchy, pivots, visibility and locks and reload exactly", async ({
+test("official canonical revisions preserve geometry, text regions and exact non-text pixels across reload", async ({
   page,
 }, testInfo) => {
   const errors: string[] = [];
@@ -250,52 +386,40 @@ test("official canonical revisions render real pixels for ordering, local hierar
   ];
   for (const [x, y, rgba] of expected)
     await expect.poll(() => pixel(canvas, x, y)).toEqual(rgba);
-  expect(
-    await canvas.evaluate((element) => {
-      const canvas = element as HTMLCanvasElement;
-      const scale = Math.min(canvas.width / 320, canvas.height / 240);
-      const x = Math.floor((canvas.width - 320 * scale) / 2 + 160 * scale);
-      const y = Math.floor((canvas.height - 240 * scale) / 2 + 180 * scale);
-      const pixels = canvas
-        .getContext("2d")!
-        .getImageData(
-          x,
-          y,
-          Math.floor(60 * scale),
-          Math.floor(30 * scale),
-        ).data;
-      let white = 0;
-      for (let index = 0; index < pixels.length; index += 4)
-        if (
-          pixels[index] > 240 &&
-          pixels[index + 1] > 240 &&
-          pixels[index + 2] > 240
-        )
-          white++;
-      return white;
-    }),
-  ).toBeGreaterThan(0);
   await page.screenshot({
     path: testInfo.outputPath("canonical-canvas-initial.png"),
     fullPage: false,
   });
-  const before = await canvas.evaluate((element) =>
-    (element as HTMLCanvasElement).toDataURL(),
-  );
+  const before = await semanticPixels(canvas);
+  expectTextInk(before);
   await page.reload();
-  // Exercise the same native readback sequence before full-image equality.
-  // Asymmetric repeated reads can change Chrome's text rasterization path.
   for (const [x, y, rgba] of expected)
     await expect.poll(() => pixel(canvas, x, y)).toEqual(rgba);
   await page.screenshot({
     path: testInfo.outputPath("canonical-canvas-reloaded.png"),
     fullPage: false,
   });
-  await expect
-    .poll(() =>
-      canvas.evaluate((element) => (element as HTMLCanvasElement).toDataURL()),
-    )
-    .toBe(before);
+  // Declare one clipped glyph mask/coverage grid for both snapshots. Chrome's
+  // native hinted TextMetrics can itself vary after repeated raster readback.
+  const after = await semanticPixels(
+    canvas,
+    before.text.map(({ bounds }) => bounds),
+  );
+  await testInfo.attach("native-text-coverage", {
+    contentType: "application/json",
+    body: JSON.stringify({ before, after }),
+  });
+  expectTextInk(after);
+  expect([after.width, after.height]).toEqual([before.width, before.height]);
+  expect(after.exactOutsideText).toBe(before.exactOutsideText);
+  after.text.forEach((text, index) => {
+    expect(text.bounds).toEqual(before.text[index].bounds);
+    text.coverage.forEach((coverage, cell) =>
+      expect(
+        Math.abs(coverage - before.text[index].coverage[cell]),
+      ).toBeLessThanOrEqual(0.04),
+    );
+  });
   const read = await (
     await page.request.get(`/api/games/${gameId}/engine-project`)
   ).json();

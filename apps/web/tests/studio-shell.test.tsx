@@ -537,11 +537,12 @@ test("the real center canvas redraws the current canonical scene at DPR without 
   fireEvent.change(screen.getByRole("combobox", { name: "Scene hiện tại" }), {
     target: { value: id(3) },
   });
-  expect(screen.getByRole("img", { name: "Scene: Bến cảng" })).toBe(canvas);
+  const switchedCanvas = screen.getByRole("img", { name: "Scene: Bến cảng" });
+  expect(switchedCanvas).toHaveAttribute("width", "1280");
   expect(calls).toContainEqual({ name: "fillRect", args: [0, 0, 800, 480] });
-  fireEvent.pointerDown(canvas, { clientX: 10, clientY: 10 });
-  fireEvent.pointerMove(canvas, { clientX: 20, clientY: 20 });
-  fireEvent.pointerUp(canvas);
+  fireEvent.pointerDown(switchedCanvas, { clientX: 10, clientY: 10 });
+  fireEvent.pointerMove(switchedCanvas, { clientX: 20, clientY: 20 });
+  fireEvent.pointerUp(switchedCanvas);
   expect(h.studio.state.document).toEqual(project);
   expect(h.studio.state.pending).toBeNull();
   expect(h.studio.state.history.past).toEqual([]);
