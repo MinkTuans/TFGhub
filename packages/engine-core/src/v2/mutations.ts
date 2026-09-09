@@ -60,8 +60,18 @@ const anchoredObjects = z
       .object({
         object: transitionObject,
         beforeObjectId: StableId.nullable(),
+        beforeObjectLayerId: StableId.optional(),
       })
-      .strict(),
+      .strict()
+      .refine(
+        (entry) =>
+          entry.beforeObjectId !== null ||
+          entry.beforeObjectLayerId === undefined,
+        {
+          message: "A layer-qualified anchor requires an object ID",
+          path: ["beforeObjectLayerId"],
+        },
+      ),
   )
   .max(transitionLimits.objects);
 const transitionScene = SceneV2.innerType().extend({
@@ -283,27 +293,40 @@ function reorder(
 
 // Restore in reverse anchor order, as with insert(), without quadratic scans
 // and splices for large transitional snapshots. Existing duplicate IDs may be
-// temporary: anchors keep first-match semantics; final validation owns IDs.
+// temporary: unqualified anchors keep first-match semantics. Layer restoration
+// qualifies anchors so repeated cross-layer IDs cannot change physical order.
 function insertObjects(
   scene: SceneV2,
   objects: z.infer<typeof anchoredObjects>,
+  allowCrossLayerIds = false,
 ) {
   if (!objects.length) return;
   type Link = { value: GameObjectV2 | null; previous: Link; next: Link };
   const root = { value: null } as Link;
   root.previous = root.next = root;
   const byId = new Map<string, Link>();
+  const key = (id: string, layerId?: string) =>
+    layerId ? `${layerId}/${id}` : id;
   const add = (value: GameObjectV2, before: Link) => {
     const link = { value, previous: before.previous, next: before };
     before.previous.next = link;
     before.previous = link;
     if (!byId.has(value.id)) byId.set(value.id, link);
+    const scoped = key(value.id, value.layerId);
+    if (!byId.has(scoped)) byId.set(scoped, link);
   };
   scene.objects.forEach((object) => add(object, root));
   for (let index = objects.length - 1; index >= 0; index -= 1) {
-    const { object, beforeObjectId } = objects[index]!;
-    if (byId.has(object.id)) throw new Error("Stable ID already exists");
-    const anchor = beforeObjectId ? byId.get(beforeObjectId) : root;
+    const { object, beforeObjectId, beforeObjectLayerId } = objects[index]!;
+    // Only structural layer carriers may overlap ownership on another layer.
+    // Same-layer IDs stay strict so the exact layer inverse cannot remove a survivor.
+    if (
+      byId.has(key(object.id, allowCrossLayerIds ? object.layerId : undefined))
+    )
+      throw new Error("Stable ID already exists");
+    const anchor = beforeObjectId
+      ? byId.get(key(beforeObjectId, beforeObjectLayerId))
+      : root;
     if (!anchor) throw new ProjectMutationTargetError(beforeObjectId!);
     add(object, anchor);
   }
@@ -432,6 +455,26 @@ function assertFreshDuplicateIds(project: EngineProjectV2, copies: unknown) {
   for (const id of ownedIds(copies)) {
     if (ids.has(id)) throw new Error("Stable ID already exists");
     ids.add(id);
+  }
+}
+
+// A layer restore must never need repeated owned IDs in the same layer. Keep
+// this invariant from the first carrier/edit, not just when a snapshot replays.
+// Missing layers are forward references and do not themselves own an ID yet.
+function assertUniqueLayerOwnedIds(scene: SceneV2) {
+  const layers = new Map<string, Set<string>>();
+  for (const layer of scene.layers) {
+    if (layers.has(layer.id))
+      throw new Error("Same-layer stable IDs must be unique");
+    layers.set(layer.id, new Set([layer.id]));
+  }
+  for (const object of scene.objects) {
+    const ids = layers.get(object.layerId) ?? new Set<string>();
+    layers.set(object.layerId, ids);
+    for (const id of ownedIds(object)) {
+      if (ids.has(id)) throw new Error("Same-layer stable IDs must be unique");
+      ids.add(id);
+    }
   }
 }
 
@@ -592,7 +635,7 @@ function applyBatch(
           )
         )
           throw new Error("Restored object must belong to the created layer");
-        insertObjects(scene, command.objects);
+        insertObjects(scene, command.objects, true);
         break;
       }
       case "layer.update":
@@ -676,7 +719,12 @@ function applyBatch(
         const ids = new Set(command.objectIds);
         if (ids.size !== command.objectIds.length)
           throw new Error("Duplicate object ID");
-        const existing = new Set(scene.objects.map((object) => object.id));
+        const existing = new Set<string>();
+        for (const object of scene.objects) {
+          if (ids.has(object.id) && existing.has(object.id))
+            throw new Error("Ambiguous object ID");
+          existing.add(object.id);
+        }
         for (const id of ids)
           if (!existing.has(id)) throw new ProjectMutationTargetError(id);
         scene.objects = scene.objects.filter((object) => !ids.has(object.id));
@@ -715,8 +763,8 @@ function applyBatch(
         break;
       }
     }
-    // Resource safety only, never intermediate semantic validation. Every
-    // captured inverse must fit the same bounded transition carrier schema.
+    // Resource and local ownership safety for replayable transition carriers;
+    // other semantics/references remain the final canonical validation's job.
     const touched =
       command.type === "scene.create"
         ? command.scene
@@ -734,6 +782,7 @@ function applyBatch(
         )
       )
         throw new Error("Atomic object components limit exceeded");
+      assertUniqueLayerOwnedIds(touched);
     }
   }
   return { document: EngineProjectV2.parse(next), undo, redo };
@@ -789,16 +838,17 @@ function inverse(
       return {
         type: "object.create",
         sceneId: command.sceneId,
-        objects: scene!.objects.flatMap((object, index) =>
-          ids.has(object.id)
-            ? [
-                {
-                  object,
-                  beforeObjectId: scene!.objects[index + 1]?.id ?? null,
-                },
-              ]
-            : [],
-        ),
+        objects: scene!.objects.flatMap((object, index) => {
+          if (!ids.has(object.id)) return [];
+          const anchor = scene!.objects[index + 1];
+          return [
+            {
+              object,
+              beforeObjectId: anchor?.id ?? null,
+              ...(anchor ? { beforeObjectLayerId: anchor.layerId } : {}),
+            },
+          ];
+        }),
       };
     }
     case "object.update": {
@@ -925,16 +975,18 @@ function inverse(
         sceneId: command.sceneId,
         layer: target(scene!.layers, command.layerId),
         beforeLayerId: nextId(scene!.layers, command.layerId),
-        objects: scene!.objects.flatMap((object, index) =>
-          object.layerId === command.layerId && ids.has(object.id)
-            ? [
-                {
-                  object,
-                  beforeObjectId: scene!.objects[index + 1]?.id ?? null,
-                },
-              ]
-            : [],
-        ),
+        objects: scene!.objects.flatMap((object, index) => {
+          if (object.layerId !== command.layerId || !ids.has(object.id))
+            return [];
+          const anchor = scene!.objects[index + 1];
+          return [
+            {
+              object,
+              beforeObjectId: anchor?.id ?? null,
+              ...(anchor ? { beforeObjectLayerId: anchor.layerId } : {}),
+            },
+          ];
+        }),
       };
     }
   }

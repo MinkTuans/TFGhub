@@ -248,7 +248,7 @@ describe("object and component authoring", () => {
   );
 
   it.each([false, true])(
-    "review: layer deletion stays scoped during temporary cross-layer ID collisions (exact %s)",
+    "review2: layer deletion round-trips temporary cross-layer ID collisions (exact %s)",
     (exact) => {
       const input = project();
       const layer = input.scenes[0]!.layers[0]!;
@@ -285,8 +285,493 @@ describe("object and component authoring", () => {
         },
       ];
       const before = structuredClone({ input, commands });
-      expect(apply(input, commands).scenes.at(-1)!.objects).toEqual([survivor]);
+      const result = roundTrip(input, commands);
+      expect(result.document.scenes.at(-1)!.objects).toEqual([survivor]);
+      const restored = history(
+        result.document,
+        engine.ProjectMutation.array().parse(result.undo),
+      );
+      expect(restored.undo[0]).toMatchObject({ type: "scene.create", scene });
       expect({ input, commands }).toEqual(before);
+    },
+  );
+
+  function collisionCarrier(objects: engine.GameObjectV2Type[]) {
+    const input = project();
+    const layer = input.scenes[0]!.layers[0]!;
+    const scene = {
+      ...input.scenes[0]!,
+      id: id("0090"),
+      key: "carrier",
+      order: 2,
+      layers: [
+        { ...layer, id: id("0091"), order: 0 },
+        { ...layer, id: id("0092"), order: 1 },
+      ],
+      objects,
+    };
+    const commands = [
+      {
+        type: "scene.create",
+        scene,
+        variables: null,
+        beforeSceneId: null,
+        entry: false,
+      },
+      {
+        type: "layer.delete",
+        sceneId: scene.id,
+        layerId: id("0091"),
+        objectIds: objects
+          .filter((value) => value.layerId === id("0091"))
+          .map((value) => value.id),
+        confirmed: true,
+      },
+    ];
+    return { input, scene, commands };
+  }
+
+  it.each(["survivor between", "survivor before", "incoming chain"])(
+    "review2: restores the exact ambiguous anchor layout with %s",
+    (layout) => {
+      const incoming = { ...object("0030", 7), layerId: id("0091") };
+      const survivor = {
+        ...object("0040", 13),
+        id: incoming.id,
+        layerId: id("0092"),
+      };
+      const earlier = { ...object("0050", 2), layerId: id("0091") };
+      const last = { ...object("0060", 31), layerId: id("0092") };
+      const objects =
+        layout === "survivor between"
+          ? [earlier, survivor, incoming, last]
+          : layout === "survivor before"
+            ? [survivor, earlier, incoming, last]
+            : [earlier, incoming, survivor, last];
+      const { input, scene, commands } = collisionCarrier(objects);
+      const before = structuredClone({ input, commands });
+      const result = roundTrip(input, commands);
+      expect(result.document.scenes.at(-1)!.objects).toEqual([survivor, last]);
+      const restored = history(
+        result.document,
+        engine.ProjectMutation.array().parse(result.undo),
+      );
+      expect(restored.undo[0]).toMatchObject({ type: "scene.create", scene });
+      expect({ input, commands }).toEqual(before);
+    },
+  );
+
+  it.each(["object", "component", "node", "choice", "all"])(
+    "review2: restores temporary %s owned-ID collisions without aliasing",
+    (collision) => {
+      const incoming = { ...object("0030", 0), layerId: id("0091") };
+      const survivor = { ...object("0040", 0), layerId: id("0092") };
+      const dialogue = (suffix: string, nodeId: string, choiceId: string) =>
+        component(suffix, "Dialogue", {
+          startNodeId: nodeId,
+          nodes: [
+            {
+              id: nodeId,
+              speakerName: "",
+              text: "",
+              avatarAssetId: null,
+              choices: [
+                { id: choiceId, text: "Go", eventId: null, conditionId: null },
+              ],
+            },
+          ],
+        });
+      incoming.components.push(
+        dialogue("0032", id("0033"), id("0034")),
+        component("0035", "Custom", {
+          definitionKey: "custom.alias",
+          config: { nested: { text: "original" } },
+        }),
+      );
+      survivor.components.push(
+        dialogue(
+          "0042",
+          collision === "node" ? id("0033") : id("0043"),
+          collision === "choice" ? id("0034") : id("0044"),
+        ),
+      );
+      if (collision === "object" || collision === "all")
+        survivor.id = incoming.id;
+      if (collision === "component")
+        survivor.components[0]!.id = incoming.components[0]!.id;
+      if (collision === "all")
+        survivor.components = structuredClone(incoming.components);
+      const { input, scene, commands } = collisionCarrier([incoming, survivor]);
+      const before = structuredClone({ input, commands });
+      const result = roundTrip(input, commands);
+      const restored = history(
+        result.document,
+        engine.ProjectMutation.array().parse(result.undo),
+      );
+      expect(restored.undo[0]).toMatchObject({ type: "scene.create", scene });
+      const inverse = result.undo.find(
+        (value) => value.type === "layer.create",
+      )!;
+      if (inverse.type !== "layer.create")
+        throw new Error("Missing layer inverse");
+      const custom = inverse.objects[0]!.object.components[2]!.properties as {
+        config: { nested: { text: string } };
+      };
+      custom.config.nested.text = "changed inverse";
+      expect({ input, commands }).toEqual(before);
+      expect(result.redo).toEqual(commands);
+      expect(result.document.scenes.at(-1)!.objects).toEqual([survivor]);
+    },
+  );
+
+  it("review2: layer restoration still rejects collisions left in the final project", () => {
+    const incoming = { ...object("0030", 0), layerId: id("0091") };
+    const survivor = {
+      ...object("0040", 0),
+      id: incoming.id,
+      layerId: id("0092"),
+    };
+    const { input, scene, commands } = collisionCarrier([incoming, survivor]);
+    const result = history(input, commands);
+    expect(() => apply(result.document, [result.undo[0]])).toThrow(
+      /Stable IDs must be unique/,
+    );
+    expect(
+      engine.EngineProjectV2.safeParse({
+        ...input,
+        scenes: [...input.scenes, scene],
+      }).success,
+    ).toBe(false);
+  });
+
+  it("review2: accepts a qualified anchor and validates its layer membership", () => {
+    const input = populated();
+    const command = {
+      type: "layer.create",
+      sceneId,
+      layer: { ...input.scenes[0]!.layers[0]!, id: id("0090"), order: 10 },
+      beforeLayerId: null,
+      objects: [
+        {
+          object: { ...object("0030", 0), layerId: id("0090") },
+          beforeObjectId: id("0010"),
+          beforeObjectLayerId: id("0004"),
+        },
+      ],
+    };
+    const result = roundTrip(input, [command]);
+    expect(result.document.scenes[0]!.objects.map((value) => value.id)).toEqual(
+      [id("0030"), id("0010"), id("0020")],
+    );
+    const wrongLayer = structuredClone(command);
+    wrongLayer.objects[0]!.beforeObjectLayerId = id("0006");
+    expect(() => apply(input, [wrongLayer])).toThrow(
+      /Mutation target does not exist/,
+    );
+    expect(
+      engine.ProjectMutation.safeParse({
+        ...command,
+        objects: [{ ...command.objects[0], beforeObjectId: null }],
+      }).success,
+    ).toBe(false);
+  });
+
+  it.each(["object.create", "layer.create"])(
+    "review2: %s does not weaken same-ownership insertion checks",
+    (type) => {
+      const input = populated();
+      const incoming = {
+        ...object("0030", 0),
+        id: id("0010"),
+        layerId: id("0090"),
+      };
+      const commands =
+        type === "object.create"
+          ? [create({ ...incoming, layerId: id("0006") })]
+          : [
+              update({ layerId: incoming.layerId }),
+              {
+                type,
+                sceneId,
+                layer: {
+                  ...input.scenes[0]!.layers[0]!,
+                  id: incoming.layerId,
+                  order: 10,
+                },
+                objects: [{ object: incoming, beforeObjectId: null }],
+                beforeLayerId: null,
+              },
+            ];
+      const cleanup = {
+        type: "scene.delete",
+        sceneId,
+        replacementSceneId: id("0003"),
+        confirmed: true,
+      };
+      expect(() => history(input, [...commands, cleanup])).toThrow(
+        /Stable ID already exists/,
+      );
+    },
+  );
+
+  it.each([99_999, 100_000])(
+    "review2: composed cross-layer restoration respects the object peak from %i existing objects",
+    (count) => {
+      const value = { ...object("0030", 0), components: [] };
+      const { input, scene } = collisionCarrier(
+        Array.from({ length: count }, (_, index) => ({
+          ...value,
+          id:
+            index === 0
+              ? value.id
+              : `550e8400-e29b-41d4-a716-${String(index).padStart(12, "0")}`,
+          layerId: id("0092"),
+        })),
+      );
+      const commands = [
+        {
+          type: "scene.create",
+          scene,
+          variables: null,
+          beforeSceneId: null,
+          entry: false,
+        },
+        {
+          type: "layer.create",
+          sceneId: scene.id,
+          layer: { ...scene.layers[0]!, id: id("0093"), order: 2 },
+          objects: [
+            { object: { ...value, layerId: id("0093") }, beforeObjectId: null },
+          ],
+          beforeLayerId: null,
+        },
+        {
+          type: "scene.delete",
+          sceneId: scene.id,
+          replacementSceneId: null,
+          confirmed: true,
+        },
+      ];
+      if (count === 99_999) expect(apply(input, commands)).toEqual(input);
+      else
+        expect(() => history(input, commands)).toThrow(
+          /Atomic scene objects limit exceeded/,
+        );
+    },
+    20_000,
+  );
+
+  function collidingLayerObjects(collision: string) {
+    const first = { ...object("0030", 0), layerId: id("0091") };
+    const second = { ...object("0040", 1), layerId: first.layerId };
+    const dialogue = (suffix: string, node: string, choice: string) =>
+      component(suffix, "Dialogue", {
+        startNodeId: node,
+        nodes: [
+          {
+            id: node,
+            speakerName: "",
+            text: "",
+            avatarAssetId: null,
+            choices: [
+              { id: choice, text: "Go", eventId: null, conditionId: null },
+            ],
+          },
+        ],
+      });
+    first.components.push(dialogue("0032", id("0033"), id("0034")));
+    second.components.push(
+      dialogue(
+        "0042",
+        collision === "node" ? id("0033") : id("0043"),
+        collision === "choice" ? id("0034") : id("0044"),
+      ),
+    );
+    if (collision === "object") second.id = first.id;
+    if (collision === "component")
+      second.components[0]!.id = first.components[0]!.id;
+    if (collision === "layer") first.id = first.layerId;
+    return [first, second];
+  }
+
+  it.each(["object", "component", "node", "choice", "layer"])(
+    "review2-origin: rejects same-layer %s collisions in scene.create before later deletion",
+    (collision) => {
+      const objects = collidingLayerObjects(collision);
+      const { input, commands } = collisionCarrier(objects);
+      commands[1] = {
+        ...commands[1],
+        objectIds: [...new Set(objects.map((value) => value.id))],
+      } as (typeof commands)[number];
+      const before = structuredClone({ input, commands });
+      expect(() => history(input, commands)).toThrow(
+        /Same-layer stable IDs must be unique/,
+      );
+      expect(() => apply(input, commands)).toThrow(
+        /Same-layer stable IDs must be unique/,
+      );
+      expect({ input, commands }).toEqual(before);
+    },
+  );
+
+  it.each(["component", "node", "choice", "layer"])(
+    "review2-origin: rejects same-layer %s collisions in layer.create before later deletion",
+    (collision) => {
+      const input = populated();
+      const objects = collidingLayerObjects(collision);
+      const commands = [
+        {
+          type: "layer.create",
+          sceneId,
+          layer: { ...input.scenes[0]!.layers[0]!, id: id("0091"), order: 10 },
+          objects: objects.map((object) => ({ object, beforeObjectId: null })),
+          beforeLayerId: null,
+        },
+        { type: "layer.delete", sceneId, layerId: id("0091"), confirmed: true },
+      ];
+      expect(() => history(input, commands)).toThrow(
+        /Same-layer stable IDs must be unique/,
+      );
+    },
+  );
+
+  it("review2-origin: rejects repeated layer ownership in scene.create", () => {
+    const { input, scene } = collisionCarrier([]);
+    scene.layers[1]!.id = scene.layers[0]!.id;
+    expect(() =>
+      history(input, [
+        {
+          type: "scene.create",
+          scene,
+          variables: null,
+          beforeSceneId: null,
+          entry: false,
+        },
+        {
+          type: "scene.delete",
+          sceneId: scene.id,
+          replacementSceneId: null,
+          confirmed: true,
+        },
+      ]),
+    ).toThrow(/Same-layer stable IDs must be unique/);
+  });
+
+  it.each(["add", "node", "choice"])(
+    "review2-origin: rejects component %s introducing same-layer ownership collisions",
+    (operation) => {
+      const input = populated();
+      const objects = collidingLayerObjects("none").map((value) => ({
+        ...value,
+        layerId: id("0004"),
+      }));
+      input.scenes[0]!.objects = objects;
+      const properties = structuredClone(
+        objects[0]!.components[1]!.properties,
+      ) as {
+        startNodeId: string;
+        nodes: Array<{ id: string; choices: Array<{ id: string }> }>;
+      };
+      if (operation === "node") {
+        properties.startNodeId = id("0043");
+        properties.nodes[0]!.id = id("0043");
+      }
+      if (operation === "choice")
+        properties.nodes[0]!.choices[0]!.id = id("0044");
+      const command =
+        operation === "add"
+          ? add(component("0041", "Health"), objects[0]!.id)
+          : {
+              type: "component.update",
+              sceneId,
+              objectId: objects[0]!.id,
+              componentId: id("0032"),
+              properties,
+            };
+      const commands = [
+        command,
+        { type: "layer.delete", sceneId, layerId: id("0004"), confirmed: true },
+      ];
+      const before = structuredClone({ input, commands });
+      expect(() => history(input, commands)).toThrow(
+        /Same-layer stable IDs must be unique/,
+      );
+      expect({ input, commands }).toEqual(before);
+    },
+  );
+
+  it.each(["object", "component", "node", "choice"])(
+    "review2-origin: rejects a layer move merging cross-layer %s IDs into one owner",
+    (collision) => {
+      const objects = collidingLayerObjects(collision);
+      objects[1]!.layerId = id("0092");
+      const { input, scene, commands } = collisionCarrier(objects);
+      const mutations = [
+        commands[0],
+        {
+          type: "object.update",
+          sceneId: scene.id,
+          objectId: objects[0]!.id,
+          changes: { layerId: id("0092") },
+        },
+        {
+          type: "layer.delete",
+          sceneId: scene.id,
+          layerId: id("0092"),
+          objectIds: [...new Set(objects.map((value) => value.id))],
+          confirmed: true,
+        },
+      ];
+      expect(() => history(input, mutations)).toThrow(
+        /Same-layer stable IDs must be unique/,
+      );
+    },
+  );
+
+  it("review2-origin: rejects object.delete when an ID names multiple layer occurrences", () => {
+    const objects = collidingLayerObjects("object");
+    objects[1]!.layerId = id("0092");
+    const { input, scene, commands } = collisionCarrier(objects);
+    const mutations = [
+      commands[0],
+      {
+        type: "object.delete",
+        sceneId: scene.id,
+        objectIds: [objects[0]!.id],
+        confirmed: true,
+      },
+    ];
+    const before = structuredClone({ input, mutations });
+    expect(() => history(input, mutations)).toThrow(/Ambiguous object ID/);
+    expect(() => apply(input, mutations)).toThrow(/Ambiguous object ID/);
+    expect({ input, mutations }).toEqual(before);
+  });
+
+  it.each([false, true])(
+    "review2-origin: restores unique object deletion with a repeated next anchor (survivor first %s)",
+    (survivorFirst) => {
+      const [first, second] = collidingLayerObjects("object");
+      second!.layerId = id("0092");
+      const unique = { ...object("0050", 2), layerId: id("0091") };
+      const { input, scene, commands } = collisionCarrier(
+        survivorFirst ? [second!, unique, first!] : [unique, second!, first!],
+      );
+      const mutations = [
+        commands[0],
+        {
+          type: "object.delete",
+          sceneId: scene.id,
+          objectIds: [unique.id],
+          confirmed: true,
+        },
+        { ...commands[1], objectIds: [first!.id] },
+      ];
+      const result = roundTrip(input, mutations);
+      const restored = history(
+        result.document,
+        engine.ProjectMutation.array().parse(result.undo),
+      );
+      expect(restored.undo[0]).toMatchObject({ type: "scene.create", scene });
     },
   );
 
@@ -2230,8 +2715,17 @@ describe("scene and layer authoring", () => {
         components: [],
       };
       if (collection === "layers")
-        scene.layers = Array.from({ length: 199 }, () => scene.layers[0]!);
-      else scene.objects = Array.from({ length: 100_000 }, () => object);
+        scene.layers = Array.from({ length: 199 }, (_, order) => ({
+          ...scene.layers[0]!,
+          id: id(String(1000 + order)),
+          order,
+        }));
+      else
+        scene.objects = Array.from({ length: 100_000 }, (_, order) => ({
+          ...object,
+          id: `550e8400-e29b-41d4-a716-${String(order).padStart(12, "0")}`,
+          order,
+        }));
       expect(() =>
         apply(before, [
           {
