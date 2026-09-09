@@ -267,14 +267,14 @@ describe('EngineProjectV1', () => {
 
   it('preserves malformed and future raw inputs instead of replacing them', () => {
     const malformed = { schemaVersion: 1, projectId: 'not-an-id', privateField: { keep: true } };
-    const future = { schemaVersion: 2, projectId: ids.project, futureField: { keep: true } };
+    const future = { schemaVersion: 3, projectId: ids.project, futureField: { keep: true } };
 
     const malformedResult = readEngineProject(malformed);
     const futureResult = readEngineProject(future);
 
     expect(malformedResult).toMatchObject({ status: 'INVALID' });
     expect(malformedResult.raw).toBe(malformed);
-    expect(futureResult).toEqual({ status: 'UNSUPPORTED_FUTURE_SCHEMA', raw: future, schemaVersion: 2 });
+    expect(futureResult).toEqual({ status: 'UNSUPPORTED_FUTURE_SCHEMA', raw: future, schemaVersion: 3 });
     expect(futureResult.raw).toBe(future);
   });
 });
