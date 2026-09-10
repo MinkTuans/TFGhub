@@ -34,7 +34,7 @@ export function configureApp(app: INestApplication): void {
       .toLowerCase();
     const isUpload =
       request.method === 'POST' &&
-      /^\/games\/[^/]+\/(?:upload|cover)\/?$/.test(request.path);
+      /^\/games\/[^/]+\/(?:upload|cover|assets)\/?$/.test(request.path);
     if (
       contentType !== undefined &&
       contentType !== 'application/json' &&

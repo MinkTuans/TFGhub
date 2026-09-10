@@ -2,6 +2,11 @@
   "name": "indieforge",
   "private": true,
   "packageManager": "pnpm@10.0.0",
+  "pnpm": {
+    "overrides": {
+      "multer": "2.3.0"
+    }
+  },
   "scripts": {
     "db:generate": "turbo run generate --filter=@indieforge/database --output-logs=errors-only",
     "dev": "pnpm db:generate && turbo dev",

@@ -19,6 +19,16 @@ const engineGameSourceMigrationPath = fileURLToPath(
 );
 
 describe('database schema', () => {
+  it('exposes backward-compatible JSON import metadata on assets', () => {
+    const asset = Prisma.dmmf.datamodel.models.find(
+      ({ name }) => name === 'GameAsset',
+    );
+    expect(asset?.fields.find(({ name }) => name === 'metadata')).toMatchObject({
+      type: 'Json',
+      isRequired: true,
+      default: '{}',
+    });
+  });
   it('exposes project-scoped mutation identities and their exact revision relation in the generated client', () => {
     const model = Prisma.dmmf.datamodel.models.find(
       ({ name }) => name === 'EngineProjectMutation',
@@ -46,7 +56,7 @@ describe('database schema', () => {
         stdio: 'pipe',
       });
     }).not.toThrow();
-  });
+  }, 15000);
 
   it('declares versioned cover metadata and bounded viewport defaults', () => {
     const schema = readFileSync(schemaPath, 'utf8');

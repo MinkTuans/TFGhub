@@ -1,4 +1,15 @@
 export { LoginInput, RegisterInput } from './auth.js';
+export {
+  AssetCategory,
+  AssetImportMetadata,
+  GameAssetKind,
+  GameAssetState,
+  GameAssetSummary,
+  ListGameAssetsInput,
+  ListGameAssetsResponse,
+  UpdateGameAssetInput,
+  UploadGameAssetInput,
+} from './game-assets.js';
 export { DeveloperProfileInput } from './developers.js';
 // Studio uses the same canonical validation and mutation reducer as the API.
 export {

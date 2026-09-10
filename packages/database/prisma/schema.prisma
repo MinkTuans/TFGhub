@@ -177,6 +177,7 @@ model EngineProjectMutation {
 }
 
 model GameAsset {
+  metadata     Json                  @default("{}")
   id           String                @id
   projectId    String
   kind         GameAssetKind
