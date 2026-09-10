@@ -18,7 +18,13 @@ import {
   assetStorageKey,
   thumbnailStorageKey,
 } from './asset-storage.js';
-import { assetHash, prepareAsset, type AssetUpload } from './asset-types.js';
+import {
+  assetHash,
+  prepareAsset,
+  type AssetUpload,
+  type PreparedAsset,
+} from './asset-types.js';
+import { isDeepStrictEqual } from 'node:util';
 import {
   assetIncludes,
   GameAssetsRepository,
@@ -34,6 +40,40 @@ export class GameAssetsService {
   ) {}
   owned(gameId: string, userId: string) {
     return this.repository.owned(gameId, userId);
+  }
+  private assertUploadIdentity(
+    row: AssetRecord,
+    expected: Pick<
+      AssetRecord,
+      | 'id'
+      | 'projectId'
+      | 'kind'
+      | 'storageKey'
+      | 'contentHash'
+      | 'mimeType'
+      | 'byteSize'
+    >,
+    prepared: PreparedAsset,
+  ) {
+    const { category: _actualCategory, ...actualMetadata } =
+      AssetImportMetadata.parse(row.metadata);
+    const { category: _expectedCategory, ...preparedMetadata } =
+      prepared.metadata;
+    const finalized = row.state !== 'UPLOADING';
+    if (
+      row.id !== expected.id ||
+      row.projectId !== expected.projectId ||
+      row.kind !== expected.kind ||
+      row.storageKey !== expected.storageKey ||
+      row.contentHash !== expected.contentHash ||
+      row.mimeType !== expected.mimeType ||
+      row.byteSize !== expected.byteSize ||
+      row.width !== (finalized ? prepared.width : null) ||
+      row.height !== (finalized ? prepared.height : null) ||
+      row.durationMs !== (finalized ? prepared.durationMs : null) ||
+      !isDeepStrictEqual(actualMetadata, finalized ? preparedMetadata : {})
+    )
+      throw new ConflictException('Upload identity already used');
   }
   private summary(gameId: string, row: AssetRecord): GameAssetSummary {
     const metadata = AssetImportMetadata.parse(row.metadata);
@@ -83,42 +123,40 @@ export class GameAssetsService {
       }).success
     )
       throw new BadRequestException('Invalid asset filename');
+    const prepared = await prepareAsset(file);
     const contentHash = assetHash(file.buffer);
-    const row = await this.repository.reserve(gameId, userId, {
+    const reservation = {
       id: input.data.uploadId,
       projectId,
-      kind: file.mimetype === 'audio/wav' ? 'AUDIO' : 'IMAGE',
+      kind: prepared.kind,
       displayName: display.data.displayName!,
       state: 'UPLOADING',
       storageKey: assetStorageKey(projectId, input.data.uploadId, contentHash),
       contentHash,
-      mimeType: file.mimetype,
+      mimeType: prepared.mimeType,
       byteSize: BigInt(file.buffer.length),
       width: null,
       height: null,
       durationMs: null,
       metadata: { category: input.data.category },
-    });
-    let prepared;
-    try {
-      prepared = await prepareAsset(file);
-    } catch (error) {
-      await this.repository.withOwner(gameId, userId, async (tx, project) => {
-        const fresh = await this.repository.locked(tx, project, row.id);
-        if (fresh.state === 'UPLOADING')
-          await tx.gameAsset.delete({ where: { id: row.id } });
-      });
-      throw error;
-    }
+    } as const;
+    const row = await this.repository.reserve(gameId, userId, reservation);
     try {
       return await this.repository.withOwner(
         gameId,
         userId,
         async (tx, project) => {
           const fresh = await this.repository.locked(tx, project, row.id);
+          this.assertUploadIdentity(fresh, reservation, prepared);
+          if (fresh.state === 'READY')
+            await this.storage.install(
+              fresh.storageKey,
+              file.buffer,
+              prepared.thumbnail,
+            );
           if (fresh.state !== 'UPLOADING') return this.summary(gameId, fresh);
           await this.storage.install(
-            row.storageKey,
+            fresh.storageKey,
             file.buffer,
             prepared.thumbnail,
           );
@@ -141,19 +179,34 @@ export class GameAssetsService {
           return this.summary(gameId, ready);
         },
       );
-    } catch {
+    } catch (error) {
       // Waiting on the same owner/asset locks resolves an uncertain commit. If
       // it did not commit, keep sealed bytes and UPLOADING for an exact retry.
       try {
-        const fresh = await this.repository.withOwner(
+        const reconciled = await this.repository.withOwner(
           gameId,
           userId,
-          (tx, project) => this.repository.locked(tx, project, row.id),
+          async (tx, project) => {
+            const fresh = await this.repository.locked(tx, project, row.id);
+            this.assertUploadIdentity(fresh, reservation, prepared);
+            if (fresh.state === 'READY')
+              await this.storage.install(
+                fresh.storageKey,
+                file.buffer,
+                prepared.thumbnail,
+              );
+            return fresh.state === 'UPLOADING'
+              ? null
+              : this.summary(gameId, fresh);
+          },
         );
-        if (fresh.state !== 'UPLOADING') return this.summary(gameId, fresh);
-      } catch {
+        if (reconciled) return reconciled;
+      } catch (reconciliationError) {
+        if (reconciliationError instanceof ConflictException)
+          throw reconciliationError;
         /* DB unavailable: retain all potentially committed bytes. */
       }
+      if (error instanceof ConflictException) throw error;
       throw new ServiceUnavailableException(
         'Asset finalization unavailable; retry the same uploadId and bytes',
       );

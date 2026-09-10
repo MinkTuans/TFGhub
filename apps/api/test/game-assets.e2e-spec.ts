@@ -756,6 +756,109 @@ describeDatabase(
         (await owner.get(`${base()}/${id}/content`).expect(200)).body,
       ).toEqual(image);
     });
+    it('keeps each READY upload byte-exact across a failed shared retry and replacement attempt', async () => {
+      const id = randomUUID();
+      const red = await sharp({
+        create: { width: 24, height: 12, channels: 3, background: 'red' },
+      })
+        .png()
+        .toBuffer();
+      const blue = await sharp({
+        create: { width: 32, height: 16, channels: 3, background: 'blue' },
+      })
+        .png()
+        .toBuffer();
+      const repository = app.get(GameAssetsRepository);
+      const reserve = repository.reserve.bind(repository);
+      let releaseRed!: () => void;
+      let releaseBlue!: () => void;
+      let redReserved!: () => void;
+      let blueReserved!: () => void;
+      const redGate = new Promise<void>((resolve) => {
+        releaseRed = resolve;
+      });
+      const blueGate = new Promise<void>((resolve) => {
+        releaseBlue = resolve;
+      });
+      const redEntered = new Promise<void>((resolve) => {
+        redReserved = resolve;
+      });
+      const blueEntered = new Promise<void>((resolve) => {
+        blueReserved = resolve;
+      });
+      let heldRed = false;
+      vi.spyOn(repository, 'reserve').mockImplementation(async (...args) => {
+        const row = await reserve(...args);
+        if (args[2].contentHash === hash(red) && !heldRed) {
+          heldRed = true;
+          redReserved();
+          await redGate;
+        } else if (args[2].contentHash === hash(blue)) {
+          blueReserved();
+          await blueGate;
+        }
+        return row;
+      });
+      const service = app.get(GameAssetsService);
+      const fields = { uploadId: id, category: 'CHARACTER' };
+      const first = service.upload(gameId, ownerId, fields, {
+        buffer: red,
+        originalname: 'hero.png',
+        mimetype: 'image/png',
+      });
+      await redEntered;
+      await expect(
+        service.upload(gameId, ownerId, fields, {
+          buffer: red,
+          originalname: 'hero.jpg',
+          mimetype: 'image/png',
+        }),
+      ).rejects.toThrow('Invalid or unsupported media');
+      const replacement = service.upload(gameId, ownerId, fields, {
+        buffer: blue,
+        originalname: 'hero.png',
+        mimetype: 'image/png',
+      });
+      const replacementOutcome = replacement.then(
+        (value) => ({ status: 'fulfilled' as const, value }),
+        (reason: unknown) => ({ status: 'rejected' as const, reason }),
+      );
+      const replacementPhase = await Promise.race([
+        blueEntered.then(() => 'reserved' as const),
+        replacementOutcome.then(() => 'settled' as const),
+      ]);
+      releaseRed();
+      const result = await first;
+      if (replacementPhase === 'reserved') releaseBlue();
+      const second = await replacementOutcome;
+
+      const ready = await database.gameAsset.findUniqueOrThrow({
+        where: { id },
+      });
+      expect(ready.state).toBe('READY');
+      const source = await readFile(
+        `${process.env.GAME_STORAGE_ROOT}/${ready.storageKey}`,
+      );
+      expect(source).toEqual(red);
+      expect(hash(source)).toBe(ready.contentHash);
+      expect(result).toMatchObject({
+        contentHash: hash(red),
+        width: 24,
+        height: 12,
+      });
+      expect(second.status).toBe('rejected');
+      if (second.status === 'rejected')
+        expect(second.reason).toMatchObject({ status: 409 });
+      const thumbnail = result.metadata.thumbnail;
+      expect(thumbnail).toBeDefined();
+      const thumbnailBytes = await readFile(
+        `${process.env.GAME_STORAGE_ROOT}/${ready.storageKey.replace(
+          /source$/,
+          `thumbnail-${thumbnail!.recipe}.png`,
+        )}`,
+      );
+      expect(hash(thumbnailBytes)).toBe(thumbnail!.contentHash);
+    });
     it('retains installed source after a failed DB finalization and safely reuses it on retry', async () => {
       const id = randomUUID();
       const repository = app.get(GameAssetsRepository);
@@ -786,6 +889,16 @@ describeDatabase(
       expect(
         await readFile(
           `${process.env.GAME_STORAGE_ROOT}/${pending.storageKey}`,
+        ),
+      ).toEqual(image);
+      await upload(image, 'hero.jpg', 'image/png', id).expect(400);
+      const retained = await database.gameAsset.findUniqueOrThrow({
+        where: { id },
+      });
+      expect(retained.state).toBe('UPLOADING');
+      expect(
+        await readFile(
+          `${process.env.GAME_STORAGE_ROOT}/${retained.storageKey}`,
         ),
       ).toEqual(image);
       await owner.get(`${base()}/${id}/content`).expect(404);
