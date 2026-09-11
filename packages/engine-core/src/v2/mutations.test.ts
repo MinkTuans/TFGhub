@@ -59,6 +59,82 @@ const rename = (name: string, target = sceneId) => ({
 });
 
 describe("asset declaration authoring", () => {
+  it("one canonical traversal must find every supported asset reference without walking 1,000 declarations", () => {
+    expect(engine).toHaveProperty("collectProjectAssetReferences");
+    const document = project();
+    const declarations = Array.from({ length: 1_000 }, (_, index) =>
+      id(String(1000 + index).padStart(4, "0")),
+    );
+    let declarationElementReads = 0;
+    document.assetIds = new Proxy(declarations, {
+      get(target, property, receiver) {
+        if (typeof property === "string" && /^\d+$/.test(property))
+          declarationElementReads += 1;
+        return Reflect.get(target, property, receiver);
+      },
+    });
+    const references = declarations.slice(0, 14);
+    const componentReferences = [
+      { type: "SpriteRenderer", properties: { assetId: references[1] } },
+      { type: "Animator", properties: { assetId: references[2] } },
+      {
+        type: "Dialogue",
+        properties: { nodes: [{ avatarAssetId: references[3] }] },
+      },
+      { type: "InventoryItem", properties: { iconAssetId: references[4] } },
+      { type: "AudioSource", properties: { assetId: references[5] } },
+      { type: "Text", properties: { fontAssetId: references[6] } },
+      { type: "UIImage", properties: { assetId: references[7] } },
+      { type: "Tilemap", properties: { tilesetAssetId: references[8] } },
+    ];
+    document.scenes[0]!.background.assetId = references[0]!;
+    document.scenes[0]!.objects = [
+      {
+        id: id("0800"),
+        components: componentReferences,
+      },
+    ] as typeof document.scenes[0]["objects"];
+    document.prefabs = [
+      { id: id("0801"), components: [componentReferences[0]] },
+    ] as typeof document.prefabs;
+    document.events = [
+      {
+        steps: [
+          { type: "PLAY_AUDIO", assetId: references[9] },
+          {
+            type: "IF_ELSE",
+            thenSteps: [
+              { type: "STOP_AUDIO", assetId: references[10] },
+            ],
+            elseSteps: [],
+          },
+        ],
+      },
+    ] as typeof document.events;
+    document.modules = [
+      {
+        type: "PUZZLE",
+        config: { pieces: [{ assetId: references[11] }] },
+      },
+      {
+        type: "MEMORY",
+        config: { cards: [{ assetId: references[12] }] },
+      },
+      {
+        type: "DRAG_DROP",
+        config: {
+          items: [{ assetId: references[13] }],
+          targets: [{ assetId: references[0] }],
+        },
+      },
+    ] as typeof document.modules;
+
+    expect(engine.collectProjectAssetReferences(document)).toEqual(
+      new Set(references),
+    );
+    expect(declarationElementReads).toBe(0);
+  });
+
   it("a missing declaration mutation cannot atomically add a stable asset ID and undo it", () => {
     const before = project();
     const command = {

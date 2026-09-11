@@ -9,7 +9,7 @@ import {
   useState,
 } from "react";
 import {
-  applyProjectMutations,
+  collectProjectAssetReferences,
   GameAssetSummary,
   ListGameAssetsResponse,
   type GameAssetSummary as GameAsset,
@@ -42,6 +42,10 @@ type ReferenceTask = {
   projectKey: string;
   gameId: string;
   assetId: string;
+};
+type ReferenceRequest = {
+  controller: AbortController;
+  task: ReferenceTask;
 };
 const REFERENCE_READ_CONCURRENCY = 4;
 export type AssetClient = {
@@ -220,7 +224,7 @@ export function AssetManager({
   const referenceCache = useRef(new Map<string, ReferenceEntry>());
   const referenceQueue = useRef<ReferenceTask[]>([]);
   const referenceQueued = useRef(new Set<string>());
-  const referenceInflight = useRef(new Map<string, AbortController>());
+  const referenceInflight = useRef(new Map<string, ReferenceRequest>());
   const referenceActive = useRef(0);
   const [referenceVersion, setReferenceVersion] = useState(0);
   const projectKey = `${state.identity.gameId}/${state.identity.projectId}`;
@@ -278,6 +282,10 @@ export function AssetManager({
     },
     [category, client, kind, pageCount, search, state.identity.gameId],
   );
+  const latestLoad = useRef(load);
+  latestLoad.current = load;
+  const latestQuery = useRef({ category, kind, search });
+  latestQuery.current = { category, kind, search };
 
   useEffect(() => {
     // Invalidate an older request before the search debounce elapses so its
@@ -289,8 +297,8 @@ export function AssetManager({
 
   const rebuild = useCallback(async () => {
     request.current += 1;
-    await load();
-  }, [load]);
+    await latestLoad.current();
+  }, []);
 
   function referenceKey(assetId: string) {
     return `${projectKey}/${assetId}`;
@@ -325,13 +333,16 @@ export function AssetManager({
       )
         continue;
       const controller = new AbortController();
-      referenceInflight.current.set(task.key, controller);
+      const operation = { controller, task };
+      referenceInflight.current.set(task.key, operation);
       referenceActive.current += 1;
       void client
         .get(task.gameId, task.assetId, controller.signal)
         .then((asset) => {
           const latest = referenceContext.current;
           if (
+            referenceInflight.current.get(task.key) === operation &&
+            !controller.signal.aborted &&
             latest.projectKey === task.projectKey &&
             latest.declared.has(task.assetId)
           ) {
@@ -345,6 +356,7 @@ export function AssetManager({
         .catch((error) => {
           const latest = referenceContext.current;
           if (
+            referenceInflight.current.get(task.key) === operation &&
             !controller.signal.aborted &&
             latest.projectKey === task.projectKey &&
             latest.declared.has(task.assetId)
@@ -357,11 +369,20 @@ export function AssetManager({
           }
         })
         .finally(() => {
-          referenceInflight.current.delete(task.key);
-          referenceActive.current -= 1;
-          pumpReferenceQueue();
+          if (referenceInflight.current.get(task.key) === operation) {
+            referenceInflight.current.delete(task.key);
+            referenceActive.current -= 1;
+            pumpReferenceQueue();
+          }
         });
     }
+  }
+
+  function cancelReferenceRequest(key: string, operation: ReferenceRequest) {
+    if (referenceInflight.current.get(key) !== operation) return;
+    referenceInflight.current.delete(key);
+    referenceActive.current -= 1;
+    operation.controller.abort();
   }
 
   function queueReference(assetId: string) {
@@ -385,9 +406,19 @@ export function AssetManager({
   useEffect(() => {
     const visible = new Set(visibleKey ? visibleKey.split(",") : []);
     const declared = new Set(declaredKey ? declaredKey.split(",") : []);
-    for (const [key, controller] of referenceInflight.current) {
+    const prefix = `${projectKey}/`;
+    for (const key of referenceCache.current.keys()) {
+      if (!key.startsWith(prefix) || !declared.has(key.slice(prefix.length)))
+        referenceCache.current.delete(key);
+    }
+    for (const [key, operation] of referenceInflight.current) {
       const assetId = key.slice(key.lastIndexOf("/") + 1);
-      if (!declared.has(assetId) || visible.has(assetId)) controller.abort();
+      if (
+        !key.startsWith(prefix) ||
+        !declared.has(assetId) ||
+        visible.has(assetId)
+      )
+        cancelReferenceRequest(key, operation);
     }
     referenceQueue.current = referenceQueue.current.filter((task) => {
       const keep =
@@ -399,6 +430,7 @@ export function AssetManager({
     });
     for (const id of declared)
       if (!visible.has(id)) queueReference(id);
+    pumpReferenceQueue();
     // Keys are stable content strings; unrelated immutable document copies do
     // not restart reference reads.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -406,8 +438,9 @@ export function AssetManager({
 
   useEffect(
     () => () => {
-      for (const controller of referenceInflight.current.values())
-        controller.abort();
+      const operations = [...referenceInflight.current];
+      for (const [key, operation] of operations)
+        cancelReferenceRequest(key, operation);
       referenceQueue.current = [];
       referenceQueued.current.clear();
     },
@@ -442,19 +475,10 @@ export function AssetManager({
       },
     ];
   });
-  const referencedAssetIds = useMemo(() => {
-    const referenced = new Set<string>();
-    for (const assetId of state.document.assetIds) {
-      try {
-        applyProjectMutations(state.document, [
-          { type: "asset.forget", assetId },
-        ]);
-      } catch {
-        referenced.add(assetId);
-      }
-    }
-    return referenced;
-  }, [state.document]);
+  const referencedAssetIds = useMemo(
+    () => collectProjectAssetReferences(state.document),
+    [state.document],
+  );
   useLayoutEffect(
     () => onAssetsChange?.(available),
     [available, onAssetsChange],
@@ -464,7 +488,8 @@ export function AssetManager({
     if (removedId) {
       setAssets((current) => current.filter((item) => item.id !== removedId));
       const key = referenceKey(removedId);
-      referenceInflight.current.get(key)?.abort();
+      const operation = referenceInflight.current.get(key);
+      if (operation) cancelReferenceRequest(key, operation);
       referenceCache.current.delete(key);
       setReferenceVersion((version) => version + 1);
     } else if (asset) {
@@ -481,19 +506,23 @@ export function AssetManager({
 
   function retryReference(assetId: string) {
     const key = referenceKey(assetId);
-    referenceInflight.current.get(key)?.abort();
+    const operation = referenceInflight.current.get(key);
+    if (operation) cancelReferenceRequest(key, operation);
     referenceCache.current.delete(key);
     setReferenceVersion((version) => version + 1);
     queueReference(assetId);
   }
 
   function matchesCurrentQuery(asset: GameAsset) {
+    const current = latestQuery.current;
     return (
       asset.state === "READY" &&
-      (!category || asset.metadata.category === category) &&
-      (!kind || asset.kind === kind) &&
-      (!search ||
-        asset.displayName.toLowerCase().includes(search.toLowerCase()))
+      (!current.category || asset.metadata.category === current.category) &&
+      (!current.kind || asset.kind === current.kind) &&
+      (!current.search ||
+        asset.displayName
+          .toLowerCase()
+          .includes(current.search.toLowerCase()))
     );
   }
 
@@ -504,7 +533,7 @@ export function AssetManager({
     request.current += 1;
     if (matchesCurrentQuery(updated)) changed(updated);
     else changed(null, updated.id);
-    await load();
+    await latestLoad.current();
   }
 
   function tombstone(asset: GameAsset) {
@@ -522,7 +551,7 @@ export function AssetManager({
       return client.tombstone(state.identity.gameId, asset.id).then(async () => {
         request.current += 1;
         changed(null, asset.id);
-        await load();
+        await latestLoad.current();
       });
     if (deletion.current)
       return Promise.reject(new Error("Một asset khác đang được xử lý."));
@@ -569,10 +598,11 @@ export function AssetManager({
           current.filter((item) => item.id !== operation.asset.id),
         );
         const key = `${projectKey}/${operation.asset.id}`;
-        referenceInflight.current.get(key)?.abort();
+        const referenceRequest = referenceInflight.current.get(key);
+        if (referenceRequest) cancelReferenceRequest(key, referenceRequest);
         referenceCache.current.delete(key);
         setReferenceVersion((version) => version + 1);
-        await load();
+        await latestLoad.current();
         operation.resolve();
       })
       .catch((error) =>
@@ -585,7 +615,6 @@ export function AssetManager({
       });
   }, [
     client,
-    load,
     projectKey,
     state.acknowledged.document.assetIds,
     state.batchError,

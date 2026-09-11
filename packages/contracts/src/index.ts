@@ -16,6 +16,7 @@ export {
   EngineProjectV2,
   applyProjectMutations,
   applyProjectMutationsWithHistory,
+  collectProjectAssetReferences,
   v2ComponentRegistry,
   buildRenderList,
   transformPoint,

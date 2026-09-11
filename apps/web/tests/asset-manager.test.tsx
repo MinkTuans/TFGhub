@@ -6,7 +6,13 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
-import { useEffect, useMemo, useState, type ComponentType } from "react";
+import {
+  StrictMode,
+  useEffect,
+  useMemo,
+  useState,
+  type ComponentType,
+} from "react";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import {
   applyProjectMutations,
@@ -712,6 +718,136 @@ test("a rename out of search cannot be overwritten by a list captured before PAT
   expect(within(manager).queryByText("Villain")).not.toBeInTheDocument();
 });
 
+test("a delayed PATCH cannot replace a newer completed search with its captured view", async () => {
+  const { AssetManager } = await assetModule();
+  const hero = asset(908, { displayName: "Hero pending" });
+  const client = clientFor(() => [hero]);
+  const queries: Array<Record<string, string | number>> = [];
+  client.list = vi.fn(async (_gameId, query) => {
+    queries.push({ ...query });
+    const search = String(query.search ?? "").toLowerCase();
+    const items = hero.displayName.toLowerCase().includes(search)
+      ? [structuredClone(hero)]
+      : [];
+    return { items, total: items.length, offset: 0, limit: 30 };
+  });
+  let finishPatch!: () => void;
+  client.update = vi.fn(
+    (_gameId, _assetId, changes) =>
+      new Promise<GameAssetSummary>((resolve) => {
+        finishPatch = () => {
+          hero.displayName = changes.displayName!;
+          resolve(structuredClone(hero));
+        };
+      }),
+  );
+  render(
+    <Wrapper>
+      <AssetManager client={client} />
+    </Wrapper>,
+  );
+  const manager = await screen.findByRole("region", { name: "Tài nguyên" });
+  const card = await within(manager).findByRole("group", {
+    name: "Asset Hero pending",
+  });
+  fireEvent.click(within(card).getByRole("button", { name: "Đổi tên" }));
+  fireEvent.change(within(card).getByRole("textbox", { name: "Tên asset" }), {
+    target: { value: "Villain complete" },
+  });
+  fireEvent.click(within(card).getByRole("button", { name: "Lưu tên" }));
+  await waitFor(() => expect(client.update).toHaveBeenCalledTimes(1));
+
+  fireEvent.change(within(manager).getByRole("searchbox", { name: "Tìm asset" }), {
+    target: { value: "Hero" },
+  });
+  await waitFor(() =>
+    expect(queries.some((query) => query.search === "Hero")).toBe(true),
+  );
+  expect(card).toBeVisible();
+
+  await act(async () => finishPatch());
+  await waitFor(() =>
+    expect(
+      within(manager).queryByRole("group", { name: "Asset Villain complete" }),
+    ).not.toBeInTheDocument(),
+  );
+  expect(within(manager).queryByText("Hero pending")).not.toBeInTheDocument();
+  expect(queries.at(-1)?.search).toBe("Hero");
+});
+
+test("a delayed DELETE cannot discard the newer filter and loaded-page snapshot", async () => {
+  const { AssetManager } = await assetModule();
+  const doomed = asset(1100, { displayName: "Delete pending" });
+  const survivor = asset(1101, { displayName: "User survivor" });
+  const itemAssets = Array.from({ length: 61 }, (_, index) =>
+    asset(1200 + index, {
+      displayName: `Current item ${String(index).padStart(2, "0")}`,
+      metadata: { ...asset(1200 + index).metadata, category: "ITEM" },
+    }),
+  );
+  const items = [doomed, survivor, ...itemAssets];
+  const client = clientFor(() => items);
+  client.list = vi.fn(async (_gameId, query) => {
+    const filtered = items.filter(
+      (item) =>
+        item.state === "READY" &&
+        (!query.category || item.metadata.category === query.category),
+    );
+    const offset = Number(query.offset);
+    const limit = Number(query.limit);
+    return {
+      items: structuredClone(filtered.slice(offset, offset + limit)),
+      total: filtered.length,
+      offset,
+      limit,
+    };
+  });
+  let finishDelete!: () => void;
+  client.tombstone = vi.fn(
+    () =>
+      new Promise<GameAssetSummary>((resolve) => {
+        finishDelete = () => {
+          doomed.state = "TOMBSTONED";
+          doomed.tombstonedAt = "2026-09-11T02:00:00.000Z";
+          resolve(structuredClone(doomed));
+        };
+      }),
+  );
+  render(
+    <Wrapper>
+      <AssetManager client={client} />
+    </Wrapper>,
+  );
+  const manager = await screen.findByRole("region", { name: "Tài nguyên" });
+  const card = await within(manager).findByRole("group", {
+    name: "Asset Delete pending",
+  });
+  fireEvent.click(within(card).getByRole("button", { name: "Xóa asset" }));
+  fireEvent.click(
+    within(
+      await screen.findByRole("dialog", { name: "Xóa Delete pending?" }),
+    ).getByRole("button", { name: "Xác nhận xóa" }),
+  );
+  await waitFor(() => expect(client.tombstone).toHaveBeenCalledTimes(1));
+
+  fireEvent.click(within(manager).getByRole("button", { name: "Item" }));
+  await within(manager).findByText("Current item 29");
+  fireEvent.click(within(manager).getByRole("button", { name: "Tải thêm" }));
+  await within(manager).findByText("Current item 59");
+
+  await act(async () => finishDelete());
+  await waitFor(() =>
+    expect(
+      screen.queryByRole("dialog", { name: "Xóa Delete pending?" }),
+    ).not.toBeInTheDocument(),
+  );
+  expect(within(manager).queryByText("User survivor")).not.toBeInTheDocument();
+  expect(within(manager).getByText("Current item 59")).toBeVisible();
+  expect(
+    within(manager).getAllByRole("group", { name: /^Asset Current item/ }),
+  ).toHaveLength(60);
+});
+
 test("a successful mutation must rebuild loaded page boundaries and totals", async () => {
   const { AssetManager } = await assetModule();
   const items = Array.from({ length: 31 }, (_, index) =>
@@ -888,6 +1024,125 @@ test("referenced metadata resolution must deduplicate, bound concurrency, abort 
   );
   await waitFor(() => expect(started.every((entry) => entry.signal?.aborted)).toBe(true));
   expect(screen.queryByText(/Asset 92/)).not.toBeInTheDocument();
+});
+
+test("StrictMode replay must restart every still-required aborted reference read", async () => {
+  const { AssetManager } = await assetModule();
+  const referenced = asset(955, { displayName: "Strict resolved" });
+  const client = clientFor(() => []);
+  let reads = 0;
+  let aborted = 0;
+  client.get = vi.fn((_gameId, _assetId, signal) => {
+    reads += 1;
+    if (reads > 1) return Promise.resolve(referenced);
+    return new Promise<GameAssetSummary>((_resolve, reject) => {
+      signal?.addEventListener("abort", () => {
+        aborted += 1;
+        reject(new DOMException("Aborted", "AbortError"));
+      });
+    });
+  });
+  function Metadata() {
+    const [resolved, setResolved] = useState<GameAssetSummary[]>([]);
+    return (
+      <>
+        <output aria-label="Strict metadata">
+          {resolved.map((item) => item.displayName).join(",")}
+        </output>
+        <AssetManager client={client} onAssetsChange={setResolved} />
+      </>
+    );
+  }
+  render(
+    <StrictMode>
+      <Wrapper document={project([referenced.id])}>
+        <Metadata />
+      </Wrapper>
+    </StrictMode>,
+  );
+
+  await waitFor(() =>
+    expect(screen.getByLabelText("Strict metadata")).toHaveTextContent(
+      "Strict resolved",
+    ),
+  );
+  expect(reads).toBe(2);
+  expect(aborted).toBe(1);
+});
+
+test("forget then redeclare must evict completed metadata and fetch the authoritative record", async () => {
+  const { AssetManager } = await assetModule();
+  const old = asset(956, { displayName: "Old cached name" });
+  const current = asset(956, { displayName: "New authoritative name" });
+  const client = clientFor(() => []);
+  let reads = 0;
+  client.get = vi.fn(async () => {
+    reads += 1;
+    return reads === 1 ? old : current;
+  });
+  function Controls() {
+    const { dispatch } = useStudio();
+    return (
+      <>
+        <button
+          type="button"
+          onClick={() =>
+            dispatch({
+              type: "commit",
+              mutations: [{ type: "asset.forget", assetId: old.id }],
+            })
+          }
+        >
+          Quên asset
+        </button>
+        <button
+          type="button"
+          onClick={() =>
+            dispatch({
+              type: "commit",
+              mutations: [{ type: "asset.declare", assetId: old.id }],
+            })
+          }
+        >
+          Khai báo lại
+        </button>
+      </>
+    );
+  }
+  function Workspace() {
+    const [metadata, setMetadata] = useState<GameAssetSummary[]>([]);
+    return (
+      <>
+        <Controls />
+        <output aria-label="Redeclared metadata">
+          {metadata.map((item) => item.displayName).join(",")}
+        </output>
+        <AssetManager client={client} onAssetsChange={setMetadata} />
+      </>
+    );
+  }
+  render(
+    <Wrapper document={project([old.id])}>
+      <Workspace />
+    </Wrapper>,
+  );
+  await waitFor(() =>
+    expect(screen.getByLabelText("Redeclared metadata")).toHaveTextContent(
+      "Old cached name",
+    ),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Quên asset" }));
+  await waitFor(() =>
+    expect(screen.getByLabelText("Redeclared metadata")).toBeEmptyDOMElement(),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Khai báo lại" }));
+
+  await waitFor(() =>
+    expect(screen.getByLabelText("Redeclared metadata")).toHaveTextContent(
+      "New authoritative name",
+    ),
+  );
+  expect(reads).toBe(2);
 });
 
 test("a transient referenced-asset read failure must stay visible and retry into a confirmed unavailable record", async () => {

@@ -137,3 +137,4 @@ export {
   applyProjectMutations,
   applyProjectMutationsWithHistory,
 } from "./v2/mutations.js";
+export { collectProjectAssetReferences } from "./v2/asset-references.js";
