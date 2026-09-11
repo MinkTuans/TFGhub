@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { EngineProjectV2Type } from "@indieforge/contracts";
 import { StudioButton } from "./studio-topbar";
 import { SceneManager } from "./scene-manager";
@@ -9,12 +10,14 @@ export function StudioSidebar({
   onSceneChange,
   open,
   onToggle,
+  assetManager,
 }: {
   scenes: EngineProjectV2Type["scenes"];
   sceneId: string;
   onSceneChange: (id: string) => void;
   open: boolean;
   onToggle: () => void;
+  assetManager?: ReactNode;
 }) {
   return (
     <aside className="studio-sidebar" aria-label="Điều hướng Scene">
@@ -39,6 +42,7 @@ export function StudioSidebar({
           <HierarchyPanel
             scene={scenes.find((scene) => scene.id === sceneId)!}
           />
+          {assetManager}
           <SceneManager sceneId={sceneId} onSceneChange={onSceneChange} />
         </>
       )}

@@ -89,6 +89,8 @@ export const SceneMutation = z
 
 // Add command variants only alongside their reducer and authoring consumer.
 export const ProjectMutation = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("asset.declare"), assetId: StableId }).strict(),
+  z.object({ type: z.literal("asset.forget"), assetId: StableId }).strict(),
   SceneMutation,
   z
     .object({
@@ -555,6 +557,16 @@ function applyBatch(
   for (const command of commands) {
     if (withHistory) undo.unshift(structuredClone(inverse(next, command)));
     switch (command.type) {
+      case "asset.declare":
+        if (next.assetIds.includes(command.assetId))
+          throw new Error("Asset is already declared");
+        next.assetIds.push(command.assetId);
+        break;
+      case "asset.forget":
+        if (!next.assetIds.includes(command.assetId))
+          throw new Error("Asset is not declared");
+        next.assetIds = next.assetIds.filter((id) => id !== command.assetId);
+        break;
       case "scene.rename": {
         const scene = target(next.scenes, command.sceneId);
         scene.name = command.name;
@@ -816,6 +828,10 @@ function inverse(
   const scene =
     "sceneId" in command ? target(before.scenes, command.sceneId) : null;
   switch (command.type) {
+    case "asset.declare":
+      return { type: "asset.forget", assetId: command.assetId };
+    case "asset.forget":
+      return { type: "asset.declare", assetId: command.assetId };
     case "object.create":
       return {
         type: "object.delete",

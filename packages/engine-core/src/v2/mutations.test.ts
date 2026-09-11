@@ -58,6 +58,42 @@ const rename = (name: string, target = sceneId) => ({
   name,
 });
 
+describe("asset declaration authoring", () => {
+  it("a missing declaration mutation cannot atomically add a stable asset ID and undo it", () => {
+    const before = project();
+    const command = {
+      type: "asset.declare" as const,
+      assetId: id("0090"),
+    };
+    const declared = engine.applyProjectMutationsWithHistory(before, [command]);
+    expect(declared.document.assetIds).toEqual([id("0090")]);
+    expect(declared.undo).toEqual([
+      { type: "asset.forget", assetId: id("0090") },
+    ]);
+    expect(
+      engine.applyProjectMutations(
+        declared.document,
+        declared.undo as engine.ProjectMutation[],
+      ),
+    ).toEqual(before);
+  });
+
+  it("a duplicate or missing declaration target cannot create ambiguous asset history", () => {
+    const before = project();
+    before.assetIds = [id("0090")];
+    expect(() =>
+      engine.applyProjectMutations(before, [
+        { type: "asset.declare", assetId: id("0090") },
+      ] as engine.ProjectMutation[]),
+    ).toThrow(/already declared/i);
+    expect(() =>
+      engine.applyProjectMutations(before, [
+        { type: "asset.forget", assetId: id("0091") },
+      ] as engine.ProjectMutation[]),
+    ).toThrow(/not declared/i);
+  });
+});
+
 describe("object and component authoring", () => {
   const component = (
     suffix: string,

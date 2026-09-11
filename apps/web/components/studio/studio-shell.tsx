@@ -1,7 +1,7 @@
 "use client";
 
-import { useRef, useState } from "react";
-import type { GameSummary } from "@indieforge/contracts";
+import { useMemo, useRef, useState } from "react";
+import type { GameAssetSummary, GameSummary } from "@indieforge/contracts";
 import { useStudio } from "./studio-provider";
 import { StudioTopbar } from "./studio-topbar";
 import { StudioSidebar } from "./studio-sidebar";
@@ -13,6 +13,7 @@ import {
 import { StudioToast } from "./studio-toast";
 import { useStudioSelection } from "./studio-selection";
 import "./studio-shell.css";
+import { AssetManager } from "./assets/asset-manager";
 
 export function StudioShell({ initialGame }: { initialGame: GameSummary }) {
   const { state } = useStudio();
@@ -20,7 +21,21 @@ export function StudioShell({ initialGame }: { initialGame: GameSummary }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [inspectorOpen, setInspectorOpen] = useState(true);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [assets, setAssets] = useState<GameAssetSummary[]>([]);
   const settingsRef = useRef<HTMLButtonElement>(null);
+  const assetMetadata = useMemo(
+    () =>
+      assets.map((asset) => ({
+        id: asset.id,
+        projectId: asset.projectId,
+        state: asset.state,
+        kind: asset.kind,
+        displayName: asset.displayName,
+        width: asset.width,
+        height: asset.height,
+      })),
+    [assets],
+  );
   // A recovered document may no longer contain the previous local selection.
   const scene =
     state.document.scenes.find((scene) => scene.id === selection.sceneId) ??
@@ -65,10 +80,12 @@ export function StudioShell({ initialGame }: { initialGame: GameSummary }) {
           onSceneChange={selectScene}
           open={sidebarOpen}
           onToggle={toggleSidebar}
+          assetManager={<AssetManager onAssetsChange={setAssets} />}
         />
         <StudioSceneOverview
           scene={scene}
           pixelArt={state.document.settings.pixelArt}
+          assetMetadata={assetMetadata}
         />
         <StudioInspector
           scene={scene}

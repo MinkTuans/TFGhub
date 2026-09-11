@@ -294,6 +294,7 @@
 }
 .studio-sidebar {
   border-right: 1px solid var(--border);
+  overflow: auto;
 }
 .studio-inspector {
   border-left: 1px solid var(--border);
@@ -526,6 +527,136 @@
 .studio-editor select {
   width: 100%;
   min-width: 0;
+}
+.studio-asset-manager {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border-top: 1px solid var(--border);
+}
+.studio-asset-heading,
+.studio-asset-filters,
+.studio-upload-job {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.studio-asset-heading {
+  justify-content: space-between;
+}
+.studio-upload-button {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.5rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--control-border);
+  border-radius: 0.25rem;
+  cursor: pointer;
+}
+.studio-upload-button input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+.studio-asset-groups {
+  display: flex;
+  gap: 0.25rem;
+  overflow-x: auto;
+}
+.studio-asset-groups button {
+  flex: 0 0 auto;
+  min-height: 2rem;
+  padding: 0.25rem 0.5rem;
+}
+.studio-asset-groups button[aria-pressed="true"] {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+.studio-asset-filters {
+  align-items: end;
+}
+.studio-asset-filters label {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.studio-asset-filters label:first-child {
+  flex: 1;
+}
+.studio-asset-filters input,
+.studio-asset-filters select {
+  width: 100%;
+  min-width: 0;
+}
+.studio-asset-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+.studio-asset-card {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+  padding: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 0.35rem;
+  background: var(--surface-raised);
+  overflow-wrap: anywhere;
+}
+.studio-asset-card[draggable="true"] {
+  cursor: grab;
+}
+.studio-asset-card strong,
+.studio-asset-card small,
+.studio-asset-card span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.studio-asset-card small,
+.studio-asset-card > span {
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+.studio-asset-preview,
+.studio-asset-placeholder {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: contain;
+  background: #09111f;
+  border-radius: 0.25rem;
+}
+.studio-asset-placeholder {
+  display: grid;
+  place-items: center;
+}
+.studio-asset-audio {
+  width: 100%;
+  max-width: 100%;
+}
+.studio-asset-card form {
+  display: grid;
+  gap: 0.35rem;
+}
+.studio-asset-card form input {
+  width: 100%;
+  min-width: 0;
+}
+.studio-asset-card .studio-actions button {
+  min-height: 2rem;
+  padding: 0.25rem 0.4rem;
+}
+.studio-upload-job {
+  flex-wrap: wrap;
+  font-size: 0.75rem;
+}
+.studio-upload-job progress {
+  flex: 1;
+  min-width: 4rem;
 }
 .studio-actions {
   display: flex;

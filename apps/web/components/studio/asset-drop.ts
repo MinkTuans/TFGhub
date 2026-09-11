@@ -2,6 +2,8 @@ import {
   applyProjectMutations,
   buildRenderList,
   v2ComponentRegistry,
+  UploadGameAssetInput,
+  type GameAssetSummary,
   type EngineProjectV2Type,
   type Matrix2D,
   type Point,
@@ -16,15 +18,10 @@ import { clientToWorld, type Camera2D } from "./canvas/coordinates";
 import type { StudioMutation } from "./studio-state";
 
 export const STUDIO_ASSET_MIME = "application/x-tfg-asset";
-export type AssetDropMetadata = {
-  id: string;
-  projectId: string;
-  state: "READY";
-  kind: "IMAGE";
-  name: string;
-  width: number;
-  height: number;
-};
+export type AssetDropMetadata = Pick<
+  GameAssetSummary,
+  "id" | "projectId" | "state" | "kind" | "displayName" | "width" | "height"
+>;
 const roles = ["IMAGE", "SPRITE", "ITEM", "UI"] as const;
 function record(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value);
@@ -74,14 +71,16 @@ export function createAssetDrop({
   const value: unknown = JSON.parse(payload);
   if (
     !record(value) ||
-    Object.keys(value).sort().join(",") !== "assetId,role" ||
+    Object.keys(value).sort().join(",") !== "assetId,kind,role" ||
     typeof value.assetId !== "string" ||
-    !roles.includes(value.role as (typeof roles)[number]) ||
-    !document.assetIds.includes(value.assetId)
+    !UploadGameAssetInput.shape.uploadId.safeParse(value.assetId).success ||
+    value.kind !== "IMAGE" ||
+    !roles.includes(value.role as (typeof roles)[number])
   )
-    throw new Error("Asset kéo thả chưa được khai báo trong dự án.");
+    throw new Error("Dữ liệu kéo thả asset không hợp lệ.");
+  const assetId = value.assetId as string;
   const matches = metadata.filter(
-    (item) => record(item) && item.id === value.assetId,
+    (item) => record(item) && item.id === assetId,
   );
   const asset = matches[0];
   if (
@@ -89,10 +88,10 @@ export function createAssetDrop({
     !record(asset) ||
     asset.projectId !== document.projectId ||
     asset.state !== "READY" ||
-    asset.kind !== "IMAGE" ||
-    typeof asset.name !== "string" ||
-    !asset.name.trim() ||
-    asset.name.length > 80 ||
+    asset.kind !== value.kind ||
+    typeof asset.displayName !== "string" ||
+    !asset.displayName.trim() ||
+    asset.displayName.length > 160 ||
     typeof asset.width !== "number" ||
     typeof asset.height !== "number" ||
     !Number.isSafeInteger(asset.width) ||
@@ -138,7 +137,7 @@ export function createAssetDrop({
   const creation = createObjectCommand(
     scene,
     {
-      name: asset.name,
+      name: asset.displayName.slice(0, 80),
       layerId,
       parentId,
       objectType:
@@ -154,7 +153,12 @@ export function createAssetDrop({
   if (creation.type !== "object.create")
     throw new Error("Invalid object creation command");
   const object = creation.objects[0].object;
-  const mutations: StudioMutation[] = [creation];
+  const mutations: StudioMutation[] = [
+    ...(document.assetIds.includes(assetId)
+      ? []
+      : [{ type: "asset.declare" as const, assetId }]),
+    creation,
+  ];
   for (const component of object.components) {
     if (
       component.type === "SpriteRenderer" ||

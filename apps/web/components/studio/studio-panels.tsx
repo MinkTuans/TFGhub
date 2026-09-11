@@ -3,17 +3,26 @@ import { StudioButton } from "./studio-topbar";
 import { LayerList } from "./layer-list";
 import { SceneCanvas } from "./canvas/scene-canvas";
 import { PropertyInspector } from "./property-inspector";
+import type { AssetDropMetadata } from "./asset-drop";
 
 type Scene = EngineProjectV2Type["scenes"][number];
 
 export function StudioSceneOverview({
   scene,
   pixelArt = false,
+  assetMetadata = [],
 }: {
   scene: Scene;
   pixelArt?: boolean;
+  assetMetadata?: readonly AssetDropMetadata[];
 }) {
-  return <SceneCanvas scene={scene} pixelArt={pixelArt} />;
+  return (
+    <SceneCanvas
+      scene={scene}
+      pixelArt={pixelArt}
+      assetMetadata={assetMetadata}
+    />
+  );
 }
 
 export function StudioInspector({

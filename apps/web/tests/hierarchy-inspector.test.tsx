@@ -1101,7 +1101,7 @@ test("a real canvas drop uses its current camera and selected group, then select
     types: [STUDIO_ASSET_MIME],
     getData: (type: string) =>
       type === STUDIO_ASSET_MIME
-        ? JSON.stringify({ assetId: id(900), role: "ITEM" })
+        ? JSON.stringify({ assetId: id(900), kind: "IMAGE", role: "ITEM" })
         : "",
   };
   const event = new MouseEvent("drop", {
@@ -1139,7 +1139,7 @@ const metadata = () => ({
   projectId: id(1),
   state: "READY",
   kind: "IMAGE",
-  name: "Fixture",
+  displayName: "Fixture",
   width: 64,
   height: 32,
 });
@@ -1154,7 +1154,7 @@ test.each(["IMAGE", "SPRITE", "ITEM", "UI"] as const)(
       sceneId: id(2),
       layerId: id(3),
       parentId: null,
-      payload: JSON.stringify({ assetId: id(900), role }),
+      payload: JSON.stringify({ assetId: id(900), kind: "IMAGE", role }),
       metadata: [metadata()],
       client: { x: 170, y: 140 },
       rect: { left: 10, top: 20, width: 640, height: 480 },
@@ -1216,7 +1216,11 @@ test.each([
         sceneId: id(2),
         layerId: id(3),
         parentId: null,
-        payload: JSON.stringify({ assetId: id(900), role: "IMAGE" }),
+        payload: JSON.stringify({
+          assetId: id(900),
+          kind: "IMAGE",
+          role: "IMAGE",
+        }),
         metadata: meta ? [meta] : [],
         client: { x: 50, y: 50 },
         rect: { left: 0, top: 0, width: 640, height: 480 },
@@ -1234,14 +1238,15 @@ test.each([
 );
 test.each([
   "{}",
-  '{"assetId":"bad","role":"IMAGE"}',
+  '{"assetId":"bad","kind":"IMAGE","role":"IMAGE"}',
   JSON.stringify({
     assetId: id(900),
+    kind: "IMAGE",
     role: "IMAGE",
     url: "https://example.test/p.png",
   }),
-  JSON.stringify({ assetId: id(901), role: "IMAGE" }),
-  JSON.stringify({ assetId: id(900), role: "PLAYER" }),
+  JSON.stringify({ assetId: id(901), kind: "IMAGE", role: "IMAGE" }),
+  JSON.stringify({ assetId: id(900), kind: "IMAGE", role: "PLAYER" }),
 ])("drop rejects invalid payload %s", async (payload) => {
   const { createAssetDrop } = await dropModule();
   expect(() =>
@@ -1275,7 +1280,11 @@ test("drop converts through rotated negative-scale parent and rejects locked/hid
     sceneId: id(2),
     layerId: id(4),
     parentId: id(10),
-    payload: JSON.stringify({ assetId: id(900), role: "IMAGE" }),
+    payload: JSON.stringify({
+      assetId: id(900),
+      kind: "IMAGE",
+      role: "IMAGE",
+    }),
     metadata: [metadata()],
     client: { x: 220, y: 140 },
     rect: { left: 0, top: 0, width: 640, height: 480 },
@@ -1333,7 +1342,7 @@ test("native browser drops READY fixtures, edits, undoes, autosaves and reloads 
         useEffect(() => { window.studio = studio; }, [studio]);
         return h('main', {className:'studio-shell'},
           h('div',null,
-            h('button',{draggable:true,onDragStart:event => event.dataTransfer.setData('application/x-tfg-asset',${JSON.stringify(JSON.stringify({ assetId: id(900), role: "ITEM" }))})},'READY Fixture'),
+            h('button',{draggable:true,onDragStart:event => event.dataTransfer.setData('application/x-tfg-asset',${JSON.stringify(JSON.stringify({ assetId: id(900), kind: "IMAGE", role: "ITEM" }))})},'READY Fixture'),
             h('button',{onClick:()=>studio.dispatch({type:'undo'})},'Undo'),
             h('button',{onClick:()=>studio.dispatch({type:'redo'})},'Redo'),
             h('output',{'aria-label':'Save state'},studio.state.status)),
