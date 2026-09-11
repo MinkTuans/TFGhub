@@ -3,6 +3,7 @@
 import {
   useEffect,
   useId,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -36,13 +37,21 @@ type Props = {
   scene: CanvasScene;
   pixelArt?: boolean;
   assetMetadata?: readonly unknown[];
+  registerAssetPlacement?: (
+    handler: ((payload: string) => void) | null,
+  ) => void;
 };
 
 export function SceneCanvas(props: Props) {
   return <CanvasSession key={props.scene.id} {...props} />;
 }
 
-function CanvasSession({ scene, pixelArt = false, assetMetadata = [] }: Props) {
+function CanvasSession({
+  scene,
+  pixelArt = false,
+  assetMetadata = [],
+  registerAssetPlacement,
+}: Props) {
   const { state, dispatch } = useStudio();
   const { selection, selectObject } = useStudioSelection();
   const editable =
@@ -77,6 +86,7 @@ function CanvasSession({ scene, pixelArt = false, assetMetadata = [] }: Props) {
     point: Point;
   } | null>(null);
   const sceneRef = useRef(scene);
+  const assetPlacement = useRef<(payload: string) => void>(() => {});
   const descriptionId = useId();
 
   function choose(id: string | null) {
@@ -447,6 +457,63 @@ function CanvasSession({ scene, pixelArt = false, assetMetadata = [] }: Props) {
       cancel();
     },
   });
+  function placeAsset(
+    payload: string,
+    client: Point,
+    rect: { left: number; top: number; width: number; height: number },
+  ) {
+    if (!editable || !camera.current) return;
+    cancel();
+    try {
+      // A selected group receives children. Other selections choose only a
+      // layer; UI defaults to an editable UI layer when none is selected.
+      const role = JSON.parse(payload)?.role;
+      const target = selectedObject;
+      const layerId =
+        target?.layerId ??
+        [...scene.layers]
+          .sort((a, b) => a.order - b.order)
+          .find(
+            (layer) =>
+              layer.visible &&
+              !layer.locked &&
+              (role !== "UI" || layer.type === "UI"),
+          )?.id;
+      if (!layerId) throw new Error("Không có lớp phù hợp để nhận asset.");
+      const result = createAssetDrop({
+        document: state.document,
+        sceneId: scene.id,
+        layerId,
+        parentId: target?.objectType === "GROUP" ? target.id : null,
+        payload,
+        metadata: assetMetadata,
+        client,
+        rect,
+        camera: camera.current,
+      });
+      prepareStudioCommit(state, result.mutations);
+      dispatch({ type: "commit", mutations: result.mutations });
+      selectObject(scene.id, result.objectId, "hierarchy");
+      setDropError("");
+    } catch (error) {
+      setDropError(studioValidationMessage(error));
+    }
+  }
+  assetPlacement.current = (payload) => {
+    const rect = canvas.current?.getBoundingClientRect();
+    if (!rect) return;
+    placeAsset(
+      payload,
+      { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 },
+      rect,
+    );
+  };
+  useLayoutEffect(() => {
+    if (!registerAssetPlacement) return;
+    const handler = (payload: string) => assetPlacement.current(payload);
+    registerAssetPlacement(handler);
+    return () => registerAssetPlacement(null);
+  }, [registerAssetPlacement]);
   const deleteTarget =
     deleting && scene.objects.find((object) => object.id === deleting);
   return (
@@ -554,44 +621,11 @@ function CanvasSession({ scene, pixelArt = false, assetMetadata = [] }: Props) {
           onDrop={(event) => {
             if (!event.dataTransfer.types.includes(STUDIO_ASSET_MIME)) return;
             event.preventDefault();
-            if (!editable || !camera.current) return;
-            cancel();
-            try {
-              const payload = event.dataTransfer.getData(STUDIO_ASSET_MIME);
-              // A selected group receives children. Other selections choose only
-              // a layer; UI defaults to an editable UI layer when none is selected.
-              const role = JSON.parse(payload)?.role;
-              const target = selectedObject;
-              const layerId =
-                target?.layerId ??
-                [...scene.layers]
-                  .sort((a, b) => a.order - b.order)
-                  .find(
-                    (layer) =>
-                      layer.visible &&
-                      !layer.locked &&
-                      (role !== "UI" || layer.type === "UI"),
-                  )?.id;
-              if (!layerId)
-                throw new Error("Không có lớp phù hợp để nhận asset.");
-              const result = createAssetDrop({
-                document: state.document,
-                sceneId: scene.id,
-                layerId,
-                parentId: target?.objectType === "GROUP" ? target.id : null,
-                payload,
-                metadata: assetMetadata,
-                client: { x: event.clientX, y: event.clientY },
-                rect: event.currentTarget.getBoundingClientRect(),
-                camera: camera.current,
-              });
-              prepareStudioCommit(state, result.mutations);
-              dispatch({ type: "commit", mutations: result.mutations });
-              selectObject(scene.id, result.objectId, "hierarchy");
-              setDropError("");
-            } catch (error) {
-              setDropError(studioValidationMessage(error));
-            }
+            placeAsset(
+              event.dataTransfer.getData(STUDIO_ASSET_MIME),
+              { x: event.clientX, y: event.clientY },
+              event.currentTarget.getBoundingClientRect(),
+            );
           }}
           onPointerDown={(event) => begin(event)}
           onPointerMove={move}

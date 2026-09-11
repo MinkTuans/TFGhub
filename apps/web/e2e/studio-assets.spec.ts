@@ -109,9 +109,10 @@ test("upload, rename, drag, autosave and reload keep only the stable asset refer
   await expect(panel).toBeVisible();
   await page.locator("canvas").focus();
   await page.keyboard.press("Escape");
-  await panel.dragTo(page.locator("canvas"), {
-    targetPosition: { x: 260, y: 180 },
-  });
+  await panel
+    .getByRole("button", { name: "Thêm panel.png vào Scene" })
+    .focus();
+  await page.keyboard.press("Enter");
   await expect(
     page.getByRole("status", { name: "Trạng thái dự án" }),
   ).toHaveText("Đã lưu");

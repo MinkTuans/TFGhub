@@ -89,7 +89,13 @@ export const SceneMutation = z
 
 // Add command variants only alongside their reducer and authoring consumer.
 export const ProjectMutation = z.discriminatedUnion("type", [
-  z.object({ type: z.literal("asset.declare"), assetId: StableId }).strict(),
+  z
+    .object({
+      type: z.literal("asset.declare"),
+      assetId: StableId,
+      beforeAssetId: StableId.nullable().optional(),
+    })
+    .strict(),
   z.object({ type: z.literal("asset.forget"), assetId: StableId }).strict(),
   SceneMutation,
   z
@@ -560,7 +566,12 @@ function applyBatch(
       case "asset.declare":
         if (next.assetIds.includes(command.assetId))
           throw new Error("Asset is already declared");
-        next.assetIds.push(command.assetId);
+        if (command.beforeAssetId) {
+          const index = next.assetIds.indexOf(command.beforeAssetId);
+          if (index < 0)
+            throw new ProjectMutationTargetError(command.beforeAssetId);
+          next.assetIds.splice(index, 0, command.assetId);
+        } else next.assetIds.push(command.assetId);
         break;
       case "asset.forget":
         if (!next.assetIds.includes(command.assetId))
@@ -831,7 +842,12 @@ function inverse(
     case "asset.declare":
       return { type: "asset.forget", assetId: command.assetId };
     case "asset.forget":
-      return { type: "asset.declare", assetId: command.assetId };
+      return {
+        type: "asset.declare",
+        assetId: command.assetId,
+        beforeAssetId:
+          before.assetIds[before.assetIds.indexOf(command.assetId) + 1] ?? null,
+      };
     case "object.create":
       return {
         type: "object.delete",

@@ -92,6 +92,58 @@ describe("asset declaration authoring", () => {
       ] as engine.ProjectMutation[]),
     ).toThrow(/not declared/i);
   });
+
+  it.each([
+    ["first", 0],
+    ["middle", 1],
+    ["last", 2],
+  ])(
+    "forgetting the %s declaration cannot make undo restore a different canonical order",
+    (_label, index) => {
+      const before = project();
+      before.assetIds = [id("0090"), id("0091"), id("0092")];
+      const forgotten = engine.applyProjectMutationsWithHistory(before, [
+        { type: "asset.forget", assetId: before.assetIds[index]! },
+      ]);
+
+      expect(
+        engine.applyProjectMutations(forgotten.document, forgotten.undo),
+      ).toEqual(before);
+    },
+  );
+
+  it("a multi-forget history entry cannot reorder declarations through undo and redo", () => {
+    const before = project();
+    before.assetIds = [id("0090"), id("0091"), id("0092")];
+    const forgotten = engine.applyProjectMutationsWithHistory(before, [
+      { type: "asset.forget", assetId: id("0091") },
+      { type: "asset.forget", assetId: id("0090") },
+    ]);
+    const restored = engine.applyProjectMutations(
+      forgotten.document,
+      forgotten.undo,
+    );
+
+    expect(restored).toEqual(before);
+    expect(engine.applyProjectMutations(restored, forgotten.redo)).toEqual(
+      forgotten.document,
+    );
+  });
+
+  it("forgetting a referenced declaration cannot leak any partial batch change", () => {
+    const before = project();
+    before.assetIds = [id("0090")];
+    before.scenes[0]!.background.assetId = id("0090");
+    const snapshot = structuredClone(before);
+
+    expect(() =>
+      engine.applyProjectMutations(before, [
+        { type: "scene.rename", sceneId, name: "Changed" },
+        { type: "asset.forget", assetId: id("0090") },
+      ]),
+    ).toThrow(/asset/i);
+    expect(before).toEqual(snapshot);
+  });
 });
 
 describe("object and component authoring", () => {

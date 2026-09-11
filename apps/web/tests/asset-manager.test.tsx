@@ -1,4 +1,5 @@
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -20,6 +21,8 @@ import {
 import { SceneCanvas } from "../components/studio/canvas/scene-canvas";
 import { recordingContext } from "./canvas-context";
 import type { StudioMutation } from "../components/studio/studio-state";
+import { createAssetDrop } from "../components/studio/asset-drop";
+import { ApiError } from "../lib/api-client";
 
 const id = (n: number) =>
   `550e8400-e29b-41d4-a716-${String(n).padStart(12, "0")}`;
@@ -112,6 +115,50 @@ function asset(
   };
 }
 
+function withPlacedItem(item: GameAssetSummary) {
+  const document = project([item.id]);
+  document.scenes.push({
+    id: id(20),
+    key: "inventory",
+    name: "Inventory",
+    type: "MIXED",
+    order: 1,
+    width: 640,
+    height: 480,
+    background: { color: "#102030", assetId: null },
+    settings: {
+      gravityX: 0,
+      gravityY: 0,
+      grid: { enabled: false, size: 32, snap: false },
+    },
+    layers: [
+      {
+        id: id(21),
+        name: "World",
+        type: "WORLD",
+        order: 0,
+        visible: true,
+        locked: false,
+      },
+    ],
+    objects: [],
+  });
+  const ids = [id(100), id(101), id(102), id(103)];
+  const placement = createAssetDrop({
+    document,
+    sceneId: id(20),
+    layerId: id(21),
+    parentId: null,
+    payload: JSON.stringify({ assetId: item.id, kind: "IMAGE", role: "ITEM" }),
+    metadata: [item],
+    client: { x: 100, y: 100 },
+    rect: { left: 0, top: 0, width: 640, height: 480 },
+    camera: { x: 0, y: 0, zoom: 1, viewportWidth: 640, viewportHeight: 480 },
+    newId: () => ids.shift()!,
+  });
+  return applyProjectMutations(document, placement.mutations);
+}
+
 type AssetClient = {
   list: (
     gameId: string,
@@ -122,7 +169,11 @@ type AssetClient = {
     offset: number;
     limit: number;
   }>;
-  get: (gameId: string, assetId: string) => Promise<GameAssetSummary>;
+  get: (
+    gameId: string,
+    assetId: string,
+    signal?: AbortSignal,
+  ) => Promise<GameAssetSummary>;
   upload: (
     gameId: string,
     input: {
@@ -144,6 +195,7 @@ type AssetClient = {
 type AssetManagerProps = {
   client?: AssetClient;
   onAssetsChange?: (assets: GameAssetSummary[]) => void;
+  onPlaceAsset?: (payload: string) => void;
 };
 type AssetModule = {
   AssetManager: ComponentType<AssetManagerProps>;
@@ -308,6 +360,36 @@ test("a missing category/search implementation cannot hide API-backed groups or 
   );
 });
 
+test("audio previews never preload binary content while browsing the library", async () => {
+  const { AssetManager } = await assetModule();
+  const audio = asset(899, {
+    kind: "AUDIO",
+    displayName: "Quiet theme",
+    mimeType: "audio/wav",
+    width: null,
+    height: null,
+    durationMs: 800,
+    metadata: {
+      category: "AUDIO",
+      audio: { channels: 1, sampleRate: 8000, bitsPerSample: 16 },
+    },
+    thumbnailUrl: null,
+  });
+  render(
+    <Wrapper>
+      <AssetManager client={clientFor(() => [audio])} />
+    </Wrapper>,
+  );
+
+  expect(
+    await screen.findByRole("group", { name: "Asset Quiet theme" }),
+  ).toBeVisible();
+  expect(screen.getByLabelText("Nghe thử Quiet theme")).toHaveAttribute(
+    "preload",
+    "none",
+  );
+});
+
 test("a missing upload retry implementation loses visible progress or changes the idempotent upload identity", async () => {
   const { AssetManager } = await assetModule();
   const items: GameAssetSummary[] = [];
@@ -362,7 +444,7 @@ test("a missing rename/delete implementation cannot warn on current and retained
   const items = [used, unused];
   const client = clientFor(() => items);
   render(
-    <Wrapper document={project([used.id])}>
+    <Wrapper document={withPlacedItem(used)}>
       <AssetManager client={client} />
     </Wrapper>,
   );
@@ -408,7 +490,476 @@ test("a missing rename/delete implementation cannot warn on current and retained
   );
 });
 
-test("a READY-only reload cannot hide a tombstoned asset that the canonical document still references", async () => {
+test("a declaration without semantic dependencies must save asset.forget before tombstone and retain historical warnings", async () => {
+  const { AssetManager } = await assetModule();
+  const unused = asset(904, {
+    displayName: "Former prop",
+    references: { revisions: 4, builds: 2 },
+  });
+  const items = [unused];
+  const client = clientFor(() => items);
+  let server = project([unused.id]);
+  let revision = 7;
+  const transport = vi.fn(
+    async (_gameId: string, batch: { mutations: StudioMutation[] }) => {
+      server = applyProjectMutations(server, batch.mutations);
+      revision += 1;
+      return { document: server, revision };
+    },
+  );
+  client.tombstone = vi.fn(async (_gameId, assetId) => {
+    expect(server.assetIds).not.toContain(assetId);
+    const found = items[0]!;
+    found.state = "TOMBSTONED";
+    found.tombstonedAt = "2026-09-11T01:00:00.000Z";
+    return structuredClone(found);
+  });
+  render(
+    <StudioProvider
+      identity={{ userId: "owner", gameId: "game", projectId: id(1) }}
+      initial={{ document: server, revision }}
+      storage={{ read: async () => null, write: async () => {} }}
+      transport={transport}
+      debounceMs={0}
+    >
+      <AssetManager client={client} />
+    </StudioProvider>,
+  );
+
+  const card = await screen.findByRole("group", { name: "Asset Former prop" });
+  fireEvent.click(within(card).getByRole("button", { name: "Xóa asset" }));
+  const confirmation = await screen.findByRole("dialog", {
+    name: "Xóa Former prop?",
+  });
+  expect(within(confirmation).getByText(/4 phiên bản đã lưu/i)).toBeVisible();
+  expect(within(confirmation).getByText(/2 bản build/i)).toBeVisible();
+  const confirm = within(confirmation).getByRole("button", {
+    name: "Xác nhận xóa",
+  });
+  expect(confirm).toBeEnabled();
+  fireEvent.click(confirm);
+
+  await waitFor(() => expect(client.tombstone).toHaveBeenCalledTimes(1));
+  expect(transport).toHaveBeenCalledTimes(1);
+  expect(server.assetIds).toEqual([]);
+  await waitFor(() => expect(card).not.toBeInTheDocument());
+});
+
+test("a failed canonical declaration release must never call the tombstone API", async () => {
+  const { AssetManager } = await assetModule();
+  const unused = asset(905, { displayName: "Recoverable prop" });
+  const client = clientFor(() => [unused]);
+  client.tombstone = vi.fn(async () => unused);
+  const transport = vi.fn(async () => {
+    throw new Error("save unavailable");
+  });
+  render(
+    <StudioProvider
+      identity={{ userId: "owner", gameId: "game", projectId: id(1) }}
+      initial={{ document: project([unused.id]), revision: 3 }}
+      storage={{ read: async () => null, write: async () => {} }}
+      transport={transport}
+      debounceMs={0}
+    >
+      <AssetManager client={client} />
+    </StudioProvider>,
+  );
+
+  const card = await screen.findByRole("group", {
+    name: "Asset Recoverable prop",
+  });
+  fireEvent.click(within(card).getByRole("button", { name: "Xóa asset" }));
+  fireEvent.click(
+    within(await screen.findByRole("dialog", { name: "Xóa Recoverable prop?" })).getByRole(
+      "button",
+      { name: "Xác nhận xóa" },
+    ),
+  );
+
+  await waitFor(() => expect(transport).toHaveBeenCalledTimes(1));
+  expect(client.tombstone).not.toHaveBeenCalled();
+  expect(card).toBeInTheDocument();
+});
+
+test("a list captured before DELETE cannot resurrect a tombstoned READY card", async () => {
+  const { AssetManager } = await assetModule();
+  const doomed = asset(906, { displayName: "Doomed prop" });
+  let release!: (value: {
+    items: GameAssetSummary[];
+    total: number;
+    offset: number;
+    limit: number;
+  }) => void;
+  let calls = 0;
+  const client = clientFor(() => [doomed]);
+  client.list = vi.fn(async () => {
+    calls += 1;
+    if (calls === 1)
+      return { items: [structuredClone(doomed)], total: 1, offset: 0, limit: 30 };
+    if (calls === 2)
+      return new Promise<{
+        items: GameAssetSummary[];
+        total: number;
+        offset: number;
+        limit: number;
+      }>((resolve) => {
+        release = resolve;
+      });
+    const ready = doomed.state === "READY" ? [structuredClone(doomed)] : [];
+    return { items: ready, total: ready.length, offset: 0, limit: 30 };
+  });
+  client.tombstone = vi.fn(async () => {
+    doomed.state = "TOMBSTONED";
+    doomed.tombstonedAt = "2026-09-11T01:00:00.000Z";
+    return structuredClone(doomed);
+  });
+  render(
+    <Wrapper>
+      <AssetManager client={client} />
+    </Wrapper>,
+  );
+  const manager = await screen.findByRole("region", { name: "Tài nguyên" });
+  const card = await within(manager).findByRole("group", {
+    name: "Asset Doomed prop",
+  });
+  fireEvent.change(within(manager).getByRole("searchbox", { name: "Tìm asset" }), {
+    target: { value: "Doomed" },
+  });
+  await waitFor(() => expect(calls).toBe(2));
+  fireEvent.click(within(card).getByRole("button", { name: "Xóa asset" }));
+  fireEvent.click(
+    within(await screen.findByRole("dialog", { name: "Xóa Doomed prop?" })).getByRole(
+      "button",
+      { name: "Xác nhận xóa" },
+    ),
+  );
+  await waitFor(() => expect(card).not.toBeInTheDocument());
+
+  await act(async () => {
+    release({
+      items: [asset(906, { displayName: "Doomed prop" })],
+      total: 1,
+      offset: 0,
+      limit: 30,
+    });
+  });
+  expect(
+    within(manager).queryByRole("group", { name: "Asset Doomed prop" }),
+  ).not.toBeInTheDocument();
+});
+
+test("a rename out of search cannot be overwritten by a list captured before PATCH", async () => {
+  const { AssetManager } = await assetModule();
+  const hero = asset(907, { displayName: "Hero old" });
+  let release!: (value: {
+    items: GameAssetSummary[];
+    total: number;
+    offset: number;
+    limit: number;
+  }) => void;
+  let calls = 0;
+  const client = clientFor(() => [hero]);
+  client.list = vi.fn(async (_gameId, query) => {
+    calls += 1;
+    if (calls === 1)
+      return { items: [structuredClone(hero)], total: 1, offset: 0, limit: 30 };
+    if (calls === 2)
+      return new Promise<{
+        items: GameAssetSummary[];
+        total: number;
+        offset: number;
+        limit: number;
+      }>((resolve) => {
+        release = resolve;
+      });
+    const matches = hero.displayName
+      .toLowerCase()
+      .includes(String(query.search).toLowerCase())
+      ? [structuredClone(hero)]
+      : [];
+    return { items: matches, total: matches.length, offset: 0, limit: 30 };
+  });
+  client.update = vi.fn(async () => {
+    hero.displayName = "Villain";
+    return structuredClone(hero);
+  });
+  render(
+    <Wrapper>
+      <AssetManager client={client} />
+    </Wrapper>,
+  );
+  const manager = await screen.findByRole("region", { name: "Tài nguyên" });
+  const card = await within(manager).findByRole("group", { name: "Asset Hero old" });
+  fireEvent.change(within(manager).getByRole("searchbox", { name: "Tìm asset" }), {
+    target: { value: "Hero" },
+  });
+  await waitFor(() => expect(calls).toBe(2));
+  fireEvent.click(within(card).getByRole("button", { name: "Đổi tên" }));
+  fireEvent.change(within(card).getByRole("textbox", { name: "Tên asset" }), {
+    target: { value: "Villain" },
+  });
+  fireEvent.click(within(card).getByRole("button", { name: "Lưu tên" }));
+
+  await waitFor(() => expect(card).not.toBeInTheDocument());
+  release({
+    items: [asset(907, { displayName: "Hero old" })],
+    total: 1,
+    offset: 0,
+    limit: 30,
+  });
+  await Promise.resolve();
+  expect(within(manager).queryByText("Hero old")).not.toBeInTheDocument();
+  expect(within(manager).queryByText("Villain")).not.toBeInTheDocument();
+});
+
+test("a successful mutation must rebuild loaded page boundaries and totals", async () => {
+  const { AssetManager } = await assetModule();
+  const items = Array.from({ length: 31 }, (_, index) =>
+    asset(1000 + index, { displayName: `Paged ${index}` }),
+  );
+  const client = clientFor(() => items);
+  client.list = vi.fn(async (_gameId, query) => {
+    const ready = items.filter((item) => item.state === "READY");
+    const offset = Number(query.offset);
+    const limit = Number(query.limit);
+    return {
+      items: structuredClone(ready.slice(offset, offset + limit)),
+      total: ready.length,
+      offset,
+      limit,
+    };
+  });
+  client.tombstone = vi.fn(async (_gameId, assetId) => {
+    const found = items.find((item) => item.id === assetId)!;
+    found.state = "TOMBSTONED";
+    found.tombstonedAt = "2026-09-11T01:00:00.000Z";
+    return structuredClone(found);
+  });
+  render(
+    <Wrapper>
+      <AssetManager client={client} />
+    </Wrapper>,
+  );
+  const manager = await screen.findByRole("region", { name: "Tài nguyên" });
+  await within(manager).findByText("Paged 29");
+  fireEvent.click(within(manager).getByRole("button", { name: "Tải thêm" }));
+  const first = await within(manager).findByRole("group", { name: "Asset Paged 0" });
+  await within(manager).findByText("Paged 30");
+  fireEvent.click(within(first).getByRole("button", { name: "Xóa asset" }));
+  fireEvent.click(
+    within(await screen.findByRole("dialog", { name: "Xóa Paged 0?" })).getByRole(
+      "button",
+      { name: "Xác nhận xóa" },
+    ),
+  );
+
+  await waitFor(() => expect(first).not.toBeInTheDocument());
+  expect(within(manager).queryByRole("button", { name: "Tải thêm" })).not.toBeInTheDocument();
+  expect(within(manager).getAllByRole("group", { name: /^Asset Paged/ })).toHaveLength(30);
+});
+
+test("unrelated canonical edits cannot refetch cached references while a real ID change resolves only the new ID", async () => {
+  const { AssetManager } = await assetModule();
+  const first = asset(910, { displayName: "Cached first" });
+  const second = asset(911, { displayName: "New second" });
+  const client = clientFor(() => []);
+  const reads = new Map<string, number>();
+  client.get = vi.fn(async (_gameId, assetId) => {
+    reads.set(assetId, (reads.get(assetId) ?? 0) + 1);
+    return assetId === first.id ? first : second;
+  });
+  function Controls() {
+    const { state, dispatch } = useStudio();
+    return (
+      <>
+        <output aria-label="Tên Scene hiện tại">{state.document.scenes[0]!.name}</output>
+        <button
+          type="button"
+          onClick={() =>
+            dispatch({
+              type: "commit",
+              mutations: [{ type: "scene.rename", sceneId: id(2), name: "Renamed" }],
+            })
+          }
+        >
+          Đổi Scene
+        </button>
+        <button
+          type="button"
+          onClick={() =>
+            dispatch({
+              type: "commit",
+              mutations: [{ type: "asset.declare", assetId: second.id }],
+            })
+          }
+        >
+          Khai báo asset mới
+        </button>
+      </>
+    );
+  }
+  function Harness() {
+    const [metadata, setMetadata] = useState<GameAssetSummary[]>([]);
+    return (
+      <>
+        <Controls />
+        <output aria-label="Resolved asset metadata">
+          {metadata.map((item) => item.displayName).join(",")}
+        </output>
+        <AssetManager client={client} onAssetsChange={setMetadata} />
+      </>
+    );
+  }
+  render(
+    <Wrapper document={project([first.id])}>
+      <Harness />
+    </Wrapper>,
+  );
+
+  await waitFor(() =>
+    expect(screen.getByLabelText("Resolved asset metadata")).toHaveTextContent(
+      "Cached first",
+    ),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Đổi Scene" }));
+  await screen.findByText("Renamed");
+  await act(async () => {});
+  expect(reads.get(first.id)).toBe(1);
+  fireEvent.click(screen.getByRole("button", { name: "Khai báo asset mới" }));
+  await waitFor(() =>
+    expect(screen.getByLabelText("Resolved asset metadata")).toHaveTextContent(
+      "New second",
+    ),
+  );
+  expect(reads.get(first.id)).toBe(1);
+  expect(reads.get(second.id)).toBe(1);
+});
+
+test("referenced metadata resolution must deduplicate, bound concurrency, abort old projects and ignore stale results", async () => {
+  const { AssetManager } = await assetModule();
+  const firstProjectIds = Array.from({ length: 10 }, (_, index) => id(920 + index));
+  let active = 0;
+  let maximum = 0;
+  const pending = new Map<
+    string,
+    { signal?: AbortSignal; resolve: (value: GameAssetSummary) => void }
+  >();
+  const client = clientFor(() => []);
+  client.get = vi.fn((_gameId, assetId, signal) => {
+    active += 1;
+    maximum = Math.max(maximum, active);
+    return new Promise<GameAssetSummary>((resolve, reject) => {
+      pending.set(assetId, {
+        signal,
+        resolve: (value) => {
+          active -= 1;
+          resolve(value);
+        },
+      });
+      signal?.addEventListener("abort", () => {
+        active -= 1;
+        reject(new DOMException("Aborted", "AbortError"));
+      });
+    });
+  });
+  const view = render(
+    <Wrapper document={project(firstProjectIds)}>
+      <AssetManager client={client} />
+    </Wrapper>,
+  );
+  await waitFor(() => expect(pending.size).toBeGreaterThan(0));
+  expect(maximum).toBeLessThanOrEqual(4);
+  const started = [...pending.values()];
+
+  const nextDocument = project([id(950)]);
+  nextDocument.projectId = id(951);
+  nextDocument.scenes[0]!.id = id(952);
+  nextDocument.scenes[0]!.key = "next";
+  nextDocument.scenes[0]!.layers[0]!.id = id(953);
+  nextDocument.entrySceneId = id(952);
+  view.rerender(
+    <StudioProvider
+      identity={{ userId: "owner", gameId: "next-game", projectId: id(951) }}
+      initial={{ document: nextDocument, revision: 0 }}
+      storage={{ read: async () => null, write: async () => {} }}
+    >
+      <AssetManager client={client} />
+    </StudioProvider>,
+  );
+  await waitFor(() => expect(started.every((entry) => entry.signal?.aborted)).toBe(true));
+  expect(screen.queryByText(/Asset 92/)).not.toBeInTheDocument();
+});
+
+test("a transient referenced-asset read failure must stay visible and retry into a confirmed unavailable record", async () => {
+  const { AssetManager } = await assetModule();
+  const missing = asset(960, {
+    displayName: "Deleted after retry",
+    state: "TOMBSTONED",
+    tombstonedAt: "2026-09-11T01:00:00.000Z",
+  });
+  const client = clientFor(() => []);
+  let fail = true;
+  client.get = vi.fn(async () => {
+    if (fail) {
+      fail = false;
+      throw new ApiError(503, "temporarily unavailable");
+    }
+    return missing;
+  });
+  function CanonicalReference() {
+    const { state } = useStudio();
+    return <output aria-label="Canonical refs">{state.document.assetIds.join(",")}</output>;
+  }
+  render(
+    <Wrapper document={project([missing.id])}>
+      <CanonicalReference />
+      <AssetManager client={client} />
+    </Wrapper>,
+  );
+
+  const unresolved = await screen.findByRole("group", {
+    name: `Asset reference ${missing.id}`,
+  });
+  expect(within(unresolved).getByText(/temporarily unavailable/i)).toBeVisible();
+  expect(unresolved).toHaveAttribute("draggable", "false");
+  expect(screen.getByLabelText("Canonical refs")).toHaveTextContent(missing.id);
+  fireEvent.click(
+    within(unresolved).getByRole("button", { name: `Thử lại asset ${missing.id}` }),
+  );
+  const resolved = await screen.findByRole("group", {
+    name: "Asset Deleted after retry",
+  });
+  expect(resolved).toHaveAttribute("draggable", "false");
+  expect(within(resolved).getByText("Đã xóa")).toBeVisible();
+});
+
+test.each([
+  [404, "Không tìm thấy asset được tham chiếu"],
+  [403, "Không có quyền đọc asset được tham chiếu"],
+])(
+  "a referenced metadata HTTP %s must remain an explicit non-draggable canonical diagnostic",
+  async (status, message) => {
+    const { AssetManager } = await assetModule();
+    const assetId = id(970 + status);
+    const client = clientFor(() => []);
+    client.get = vi.fn(async () => {
+      throw new ApiError(status, "request failed");
+    });
+    render(
+      <Wrapper document={project([assetId])}>
+        <AssetManager client={client} />
+      </Wrapper>,
+    );
+
+    const unresolved = await screen.findByRole("group", {
+      name: `Asset reference ${assetId}`,
+    });
+    expect(within(unresolved).getByText(message)).toBeVisible();
+    expect(unresolved).toHaveAttribute("draggable", "false");
+  },
+);
+
+test("a READY-only reload cannot hide a tombstoned asset that remains canonically declared", async () => {
   const { AssetManager } = await assetModule();
   const missing = asset(903, {
     displayName: "Deleted backdrop",
@@ -427,7 +978,7 @@ test("a READY-only reload cannot hide a tombstoned asset that the canonical docu
   });
   expect(card).toHaveAttribute("draggable", "false");
   expect(within(card).getByText("Đã xóa")).toBeVisible();
-  expect(within(card).getByText("Đang dùng trong dự án")).toBeVisible();
+  expect(within(card).getByText("Đã khai báo trong dự án")).toBeVisible();
 });
 
 test("a missing real drag integration cannot atomically declare, save and reload an asset-id-only object", async () => {
@@ -549,4 +1100,77 @@ test("a missing real drag integration cannot atomically declare, save and reload
   );
   const reloaded = await screen.findByRole("group", { name: "Asset Potion" });
   expect(within(reloaded).getByText("Đang dùng trong dự án")).toBeVisible();
+});
+
+test("a missing keyboard placement action cannot use the validated canvas role and layer path", async () => {
+  const { AssetManager } = await assetModule();
+  const ready = asset(980, {
+    displayName: "Keyboard panel",
+    metadata: { ...asset(980).metadata, category: "UI" },
+  });
+  const client = clientFor(() => [ready]);
+  let server = project();
+  let revision = 0;
+  let placement: ((payload: string) => void) | null = null;
+  const transport = async (
+    _gameId: string,
+    batch: { mutations: StudioMutation[] },
+  ) => {
+    server = applyProjectMutations(server, batch.mutations);
+    revision += 1;
+    return { document: server, revision };
+  };
+  const CanvasWithPlacement = SceneCanvas as ComponentType<{
+    scene: EngineProjectV2Type["scenes"][number];
+    assetMetadata: GameAssetSummary[];
+    registerAssetPlacement: (
+      handler: ((payload: string) => void) | null,
+    ) => void;
+  }>;
+  function Workspace() {
+    const studio = useStudio();
+    const [metadata, setMetadata] = useState<GameAssetSummary[]>([]);
+    return (
+      <>
+        <AssetManager
+          client={client}
+          onAssetsChange={setMetadata}
+          onPlaceAsset={(payload) => placement?.(payload)}
+        />
+        <CanvasWithPlacement
+          scene={studio.state.document.scenes[0]!}
+          assetMetadata={metadata}
+          registerAssetPlacement={(handler) => {
+            placement = handler;
+          }}
+        />
+      </>
+    );
+  }
+  render(
+    <StudioProvider
+      identity={{ userId: "owner", gameId: "game", projectId: id(1) }}
+      initial={{ document: server, revision }}
+      storage={{ read: async () => null, write: async () => {} }}
+      transport={transport}
+      debounceMs={0}
+    >
+      <Workspace />
+    </StudioProvider>,
+  );
+
+  const add = await screen.findByRole("button", {
+    name: "Thêm Keyboard panel vào Scene",
+  });
+  add.focus();
+  fireEvent.keyDown(add, { key: "Enter" });
+  fireEvent.click(add);
+
+  await waitFor(() => expect(server.assetIds).toEqual([ready.id]));
+  const created = server.scenes[0]!.objects[0]!;
+  expect(created.layerId).toBe(id(4));
+  expect(
+    created.components.find((component) => component.type === "UIImage")
+      ?.properties.assetId,
+  ).toBe(ready.id);
 });

@@ -15,6 +15,7 @@
     "test:containers": "node scripts/test-container-contract.mjs",
     "test:deploy-config": "node scripts/test-deployment-config.mjs",
     "test:deploy-smoke": "bash scripts/smoke-production.sh",
+    "test:e2e:studio-assets": "bash scripts/run-studio-assets-e2e.sh",
     "lint": "turbo lint",
     "typecheck": "pnpm db:generate && turbo typecheck"
   },

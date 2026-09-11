@@ -23,6 +23,7 @@ export function StudioShell({ initialGame }: { initialGame: GameSummary }) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [assets, setAssets] = useState<GameAssetSummary[]>([]);
   const settingsRef = useRef<HTMLButtonElement>(null);
+  const assetPlacement = useRef<((payload: string) => void) | null>(null);
   const assetMetadata = useMemo(
     () =>
       assets.map((asset) => ({
@@ -80,12 +81,20 @@ export function StudioShell({ initialGame }: { initialGame: GameSummary }) {
           onSceneChange={selectScene}
           open={sidebarOpen}
           onToggle={toggleSidebar}
-          assetManager={<AssetManager onAssetsChange={setAssets} />}
+          assetManager={
+            <AssetManager
+              onAssetsChange={setAssets}
+              onPlaceAsset={(payload) => assetPlacement.current?.(payload)}
+            />
+          }
         />
         <StudioSceneOverview
           scene={scene}
           pixelArt={state.document.settings.pixelArt}
           assetMetadata={assetMetadata}
+          registerAssetPlacement={(handler) => {
+            assetPlacement.current = handler;
+          }}
         />
         <StudioInspector
           scene={scene}

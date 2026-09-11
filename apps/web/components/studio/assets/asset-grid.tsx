@@ -4,7 +4,6 @@ import { useState } from "react";
 import type { GameAssetSummary } from "@indieforge/contracts";
 import { StudioConfirmation } from "../studio-confirmation";
 import { STUDIO_ASSET_MIME } from "../asset-drop";
-import type { AssetClient } from "./asset-manager";
 import { AssetPreview } from "./asset-preview";
 
 function intendedRole(asset: GameAssetSummary) {
@@ -21,18 +20,28 @@ function intendedRole(asset: GameAssetSummary) {
   }
 }
 
+function placementPayload(asset: GameAssetSummary) {
+  return JSON.stringify({
+    assetId: asset.id,
+    kind: asset.kind,
+    role: intendedRole(asset),
+  });
+}
+
 export function AssetGrid({
-  gameId,
   assets,
   declaredAssetIds,
-  client,
-  onChanged,
+  referencedAssetIds,
+  onRename,
+  onTombstone,
+  onPlaceAsset,
 }: {
-  gameId: string;
   assets: GameAssetSummary[];
   declaredAssetIds: readonly string[];
-  client: AssetClient;
-  onChanged: (asset: GameAssetSummary | null, removedId?: string) => void;
+  referencedAssetIds: ReadonlySet<string>;
+  onRename: (asset: GameAssetSummary, displayName: string) => Promise<void>;
+  onTombstone: (asset: GameAssetSummary) => Promise<void>;
+  onPlaceAsset?: (payload: string) => void;
 }) {
   const [renaming, setRenaming] = useState<string | null>(null);
   const [name, setName] = useState("");
@@ -44,10 +53,7 @@ export function AssetGrid({
     setBusy(true);
     setError("");
     try {
-      const updated = await client.update(gameId, asset.id, {
-        displayName: name,
-      });
-      onChanged(updated);
+      await onRename(asset, name);
       setRenaming(null);
     } catch (failure) {
       setError(
@@ -61,8 +67,7 @@ export function AssetGrid({
     setBusy(true);
     setError("");
     try {
-      await client.tombstone(gameId, asset.id);
-      onChanged(null, asset.id);
+      await onTombstone(asset);
       setDeleting(null);
     } catch (failure) {
       setError(
@@ -79,6 +84,7 @@ export function AssetGrid({
     <div className="studio-asset-grid">
       {assets.map((asset) => {
         const declared = declaredAssetIds.includes(asset.id);
+        const referenced = referencedAssetIds.has(asset.id);
         const draggable = asset.state === "READY" && asset.kind === "IMAGE";
         return (
           <article
@@ -92,11 +98,7 @@ export function AssetGrid({
               event.dataTransfer.effectAllowed = "copy";
               event.dataTransfer.setData(
                 STUDIO_ASSET_MIME,
-                JSON.stringify({
-                  assetId: asset.id,
-                  kind: asset.kind,
-                  role: intendedRole(asset),
-                }),
+                placementPayload(asset),
               );
             }}
           >
@@ -130,9 +132,22 @@ export function AssetGrid({
                 <small>
                   {asset.metadata.category ?? "USER"} · {asset.kind}
                 </small>
-                {declared && <span>Đang dùng trong dự án</span>}
+                {referenced ? (
+                  <span>Đang dùng trong dự án</span>
+                ) : (
+                  declared && <span>Đã khai báo trong dự án</span>
+                )}
                 {asset.state !== "READY" && <span>Đã xóa</span>}
                 <div className="studio-actions">
+                  {draggable && onPlaceAsset && (
+                    <button
+                      type="button"
+                      aria-label={`Thêm ${asset.displayName} vào Scene`}
+                      onClick={() => onPlaceAsset(placementPayload(asset))}
+                    >
+                      Thêm vào Scene
+                    </button>
+                  )}
                   <button
                     type="button"
                     disabled={asset.state !== "READY"}
@@ -161,11 +176,11 @@ export function AssetGrid({
       {deleting && (
         <StudioConfirmation
           title={`Xóa ${deleting.displayName}?`}
-          disabled={busy || declaredAssetIds.includes(deleting.id)}
+          disabled={busy || referencedAssetIds.has(deleting.id)}
           onCancel={() => setDeleting(null)}
           onConfirm={() => void remove(deleting)}
         >
-          {declaredAssetIds.includes(deleting.id) ? (
+          {referencedAssetIds.has(deleting.id) ? (
             <p>
               Asset đang được dùng trong dự án hiện tại. Hãy xóa các đối tượng
               phụ thuộc trước khi xóa asset.

@@ -11,16 +11,21 @@ export function StudioSceneOverview({
   scene,
   pixelArt = false,
   assetMetadata = [],
+  registerAssetPlacement,
 }: {
   scene: Scene;
   pixelArt?: boolean;
   assetMetadata?: readonly AssetDropMetadata[];
+  registerAssetPlacement?: (
+    handler: ((payload: string) => void) | null,
+  ) => void;
 }) {
   return (
     <SceneCanvas
       scene={scene}
       pixelArt={pixelArt}
       assetMetadata={assetMetadata}
+      registerAssetPlacement={registerAssetPlacement}
     />
   );
 }

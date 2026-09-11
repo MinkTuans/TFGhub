@@ -26,6 +26,22 @@ Lệnh cuối giữ máy chủ web và API hoạt động. Mở [ứng dụng we
 
 Xem [hướng dẫn phát triển](docs/development.md) và [tài liệu API](docs/api/foundation.md) để biết quy trình và ví dụ gọi API.
 
+### Kiểm thử tích hợp Asset Manager
+
+Lane Task 19 dùng ứng dụng thật thay vì API giả lập: lệnh sau tự tạo một
+PostgreSQL 16 dùng một lần và thư mục lưu asset tạm, chạy migration, khởi động
+API/web, rồi chạy `studio-assets.spec.ts` bằng Playwright. Container, tiến trình
+và dữ liệu tạm được dọn khi lệnh kết thúc.
+
+```bash
+pnpm test:e2e:studio-assets
+```
+
+Cần Docker đang chạy và Chromium của Playwright (`pnpm --filter web exec
+playwright install chromium` nếu máy chưa có). Dùng `pnpm
+test:e2e:studio-assets -- --help` để xem các biến đổi cổng khi cổng mặc định
+đang bận.
+
 ## Triển khai
 
 Xem [hướng dẫn vận hành](docs/deployment.md) cho Docker Compose trên một máy chủ, HTTPS hoặc bản xem thử HTTP qua IP, sao lưu, khôi phục, nâng cấp và quay lui. Ảnh bìa và nội dung game cùng nằm trong volume `game_storage`; cần sao lưu toàn bộ volume cùng cơ sở dữ liệu.
