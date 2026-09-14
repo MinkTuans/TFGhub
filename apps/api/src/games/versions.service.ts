@@ -121,6 +121,31 @@ export class VersionsService {
     return summary(await this.scanner.process(version.id));
   }
 
+  async ingestOwnedZip(
+    gameId: string,
+    userId: string,
+    filename: string,
+    archive: Buffer,
+  ): Promise<GameVersionSummary> {
+    await this.requireOwnedGame(gameId, userId);
+    const checksumSha256 = createHash('sha256').update(archive).digest('hex');
+    const id = randomBytes(8).toString('hex');
+    const version = await this.versions.create({
+      gameId,
+      filename,
+      byteSize: archive.length,
+      checksumSha256,
+      storageKey: `quarantine/${gameId}/${id}/${filename}`,
+      uploadToken: randomBytes(24).toString('hex'),
+      uploadExpiresAt: new Date(Date.now() + 15 * 60 * 1000),
+    });
+    await this.storage.put(version.storageKey, archive);
+    version.status = 'SCANNING';
+    version.uploadToken = null;
+    await this.versions.save(version);
+    return summary(await this.scanner.process(version.id));
+  }
+
   async listOwned(gameId: string, userId: string): Promise<GameVersionSummary[]> {
     await this.requireOwnedGame(gameId, userId);
     return (await this.versions.listByGame(gameId)).map(summary);

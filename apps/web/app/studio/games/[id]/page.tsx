@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { GameSummary, GameVersionSummary } from "@indieforge/contracts";
 import { ReleaseForm } from "../../../../components/release-form";
@@ -26,6 +27,9 @@ export default async function StudioGamePage({
             : "Unlisted"}
       </p>
       <p className="description">{game.description}</p>
+      <p>
+        <Link href={`/studio/games/${game.id}/engine`}>Open engine</Link>
+      </p>
       <ReleaseForm game={game} versions={versions} />
     </main>
   );

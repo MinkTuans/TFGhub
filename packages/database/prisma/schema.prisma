@@ -97,7 +97,19 @@ model Game {
   donations       Donation[]
   playSessions    PlaySession[]
   reports         Report[]
+  project         GameProject?
   activeVersion   GameVersion?    @relation("ActiveGameVersion", fields: [activeVersionId], references: [id], onDelete: SetNull)
+}
+
+model GameProject {
+  id            String   @id @default(cuid())
+  gameId        String   @unique
+  templateId    String
+  formatVersion String   @default("1")
+  document      Json
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  game          Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
 }
 
 model Donation {

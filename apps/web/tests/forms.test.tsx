@@ -5,6 +5,7 @@ import { GameForm } from "../components/game-form";
 import { DonateForm } from "../components/donate-form";
 import { ReportForm } from "../components/report-form";
 import { ReleaseForm } from "../components/release-form";
+import { EngineForm } from "../components/engine-form";
 
 // Navigation needs a Next router; the form, validation and HTTP client stay real.
 vi.mock("next/navigation", () => ({
@@ -79,6 +80,111 @@ test("draft creation keeps input visible after a duplicate slug rejection", asyn
   );
   expect(screen.getByLabelText("Title")).toHaveValue("My game");
   expect(screen.getByRole("button", { name: "Create draft" })).toBeEnabled();
+});
+
+const engineProject = {
+  id: "proj-1",
+  gameId: "game-1",
+  templateId: "phaser3-starter",
+  formatVersion: "1",
+  document: {
+    engine: "phaser3" as const,
+    engineVersion: "3.80.1",
+    formatVersion: "1" as const,
+    entryScene: "Main",
+    scenes: [
+      {
+        id: "Main",
+        width: 800,
+        height: 600,
+        background: "#1b2838",
+        objects: [
+          {
+            id: "player",
+            type: "rectangle" as const,
+            x: 376,
+            y: 276,
+            width: 48,
+            height: 48,
+            color: "#66c0f4",
+            bounce: true,
+          },
+        ],
+      },
+    ],
+  },
+  createdAt: "2026-09-14T03:00:00.000Z",
+  updatedAt: "2026-09-14T03:00:00.000Z",
+};
+
+test("engine form creates a starter project when none exists", async () => {
+  const fetch = vi
+    .fn()
+    .mockResolvedValueOnce(new Response("{}", { status: 404 }))
+    .mockResolvedValueOnce(
+      new Response(JSON.stringify(engineProject), { status: 201 }),
+    )
+    .mockResolvedValueOnce(
+      new Response(JSON.stringify({ html: "<html>preview</html>" }), {
+        status: 200,
+      }),
+    );
+  vi.stubGlobal("fetch", fetch);
+  render(<EngineForm gameId="game-1" />);
+  expect(await screen.findByLabelText("Player color")).toHaveValue("#66c0f4");
+  expect(String(fetch.mock.calls[1]?.[1]?.method)).toBe("POST");
+  expect(JSON.parse(String(fetch.mock.calls[1]?.[1]?.body))).toEqual({
+    template: "phaser3-starter",
+  });
+});
+
+test("engine form saves player edits", async () => {
+  const fetch = vi
+    .fn()
+    .mockResolvedValueOnce(
+      new Response(JSON.stringify(engineProject), { status: 200 }),
+    )
+    .mockResolvedValueOnce(
+      new Response(JSON.stringify({ html: "<html>preview</html>" }), {
+        status: 200,
+      }),
+    )
+    .mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          ...engineProject,
+          document: {
+            ...engineProject.document,
+            scenes: [
+              {
+                ...engineProject.document.scenes[0],
+                objects: [
+                  {
+                    ...engineProject.document.scenes[0].objects[0],
+                    color: "#ff8800",
+                  },
+                ],
+              },
+            ],
+          },
+        }),
+        { status: 200 },
+      ),
+    )
+    .mockResolvedValueOnce(
+      new Response(JSON.stringify({ html: "<html>saved</html>" }), {
+        status: 200,
+      }),
+    );
+  vi.stubGlobal("fetch", fetch);
+  render(<EngineForm gameId="game-1" />);
+  fireEvent.change(await screen.findByLabelText("Player color"), {
+    target: { value: "#ff8800" },
+  });
+  fireEvent.submit(
+    screen.getByRole("button", { name: "Save project" }).closest("form")!,
+  );
+  expect(await screen.findByRole("status")).toHaveTextContent("Project saved.");
 });
 
 test("release form asks for a zip before calling the API", () => {

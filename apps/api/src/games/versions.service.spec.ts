@@ -241,4 +241,19 @@ describe('VersionsService', () => {
       ForbiddenException,
     );
   });
+
+  it('ingests a zip for the owner, scans it, and returns READY', async () => {
+    const archive = await html5Zip();
+    const versions = new Map<string, StoredVersion>();
+    const service = serviceFor(game, versions);
+    const result = await service.ingestOwnedZip(
+      'game-1',
+      'owner-1',
+      'engine.zip',
+      archive,
+    );
+    expect(result.status).toBe('READY');
+    expect(result.filename).toBe('engine.zip');
+    expect(result.findings).toBe('');
+  });
 });

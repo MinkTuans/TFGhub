@@ -249,3 +249,15 @@ GET /games/by-slug/orbit-orchard
 ```
 
 This response never includes the owner's email. Draft, unlisted, flagged, quarantined, or missing games return `404`. The current foundation has no publishing endpoint, so public records are shown here to document the read contract for public data that exists; publishing is planned work.
+
+## Online engine project
+
+One project per owned game. `POST` with `{ "template": "phaser3-starter" }` creates it (`409` if it already exists). `GET` returns the document; `404` if none. `PUT` replaces the document. `GET /preview` returns `{ "html": "..." }` for a studio iframe. `POST /build` compiles `engine.zip`, scans it, and returns a version summary (`READY` when the zip is accepted). None of these routes publish the game.
+
+```http
+POST /games/cmexamplegame1/project
+Cookie: indieforge_access=...
+Content-Type: application/json
+
+{"template":"phaser3-starter"}
+```

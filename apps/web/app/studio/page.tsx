@@ -99,7 +99,11 @@ export default async function StudioPage() {
                       : "Unlisted"}
                 </p>
                 <p className="description">{game.description}</p>
-                <Link href={`/studio/games/${game.id}`}>Manage release</Link>
+                <p>
+                  <Link href={`/studio/games/${game.id}`}>Manage release</Link>
+                  {" · "}
+                  <Link href={`/studio/games/${game.id}/engine`}>Open engine</Link>
+                </p>
               </article>
             ))}
           </div>

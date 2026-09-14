@@ -38,3 +38,12 @@ export {
   ReportSummary,
   ResolveReportInput,
 } from './reports.js';
+export {
+  CreateGameProjectInput,
+  EngineObject,
+  EngineScene,
+  GameProjectDocument,
+  GameProjectPreview,
+  GameProjectSummary,
+  UpdateGameProjectInput,
+} from './projects.js';

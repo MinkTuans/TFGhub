@@ -186,6 +186,15 @@ button:disabled {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+.engine-preview {
+  display: block;
+  width: min(100%, 800px);
+  height: 360px;
+  margin: 24px 0;
+  border: 1px solid #dce3d8;
+  border-radius: 12px;
+  background: #111;
+}
 .search-form {
   display: flex;
   align-items: end;

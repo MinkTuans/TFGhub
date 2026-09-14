@@ -3,11 +3,14 @@ import {
   CompleteGameVersionInput,
   CreateDonationInput,
   CreateGameInput,
+  CreateGameProjectInput,
+  GameProjectDocument,
   PlayHeartbeatInput,
   CreateGameVersionInput,
   PublishGameInput,
   RegisterInput,
   RollbackGameInput,
+  UpdateGameProjectInput,
 } from './index';
 
 describe('contracts', () => {
@@ -72,6 +75,67 @@ describe('contracts', () => {
         idempotencyKey: 'donate-key-1',
       }),
     ).toEqual({ amountCents: 500, idempotencyKey: 'donate-key-1' });
+  });
+
+  it('accepts the Phaser 3 starter template id', () => {
+    expect(CreateGameProjectInput.parse({ template: 'phaser3-starter' })).toEqual({
+      template: 'phaser3-starter',
+    });
+  });
+
+  it('rejects an unknown engine template', () => {
+    expect(() => CreateGameProjectInput.parse({ template: 'unity' })).toThrow();
+  });
+
+  it('requires the entry scene to exist in the project document', () => {
+    const objects = [
+      {
+        id: 'player',
+        type: 'rectangle',
+        x: 40,
+        y: 40,
+        width: 48,
+        height: 48,
+        color: '#66c0f4',
+        bounce: true,
+      },
+    ];
+    expect(() =>
+      GameProjectDocument.parse({
+        engine: 'phaser3',
+        engineVersion: '3.80.1',
+        formatVersion: '1',
+        entryScene: 'Missing',
+        scenes: [
+          {
+            id: 'Main',
+            width: 800,
+            height: 600,
+            background: '#1b2838',
+            objects,
+          },
+        ],
+      }),
+    ).toThrow();
+    expect(
+      UpdateGameProjectInput.parse({
+        document: {
+          engine: 'phaser3',
+          engineVersion: '3.80.1',
+          formatVersion: '1',
+          entryScene: 'Main',
+          scenes: [
+            {
+              id: 'Main',
+              width: 800,
+              height: 600,
+              background: '#1b2838',
+              objects,
+            },
+          ],
+        },
+      }).document.entryScene,
+    ).toBe('Main');
   });
 
   it('rejects a donation below one dollar', () => {

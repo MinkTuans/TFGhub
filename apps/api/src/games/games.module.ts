@@ -1,8 +1,15 @@
 import { Module } from '@nestjs/common';
+import { GameProjectDocument } from '@indieforge/contracts';
 import { database } from '@indieforge/database';
 import { AuthModule } from '../auth/auth.module.js';
 import { GamesController } from './games.controller.js';
 import { GamesRepository, GamesService } from './games.service.js';
+import {
+  ProjectsRepository,
+  ProjectsService,
+  type StoredProject,
+} from './projects.service.js';
+import { ProjectsController } from './projects.controller.js';
 import {
   createObjectStorage,
   createR2ObjectStorage,
@@ -32,6 +39,21 @@ export const gameSummarySelect = {
   updatedAt: true,
 } as const;
 
+function asStoredProject(row: {
+  id: string;
+  gameId: string;
+  templateId: string;
+  formatVersion: string;
+  document: unknown;
+  createdAt: Date;
+  updatedAt: Date;
+}): StoredProject {
+  return {
+    ...row,
+    document: GameProjectDocument.parse(row.document),
+  };
+}
+
 const publicGameSelect = {
   id: true,
   slug: true,
@@ -49,11 +71,13 @@ const publicGameSelect = {
     PublicGamesController,
     VersionsController,
     RuntimeController,
+    ProjectsController,
   ],
   providers: [
     GamesService,
     PublicGamesService,
     VersionsService,
+    ProjectsService,
     ScanWorker,
     RuntimeService,
     {
@@ -101,6 +125,29 @@ const publicGameSelect = {
       provide: ObjectStorage,
       useFactory: async () =>
         (await createR2ObjectStorage()) ?? createObjectStorage(),
+    },
+    {
+      provide: ProjectsRepository,
+      useFactory: (): ProjectsRepository => ({
+        findGame: (id) =>
+          database.game.findUnique({
+            where: { id },
+            select: { id: true, ownerId: true },
+          }),
+        findByGameId: async (gameId) => {
+          const row = await database.gameProject.findUnique({ where: { gameId } });
+          return row ? asStoredProject(row) : null;
+        },
+        create: async (input) =>
+          asStoredProject(await database.gameProject.create({ data: input })),
+        save: async (project) =>
+          asStoredProject(
+            await database.gameProject.update({
+              where: { id: project.id },
+              data: { document: project.document },
+            }),
+          ),
+      }),
     },
     {
       provide: VersionsRepository,
