@@ -69,6 +69,7 @@ export function EngineForm({ gameId }: { gameId: string }) {
     const y = Number(form.get("y"));
     const next = {
       ...project.document,
+      scripts: { "main.ts": String(form.get("main.ts") ?? "") },
       scenes: project.document.scenes.map((scene, index) =>
         index === 0
           ? {
@@ -82,7 +83,7 @@ export function EngineForm({ gameId }: { gameId: string }) {
     };
     const parsed = GameProjectDocument.safeParse(next);
     if (!parsed.success) {
-      setError("Check the player position and color.");
+      setError("Check the player position, color, and TypeScript.");
       return;
     }
     setError("");
@@ -158,6 +159,15 @@ export function EngineForm({ gameId }: { gameId: string }) {
         <label>
           Player color
           <input name="color" type="color" defaultValue={player.color} required />
+        </label>
+        <label>
+          TypeScript (main.ts)
+          <textarea
+            name="main.ts"
+            rows={12}
+            defaultValue={project.document.scripts["main.ts"] ?? ""}
+            spellCheck={false}
+          />
         </label>
         {error ? <p role="alert">{error}</p> : null}
         {status ? <p role="status">{status}</p> : null}

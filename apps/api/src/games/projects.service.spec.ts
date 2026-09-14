@@ -1,4 +1,8 @@
-import { ConflictException, ForbiddenException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { describe, expect, it } from 'vitest';
 import { MemoryObjectStorage } from './object-storage.js';
 import { ProjectsService, type ProjectsRepository } from './projects.service.js';
@@ -156,7 +160,22 @@ describe('ProjectsService', () => {
     expect(saved.document.scenes[0]?.objects[0]?.color).toBe('#ff8800');
     const preview = await service.preview('game-1', 'owner-1');
     expect(preview.html).toContain('#ff8800');
-    expect(preview.html).toContain('requestAnimationFrame');
+    expect(preview.html).toContain('new Phaser.Game');
+  });
+
+  it('rejects TypeScript that uses import', async () => {
+    const { service } = fixture();
+    const created = await service.create('game-1', 'owner-1', {
+      template: 'phaser3-starter',
+    });
+    await expect(
+      service.update('game-1', 'owner-1', {
+        document: {
+          ...created.document,
+          scripts: { 'main.ts': 'import fs from "fs";' },
+        },
+      }),
+    ).rejects.toThrow(BadRequestException);
   });
 
   it('builds a scanned READY html5 zip from the project', async () => {

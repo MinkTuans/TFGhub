@@ -20,8 +20,9 @@ export default async function StudioEnginePage({
       </p>
       <h1>Online engine</h1>
       <p className="hint">
-        Phaser 3 starter for {game.title}. Edit the player, preview, then build an
-        HTML5 zip that uses the same scan pipeline as an uploaded release.
+        Phaser 3 starter for {game.title}. Edit the player and main.ts, preview,
+        then build an HTML5 zip that uses the same scan pipeline as an uploaded
+        release.
       </p>
       <EngineForm gameId={game.id} />
     </main>

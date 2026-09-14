@@ -213,7 +213,7 @@ describe('Online engine project HTTP boundary', () => {
       .expect(409);
 
     const preview = await instance.get(`/games/${gameId}/project/preview`).expect(200);
-    expect(preview.body.html).toContain('requestAnimationFrame');
+    expect(preview.body.html).toContain('new Phaser.Game');
 
     const document = created.body.document;
     document.scenes[0].objects[0].color = '#ff8800';

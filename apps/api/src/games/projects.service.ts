@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   Inject,
@@ -13,9 +14,11 @@ import type {
   UpdateGameProjectInput,
 } from '@indieforge/contracts';
 import {
+  EngineCompileError,
   compileHtml5Zip,
   compilePreviewHtml,
   phaser3StarterDocument,
+  transpileMain,
 } from './engine-compiler.js';
 import { VersionsService } from './versions.service.js';
 
@@ -112,24 +115,50 @@ export class ProjectsService {
     return summary(await this.requireProject(gameId, userId));
   }
 
+  private compileDocument(document: GameProjectDocument) {
+    try {
+      transpileMain(document.scripts['main.ts'] ?? '');
+    } catch (error) {
+      if (error instanceof EngineCompileError) {
+        throw new BadRequestException(error.message);
+      }
+      throw error;
+    }
+  }
+
   async update(
     gameId: string,
     userId: string,
     input: UpdateGameProjectInput,
   ): Promise<GameProjectSummary> {
     const project = await this.requireProject(gameId, userId);
+    this.compileDocument(input.document);
     project.document = input.document;
     return summary(await this.projects.save(project));
   }
 
   async preview(gameId: string, userId: string): Promise<GameProjectPreview> {
     const project = await this.requireProject(gameId, userId);
-    return { html: compilePreviewHtml(project.document) };
+    try {
+      return { html: compilePreviewHtml(project.document) };
+    } catch (error) {
+      if (error instanceof EngineCompileError) {
+        throw new BadRequestException(error.message);
+      }
+      throw error;
+    }
   }
 
   async build(gameId: string, userId: string) {
     const project = await this.requireProject(gameId, userId);
-    const archive = await compileHtml5Zip(project.document);
-    return this.versions.ingestOwnedZip(gameId, userId, 'engine.zip', archive);
+    try {
+      const archive = await compileHtml5Zip(project.document);
+      return this.versions.ingestOwnedZip(gameId, userId, 'engine.zip', archive);
+    } catch (error) {
+      if (error instanceof EngineCompileError) {
+        throw new BadRequestException(error.message);
+      }
+      throw error;
+    }
   }
 }

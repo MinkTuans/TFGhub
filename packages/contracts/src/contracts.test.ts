@@ -136,6 +136,58 @@ describe('contracts', () => {
         },
       }).document.entryScene,
     ).toBe('Main');
+    expect(
+      UpdateGameProjectInput.parse({
+        document: {
+          engine: 'phaser3',
+          engineVersion: '3.80.1',
+          formatVersion: '1',
+          entryScene: 'Main',
+          scenes: [
+            {
+              id: 'Main',
+              width: 800,
+              height: 600,
+              background: '#1b2838',
+              objects,
+            },
+          ],
+          scripts: { 'main.ts': 'function onCreate() {}' },
+        },
+      }).document.scripts['main.ts'],
+    ).toBe('function onCreate() {}');
+  });
+
+  it('rejects TypeScript larger than 20KB', () => {
+    expect(() =>
+      GameProjectDocument.parse({
+        engine: 'phaser3',
+        engineVersion: '3.80.1',
+        formatVersion: '1',
+        entryScene: 'Main',
+        scenes: [
+          {
+            id: 'Main',
+            width: 800,
+            height: 600,
+            background: '#1b2838',
+            objects: [
+              {
+                id: 'player',
+                type: 'rectangle',
+                x: 40,
+                y: 40,
+                width: 48,
+                height: 48,
+                color: '#66c0f4',
+                bounce: true,
+              },
+            ],
+          },
+        ],
+        scripts: { 'main.ts': 'x'.repeat(20001) },
+      }),
+    ).toThrow();
   });
 
   it('rejects a donation below one dollar', () => {

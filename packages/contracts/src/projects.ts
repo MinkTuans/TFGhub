@@ -19,6 +19,10 @@ export const EngineScene = z.object({
   objects: z.array(EngineObject).min(1).max(50),
 });
 
+export const EngineScripts = z.object({
+  'main.ts': z.string().max(20_000),
+});
+
 export const GameProjectDocument = z
   .object({
     engine: z.literal('phaser3'),
@@ -26,6 +30,7 @@ export const GameProjectDocument = z
     formatVersion: z.literal('1'),
     entryScene: z.string().trim().min(1).max(64),
     scenes: z.array(EngineScene).min(1).max(20),
+    scripts: EngineScripts.default({ 'main.ts': '' }),
   })
   .refine(
     (value) => value.scenes.some((scene) => scene.id === value.entryScene),
@@ -56,6 +61,7 @@ export const GameProjectPreview = z.object({
 
 export type EngineObject = z.infer<typeof EngineObject>;
 export type EngineScene = z.infer<typeof EngineScene>;
+export type EngineScripts = z.infer<typeof EngineScripts>;
 export type GameProjectDocument = z.infer<typeof GameProjectDocument>;
 export type CreateGameProjectInput = z.infer<typeof CreateGameProjectInput>;
 export type UpdateGameProjectInput = z.infer<typeof UpdateGameProjectInput>;

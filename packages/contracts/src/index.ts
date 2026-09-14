@@ -42,6 +42,7 @@ export {
   CreateGameProjectInput,
   EngineObject,
   EngineScene,
+  EngineScripts,
   GameProjectDocument,
   GameProjectPreview,
   GameProjectSummary,

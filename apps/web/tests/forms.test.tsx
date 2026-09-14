@@ -92,6 +92,7 @@ const engineProject = {
     engineVersion: "3.80.1",
     formatVersion: "1" as const,
     entryScene: "Main",
+    scripts: { "main.ts": "function onCreate() {}" },
     scenes: [
       {
         id: "Main",
@@ -132,6 +133,9 @@ test("engine form creates a starter project when none exists", async () => {
   vi.stubGlobal("fetch", fetch);
   render(<EngineForm gameId="game-1" />);
   expect(await screen.findByLabelText("Player color")).toHaveValue("#66c0f4");
+  expect(screen.getByLabelText("TypeScript (main.ts)")).toHaveValue(
+    "function onCreate() {}",
+  );
   expect(String(fetch.mock.calls[1]?.[1]?.method)).toBe("POST");
   expect(JSON.parse(String(fetch.mock.calls[1]?.[1]?.body))).toEqual({
     template: "phaser3-starter",

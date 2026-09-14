@@ -20,19 +20,55 @@ describe('engine compiler', () => {
     );
   });
 
-  it('packages index.html and game.js that a scanner will accept', async () => {
-    const archive = await compileHtml5Zip(starter);
+  const stub = { phaserSource: 'window.Phaser={Game:function(){},AUTO:1};' };
+
+  it('packages Phaser, game.js, and a scanner-accepted zip', async () => {
+    const archive = await compileHtml5Zip(starter, stub);
     const zip = await JSZip.loadAsync(archive);
-    expect(zip.file('index.html')).toBeTruthy();
+    const index = await zip.file('index.html')?.async('string');
     const game = await zip.file('game.js')?.async('string');
+    const phaser = await zip.file('phaser.min.js')?.async('string');
+    expect(index).toContain('src="phaser.min.js"');
+    expect(index).toContain('src="game.js"');
+    expect(index?.indexOf('phaser.min.js') ?? -1).toBeLessThan(
+      index?.indexOf('game.js') ?? 0,
+    );
+    expect(phaser).toContain('Phaser');
+    expect(game).toContain('new Phaser.Game');
+    expect(game).toContain('arcade');
     expect(game).toContain('"player"');
-    expect(game).toContain(starter.entryScene);
     expect(await scanHtml5Zip(archive)).toEqual({ ok: true });
   });
 
-  it('inlines the runtime for a studio preview document', () => {
-    const html = compilePreviewHtml(starter);
-    expect(html).toContain('requestAnimationFrame');
+  it('transpiles main.ts into the published runtime', async () => {
+    const archive = await compileHtml5Zip(
+      {
+        ...starter,
+        scripts: { 'main.ts': 'function onCreate() { const n: number = 1; n; }' },
+      },
+      stub,
+    );
+    const zip = await JSZip.loadAsync(archive);
+    const user = await zip.file('user.js')?.async('string');
+    expect(user).toContain('function onCreate');
+    expect(user).not.toContain(': number');
+  });
+
+  it('rejects imports in main.ts', () => {
+    expect(() =>
+      compilePreviewHtml(
+        {
+          ...starter,
+          scripts: { 'main.ts': 'import fs from "fs";' },
+        },
+        stub,
+      ),
+    ).toThrow(/import/i);
+  });
+
+  it('inlines Phaser for a studio preview document', () => {
+    const html = compilePreviewHtml(starter, stub);
+    expect(html).toContain('new Phaser.Game');
     expect(html).not.toContain('src="game.js"');
     expect(html).toContain('#66c0f4');
   });
