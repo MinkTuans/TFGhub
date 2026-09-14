@@ -40,11 +40,16 @@ export {
 } from './reports.js';
 export {
   CreateGameProjectInput,
+  EngineAction,
+  EngineAsset,
+  EngineEvent,
   EngineObject,
   EngineScene,
   EngineScripts,
   GameProjectDocument,
   GameProjectPreview,
   GameProjectSummary,
+  RectangleObject,
+  SpriteObject,
   UpdateGameProjectInput,
 } from './projects.js';

@@ -161,4 +161,13 @@ export class ProjectsService {
       throw error;
     }
   }
+
+  async publish(gameId: string, userId: string) {
+    const version = await this.build(gameId, userId);
+    if (version.status !== 'READY') {
+      throw new ConflictException(version.findings || 'Build was rejected');
+    }
+    const game = await this.versions.publish(gameId, userId, version.id);
+    return { game, version };
+  }
 }

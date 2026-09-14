@@ -169,8 +169,21 @@ describe('Online engine project HTTP boundary', () => {
         async findPublishedRuntime() {
           return null;
         },
-        async publish() {
-          throw new Error('unused');
+        async publish(gameId: string, versionId: string) {
+          const game = games.get(gameId)!;
+          game.visibility = 'PUBLIC';
+          game.activeVersionId = versionId;
+          return {
+            id: game.id,
+            slug: game.slug,
+            title: game.title,
+            description: game.description,
+            visibility: game.visibility,
+            accessMode: game.accessMode,
+            moderationState: game.moderationState,
+            createdAt: game.createdAt.toISOString(),
+            updatedAt: new Date('2026-09-14T03:10:00.000Z').toISOString(),
+          };
         },
       })
       .compile();
@@ -226,6 +239,12 @@ describe('Online engine project HTTP boundary', () => {
     const built = await instance.post(`/games/${gameId}/project/build`).expect(201);
     expect(built.body.status).toBe('READY');
     expect(built.body.filename).toBe('engine.zip');
+
+    const published = await instance
+      .post(`/games/${gameId}/project/publish`)
+      .expect(201);
+    expect(published.body.game.visibility).toBe('PUBLIC');
+    expect(published.body.version.status).toBe('READY');
   });
 
   it('rejects engine access for another developer', async () => {

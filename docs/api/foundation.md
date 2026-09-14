@@ -252,7 +252,7 @@ This response never includes the owner's email. Draft, unlisted, flagged, quaran
 
 ## Online engine project
 
-One project per owned game. `POST` with `{ "template": "phaser3-starter" }` creates it (`409` if it already exists). `GET` returns the document; `404` if none. `PUT` replaces the document, including `scripts["main.ts"]` (max 20KB, no `import`/`require`). `GET /preview` returns `{ "html": "..." }` for a studio iframe that inlines Phaser 3. `POST /build` compiles `engine.zip` (`phaser.min.js`, `user.js`, `game.js`), scans it, and returns a version summary (`READY` when the zip is accepted). None of these routes publish the game.
+One project per owned game. `POST` with `{ "template": "phaser3-starter" }` creates it (`409` if it already exists). `GET` returns the document; `404` if none. `PUT` replaces the document, including scenes, `scripts["main.ts"]` (max 20KB, no `import`/`require`), `assets` (PNG/JPEG/MP3/OGG/WAV as base64), and no-code `events`. `GET /preview` returns `{ "html": "..." }` for a studio iframe that inlines Phaser 3. `POST /build` compiles `engine.zip` (`phaser.min.js`, `user.js`, `game.js`, `assets/*`), scans it, and returns a version summary. `POST /publish` builds, scans, and publishes only a `READY` zip (`409` if rejected).
 
 ```http
 POST /games/cmexamplegame1/project

@@ -61,4 +61,10 @@ export class ProjectsController {
   build(@CurrentUser() user: AuthenticatedUser, @Param('gameId') gameId: string) {
     return this.projects.build(gameId, user.id);
   }
+
+  @Post('publish')
+  @HttpCode(201)
+  publish(@CurrentUser() user: AuthenticatedUser, @Param('gameId') gameId: string) {
+    return this.projects.publish(gameId, user.id);
+  }
 }

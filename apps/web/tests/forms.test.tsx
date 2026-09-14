@@ -132,7 +132,7 @@ test("engine form creates a starter project when none exists", async () => {
     );
   vi.stubGlobal("fetch", fetch);
   render(<EngineForm gameId="game-1" />);
-  expect(await screen.findByLabelText("Player color")).toHaveValue("#66c0f4");
+  expect(await screen.findByLabelText("Color")).toHaveValue("#66c0f4");
   expect(screen.getByLabelText("TypeScript (main.ts)")).toHaveValue(
     "function onCreate() {}",
   );
@@ -182,13 +182,41 @@ test("engine form saves player edits", async () => {
     );
   vi.stubGlobal("fetch", fetch);
   render(<EngineForm gameId="game-1" />);
-  fireEvent.change(await screen.findByLabelText("Player color"), {
+  fireEvent.change(await screen.findByLabelText("Color"), {
     target: { value: "#ff8800" },
   });
   fireEvent.submit(
     screen.getByRole("button", { name: "Save project" }).closest("form")!,
   );
   expect(await screen.findByRole("status")).toHaveTextContent("Project saved.");
+});
+
+test("engine form adds a rectangle and can one-click publish", async () => {
+  const fetch = vi
+    .fn()
+    .mockResolvedValueOnce(
+      new Response(JSON.stringify(engineProject), { status: 200 }),
+    )
+    .mockResolvedValueOnce(
+      new Response(JSON.stringify({ html: "<html>preview</html>" }), {
+        status: 200,
+      }),
+    )
+    .mockResolvedValueOnce(
+      new Response(JSON.stringify({ game: { visibility: "PUBLIC" } }), {
+        status: 201,
+      }),
+    );
+  vi.stubGlobal("fetch", fetch);
+  render(<EngineForm gameId="game-1" />);
+  fireEvent.click(await screen.findByRole("button", { name: "Add rectangle" }));
+  fireEvent.click(screen.getByRole("button", { name: "Build and publish" }));
+  expect(
+    await screen.findByRole("status"),
+  ).toHaveTextContent("Built, scanned, and published.");
+  expect(String(fetch.mock.calls.at(-1)?.[0])).toContain(
+    "/games/game-1/project/publish",
+  );
 });
 
 test("release form asks for a zip before calling the API", () => {

@@ -158,6 +158,87 @@ describe('contracts', () => {
     ).toBe('function onCreate() {}');
   });
 
+  it('accepts a sprite object when its image asset exists', () => {
+    const parsed = GameProjectDocument.parse({
+      engine: 'phaser3',
+      engineVersion: '3.80.1',
+      formatVersion: '1',
+      entryScene: 'Main',
+      scenes: [
+        {
+          id: 'Main',
+          width: 800,
+          height: 600,
+          background: '#1b2838',
+          objects: [
+            {
+              id: 'hero',
+              type: 'sprite',
+              x: 10,
+              y: 10,
+              width: 32,
+              height: 32,
+              assetId: 'hero-img',
+              bounce: false,
+            },
+          ],
+        },
+      ],
+      assets: [
+        {
+          id: 'hero-img',
+          kind: 'image',
+          name: 'hero.png',
+          mime: 'image/png',
+          dataBase64: 'AAAA',
+        },
+      ],
+      events: [
+        {
+          id: 'go-right',
+          trigger: 'keydown',
+          key: 'RIGHT',
+          actions: [{ type: 'setVelocity', objectId: 'hero', vx: 140, vy: 0 }],
+        },
+      ],
+      cameraFollow: 'hero',
+      localSave: true,
+    });
+    expect(parsed.assets[0]?.id).toBe('hero-img');
+    expect(parsed.events[0]?.trigger).toBe('keydown');
+    expect(parsed.cameraFollow).toBe('hero');
+  });
+
+  it('rejects a sprite that points at a missing asset', () => {
+    expect(() =>
+      GameProjectDocument.parse({
+        engine: 'phaser3',
+        engineVersion: '3.80.1',
+        formatVersion: '1',
+        entryScene: 'Main',
+        scenes: [
+          {
+            id: 'Main',
+            width: 800,
+            height: 600,
+            background: '#1b2838',
+            objects: [
+              {
+                id: 'hero',
+                type: 'sprite',
+                x: 10,
+                y: 10,
+                width: 32,
+                height: 32,
+                assetId: 'missing',
+              },
+            ],
+          },
+        ],
+      }),
+    ).toThrow();
+  });
+
   it('rejects TypeScript larger than 20KB', () => {
     expect(() =>
       GameProjectDocument.parse({

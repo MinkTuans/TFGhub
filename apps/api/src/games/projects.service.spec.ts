@@ -63,8 +63,20 @@ function versionsRepo(
     async listByGame(gameId) {
       return [...versions.values()].filter((row) => row.gameId === gameId);
     },
-    async publish() {
-      throw new Error('unused');
+    async publish(gameId, versionId) {
+      game.activeVersionId = versionId;
+      game.visibility = 'PUBLIC';
+      return {
+        id: gameId,
+        slug: 'orbit-orchard',
+        title: 'Orbit Orchard',
+        description: '',
+        visibility: 'PUBLIC' as const,
+        accessMode: 'GUEST_ALLOWED' as const,
+        moderationState: 'CLEAR' as const,
+        createdAt: '2026-09-14T03:00:00.000Z',
+        updatedAt: '2026-09-14T03:10:00.000Z',
+      };
     },
   };
 }
@@ -184,5 +196,13 @@ describe('ProjectsService', () => {
     const built = await service.build('game-1', 'owner-1');
     expect(built.status).toBe('READY');
     expect(built.filename).toBe('engine.zip');
+  });
+
+  it('builds and publishes a READY engine zip in one step', async () => {
+    const { service } = fixture();
+    await service.create('game-1', 'owner-1', { template: 'phaser3-starter' });
+    const published = await service.publish('game-1', 'owner-1');
+    expect(published.version.status).toBe('READY');
+    expect(published.game.visibility).toBe('PUBLIC');
   });
 });

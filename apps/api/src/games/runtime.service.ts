@@ -17,6 +17,9 @@ const TYPES: Record<string, string> = {
   svg: 'image/svg+xml',
   wasm: 'application/wasm',
   txt: 'text/plain; charset=utf-8',
+  mp3: 'audio/mpeg',
+  ogg: 'audio/ogg',
+  wav: 'audio/wav',
 };
 
 export type RuntimeFile = { body: Buffer; contentType: string };

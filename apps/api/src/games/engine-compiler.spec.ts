@@ -71,5 +71,71 @@ describe('engine compiler', () => {
     expect(html).toContain('new Phaser.Game');
     expect(html).not.toContain('src="game.js"');
     expect(html).toContain('#66c0f4');
+    expect(html).toContain('keydown-');
+    expect(html).toContain('"RIGHT"');
+    expect(html).toContain('startFollow');
+    expect(html).toContain('localStorage');
+  });
+
+  it('packages image assets and collision/audio hooks', async () => {
+    const archive = await compileHtml5Zip(
+      {
+        ...starter,
+        assets: [
+          {
+            id: 'hero-img',
+            kind: 'image',
+            name: 'hero.png',
+            mime: 'image/png',
+            dataBase64: Buffer.from('png').toString('base64'),
+          },
+          {
+            id: 'blip',
+            kind: 'audio',
+            name: 'blip.wav',
+            mime: 'audio/wav',
+            dataBase64: Buffer.from('RIFF').toString('base64'),
+          },
+        ],
+        events: [
+          {
+            id: 'bump',
+            trigger: 'collision',
+            a: 'player',
+            b: 'floor',
+            actions: [{ type: 'playSound', assetId: 'blip' }],
+          },
+        ],
+        scenes: [
+          {
+            ...starter.scenes[0],
+            objects: [
+              ...starter.scenes[0].objects,
+              {
+                id: 'hero',
+                type: 'sprite',
+                x: 80,
+                y: 80,
+                width: 32,
+                height: 32,
+                assetId: 'hero-img',
+                bounce: false,
+                solid: false,
+                frames: 1,
+              },
+            ],
+          },
+        ],
+      },
+      stub,
+    );
+    const zip = await JSZip.loadAsync(archive);
+    expect(zip.file('assets/hero-img.png')).toBeTruthy();
+    expect(zip.file('assets/blip.wav')).toBeTruthy();
+    const game = await zip.file('game.js')?.async('string');
+    expect(game).toContain('this.add.sprite');
+    expect(game).toContain('playSound');
+    expect(game).toContain('physics.add.collider');
+    expect(await scanHtml5Zip(archive)).toEqual({ ok: true });
   });
 });
