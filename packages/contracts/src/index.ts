@@ -22,3 +22,10 @@ export {
   DonationSummary,
   SandboxDonationWebhookInput,
 } from './donations.js';
+export {
+  GameAnalyticsSummary,
+  PlayHeartbeatInput,
+  PlaySessionSummary,
+  StartPlaySessionInput,
+  StudioAnalyticsResponse,
+} from './analytics.js';

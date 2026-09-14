@@ -3,6 +3,7 @@ import {
   CompleteGameVersionInput,
   CreateDonationInput,
   CreateGameInput,
+  PlayHeartbeatInput,
   CreateGameVersionInput,
   PublishGameInput,
   RegisterInput,
@@ -72,5 +73,17 @@ describe('contracts', () => {
         idempotencyKey: 'donate-key-1',
       }),
     ).toThrow();
+  });
+
+  it('requires a heartbeat event id and timestamp', () => {
+    expect(() => PlayHeartbeatInput.parse({ visible: true, active: true })).toThrow();
+    expect(
+      PlayHeartbeatInput.parse({
+        eventId: 'heartbeat-1',
+        visible: true,
+        active: false,
+        occurredAt: '2026-09-05T12:00:00.000Z',
+      }),
+    ).toMatchObject({ visible: true, active: false });
   });
 });

@@ -179,6 +179,24 @@ POST /donations/webhooks/sandbox
 
 A 10% platform fee (`DONATION_FEE_BPS`, default 1000) is disclosed on the receipt. Duplicate webhook `eventId` values do not credit twice. `GET /donations/received` lists `SUCCEEDED` gifts for the creator.
 
+## Play analytics
+
+Guest or signed-in players start a session (auth required only when the game is `AUTH_REQUIRED`):
+
+```http
+POST /analytics/sessions
+{"visitorId":"anon-visitor-1","gameSlug":"orbit-orchard"}
+```
+
+Rapid reloads within 10 seconds reuse the same session. Heartbeats:
+
+```http
+POST /analytics/sessions/<id>/heartbeats
+{"eventId":"beat-1","visible":true,"active":true,"occurredAt":"2026-09-05T12:00:00.000Z"}
+```
+
+Only visible + recently active beats at least 10 seconds apart add 15 seconds. Duplicate `eventId` values are ignored. `GET /analytics/studio` (cookie) returns valid plays, active minutes, and `score = 0.3 * normalizedPlays + 0.7 * normalizedMinutes` across the creator's games.
+
 ## List owned games
 
 ```http

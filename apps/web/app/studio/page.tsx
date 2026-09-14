@@ -1,17 +1,22 @@
 import Link from "next/link";
-import type { DonationSummary, GameSummary } from "@indieforge/contracts";
+import type {
+  DonationSummary,
+  GameSummary,
+  StudioAnalyticsResponse,
+} from "@indieforge/contracts";
 import { ProfileForm, type Profile } from "../../components/profile-form";
 import { ApiError } from "../../lib/api-client";
 import { privateGet } from "../../lib/session";
 
 export default async function StudioPage() {
-  const [games, profile, donations] = await Promise.all([
+  const [games, profile, donations, analytics] = await Promise.all([
     privateGet<GameSummary[]>("/games/mine"),
     privateGet<Profile>("/developers/me").catch((error) => {
       if (error instanceof ApiError && error.status === 404) return null;
       throw error;
     }),
     privateGet<DonationSummary[]>("/donations/received"),
+    privateGet<StudioAnalyticsResponse>("/analytics/studio"),
   ]);
   return (
     <main>
@@ -20,6 +25,21 @@ export default async function StudioPage() {
       <section aria-labelledby="profile-heading">
         <h2 id="profile-heading">Developer profile</h2>
         <ProfileForm profile={profile} />
+      </section>
+      <section aria-labelledby="analytics-heading">
+        <h2 id="analytics-heading">Play analytics</h2>
+        {analytics.games.length === 0 ? (
+          <p>No public play data yet.</p>
+        ) : (
+          <ul>
+            {analytics.games.map((row) => (
+              <li key={row.gameId}>
+                {row.title}: {row.validPlays} valid plays, {row.validActiveMinutes}{" "}
+                active minutes, score {row.score}
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
       <section aria-labelledby="donations-heading">
         <h2 id="donations-heading">Sandbox donations</h2>

@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import type { PublicGameSummary } from "@indieforge/contracts";
 import { DonateForm } from "../../../components/donate-form";
+import { PlayBeacon } from "../../../components/play-beacon";
 import { api, ApiError } from "../../../lib/api-client";
 
 export default async function GamePage({
@@ -36,6 +37,7 @@ export default async function GamePage({
             referrerPolicy="no-referrer"
           />
         )}
+        {game.playUrl && <PlayBeacon slug={game.slug} />}
         <DonateForm slug={game.slug} />
       </article>
     </main>

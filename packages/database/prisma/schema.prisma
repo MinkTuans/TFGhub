@@ -78,6 +78,7 @@ model Game {
   owner           User            @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   versions        GameVersion[]
   donations       Donation[]
+  playSessions    PlaySession[]
   activeVersion   GameVersion?    @relation("ActiveGameVersion", fields: [activeVersionId], references: [id], onDelete: SetNull)
 }
 
@@ -118,4 +119,29 @@ model GameVersion {
   publishedFor    Game?             @relation("ActiveGameVersion")
 
   @@index([gameId, createdAt])
+}
+
+model PlaySession {
+  id              String          @id @default(cuid())
+  gameId          String
+  visitorId       String
+  valid           Boolean         @default(true)
+  countedSeconds  Int             @default(0)
+  lastHeartbeatAt DateTime?
+  createdAt       DateTime        @default(now())
+  game            Game            @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  heartbeats      PlayHeartbeat[]
+
+  @@index([gameId, visitorId, createdAt])
+}
+
+model PlayHeartbeat {
+  id        String      @id @default(cuid())
+  sessionId String
+  eventId   String      @unique
+  visible   Boolean
+  active    Boolean
+  counted   Boolean     @default(false)
+  createdAt DateTime    @default(now())
+  session   PlaySession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 }
