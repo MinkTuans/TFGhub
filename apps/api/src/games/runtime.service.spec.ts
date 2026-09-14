@@ -2,7 +2,7 @@ import JSZip from 'jszip';
 import { describe, expect, it } from 'vitest';
 import { MemoryObjectStorage } from './object-storage.js';
 import { RuntimeService } from './runtime.service.js';
-import type { VersionsRepository } from './versions.service.js';
+import type { VersionsRepository } from './versions.repository.js';
 
 async function zipWith(files: Record<string, string>): Promise<Buffer> {
   const zip = new JSZip();

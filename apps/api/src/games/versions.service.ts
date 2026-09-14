@@ -12,50 +12,19 @@ import type {
   GameSummary,
   GameVersionSummary,
 } from '@indieforge/contracts';
-import { scanHtml5Zip } from './build-scanner.js';
 import { ObjectStorage } from './object-storage.js';
+import { ScanWorker } from './scan-worker.js';
+import {
+  VersionsRepository,
+  type OwnedGame,
+  type StoredVersion,
+} from './versions.repository.js';
 
-export type StoredVersion = {
-  id: string;
-  gameId: string;
-  status: 'UPLOADING' | 'SCANNING' | 'READY' | 'REJECTED';
-  filename: string;
-  byteSize: number;
-  checksumSha256: string;
-  storageKey: string;
-  findings: string;
-  uploadToken: string | null;
-  uploadExpiresAt: Date | null;
-  createdAt: Date;
-};
-
-export type OwnedGame = {
-  id: string;
-  ownerId: string;
-  visibility: 'DRAFT' | 'PUBLIC' | 'UNLISTED';
-  moderationState: 'CLEAR' | 'FLAGGED' | 'QUARANTINED';
-  activeVersionId: string | null;
-};
-
-export abstract class VersionsRepository {
-  abstract create(input: {
-    gameId: string;
-    filename: string;
-    byteSize: number;
-    checksumSha256: string;
-    storageKey: string;
-    uploadToken: string;
-    uploadExpiresAt: Date;
-  }): Promise<StoredVersion>;
-  abstract findById(id: string): Promise<StoredVersion | null>;
-  abstract findByUploadToken(token: string): Promise<StoredVersion | null>;
-  abstract save(version: StoredVersion): Promise<StoredVersion>;
-  abstract findGame(id: string): Promise<OwnedGame | null>;
-  abstract publish(gameId: string, versionId: string): Promise<GameSummary>;
-  abstract findPublishedRuntime(
-    slug: string,
-  ): Promise<{ storageKey: string } | null>;
-}
+export {
+  VersionsRepository,
+  type OwnedGame,
+  type StoredVersion,
+} from './versions.repository.js';
 
 function summary(version: StoredVersion): GameVersionSummary {
   return {
@@ -76,6 +45,7 @@ export class VersionsService {
     @Inject(VersionsRepository)
     private readonly versions: VersionsRepository,
     @Inject(ObjectStorage) private readonly storage: ObjectStorage,
+    @Inject(ScanWorker) private readonly scanner: ScanWorker,
   ) {}
 
   private async requireOwnedGame(gameId: string, userId: string): Promise<OwnedGame> {
@@ -105,9 +75,10 @@ export class VersionsService {
       uploadExpiresAt: new Date(Date.now() + 15 * 60 * 1000),
     });
     const origin = publicApiUrl.replace(/\/$/, '');
+    const presigned = await this.storage.presignPut?.(version.storageKey, 900);
     return {
       ...summary(version),
-      uploadUrl: `${origin}/uploads/${token}`,
+      uploadUrl: presigned ?? `${origin}/uploads/${token}`,
     };
   }
 
@@ -147,11 +118,27 @@ export class VersionsService {
     version.status = 'SCANNING';
     version.uploadToken = null;
     await this.versions.save(version);
+    return summary(await this.scanner.process(version.id));
+  }
 
-    const scan = await scanHtml5Zip(body);
-    version.status = scan.ok ? 'READY' : 'REJECTED';
-    version.findings = scan.ok ? '' : scan.findings;
-    return summary(await this.versions.save(version));
+  async listOwned(gameId: string, userId: string): Promise<GameVersionSummary[]> {
+    await this.requireOwnedGame(gameId, userId);
+    return (await this.versions.listByGame(gameId)).map(summary);
+  }
+
+  async rollback(
+    gameId: string,
+    userId: string,
+    versionId: string,
+  ): Promise<GameSummary> {
+    const game = await this.requireOwnedGame(gameId, userId);
+    if (game.visibility !== 'PUBLIC' || !game.activeVersionId) {
+      throw new ConflictException('Nothing to roll back');
+    }
+    if (game.activeVersionId === versionId) {
+      throw new ConflictException('That version is already live');
+    }
+    return this.publish(gameId, userId, versionId);
   }
 
   async publish(gameId: string, userId: string, versionId: string): Promise<GameSummary> {

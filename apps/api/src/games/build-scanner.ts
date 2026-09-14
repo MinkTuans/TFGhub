@@ -83,6 +83,9 @@ export async function scanHtml5Zip(archive: Buffer): Promise<ScanResult> {
       return { ok: false, findings: `Blocked file type: ${name}` };
     }
     const bytes = await entry.async('uint8array');
+    if (bytes.length >= 2 && bytes[0] === 0x4d && bytes[1] === 0x5a) {
+      return { ok: false, findings: `Malware indicator (MZ) in ${name}` };
+    }
     uncompressed += bytes.byteLength;
     if (uncompressed > MAX_UNCOMPRESSED_BYTES) {
       return { ok: false, findings: 'Uncompressed archive is too large.' };

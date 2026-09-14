@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import JSZip from 'jszip';
 import { ObjectStorage } from './object-storage.js';
-import { VersionsRepository } from './versions.service.js';
+import { VersionsRepository } from './versions.repository.js';
 
 const TYPES: Record<string, string> = {
   html: 'text/html; charset=utf-8',

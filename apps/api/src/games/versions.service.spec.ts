@@ -7,12 +7,13 @@ import { createHash } from 'node:crypto';
 import JSZip from 'jszip';
 import { describe, expect, it } from 'vitest';
 import { MemoryObjectStorage } from './object-storage.js';
-import {
-  VersionsService,
-  type OwnedGame,
-  type StoredVersion,
-  type VersionsRepository,
-} from './versions.service.js';
+import { ScanWorker } from './scan-worker.js';
+import type {
+  OwnedGame,
+  StoredVersion,
+  VersionsRepository,
+} from './versions.repository.js';
+import { VersionsService } from './versions.service.js';
 
 async function html5Zip(): Promise<Buffer> {
   const zip = new JSZip();
@@ -24,7 +25,7 @@ function makeRepo(game: OwnedGame, versions: Map<string, StoredVersion>): Versio
   return {
     async create(input) {
       const stored: StoredVersion = {
-        id: 'ver-1',
+        id: `ver-${versions.size + 1}`,
         status: 'UPLOADING',
         findings: '',
         createdAt: new Date('2026-09-05T12:00:00.000Z'),
@@ -52,6 +53,9 @@ function makeRepo(game: OwnedGame, versions: Map<string, StoredVersion>): Versio
     async findPublishedRuntime() {
       return null;
     },
+    async listByGame(gameId) {
+      return [...versions.values()].filter((row) => row.gameId === gameId);
+    },
     async publish(gameId, versionId) {
       game.activeVersionId = versionId;
       game.visibility = 'PUBLIC';
@@ -70,6 +74,15 @@ function makeRepo(game: OwnedGame, versions: Map<string, StoredVersion>): Versio
   };
 }
 
+function serviceFor(
+  game: OwnedGame,
+  versions: Map<string, StoredVersion>,
+  storage = new MemoryObjectStorage(),
+) {
+  const repo = makeRepo(game, versions);
+  return new VersionsService(repo, storage, new ScanWorker(repo, storage));
+}
+
 describe('VersionsService', () => {
   const game: OwnedGame = {
     id: 'game-1',
@@ -80,7 +93,7 @@ describe('VersionsService', () => {
   };
 
   it('does not create an upload slot for another developer', async () => {
-    const service = new VersionsService(makeRepo(game, new Map()), new MemoryObjectStorage());
+    const service = serviceFor(game, new Map());
     await expect(
       service.createUpload(
         'game-1',
@@ -99,7 +112,7 @@ describe('VersionsService', () => {
     const archive = await html5Zip();
     const versions = new Map<string, StoredVersion>();
     const storage = new MemoryObjectStorage();
-    const service = new VersionsService(makeRepo(game, versions), storage);
+    const service = serviceFor(game, versions, storage);
     const created = await service.createUpload(
       'game-1',
       'owner-1',
@@ -122,7 +135,7 @@ describe('VersionsService', () => {
     const checksum = createHash('sha256').update(archive).digest('hex');
     const versions = new Map<string, StoredVersion>();
     const storage = new MemoryObjectStorage();
-    const service = new VersionsService(makeRepo(game, versions), storage);
+    const service = serviceFor(game, versions, storage);
     const created = await service.createUpload(
       'game-1',
       'owner-1',
@@ -143,7 +156,7 @@ describe('VersionsService', () => {
     const archive = Buffer.from(await zip.generateAsync({ type: 'uint8array' }));
     const checksum = createHash('sha256').update(archive).digest('hex');
     const versions = new Map<string, StoredVersion>();
-    const service = new VersionsService(makeRepo(game, versions), new MemoryObjectStorage());
+    const service = serviceFor(game, versions);
     const created = await service.createUpload(
       'game-1',
       'owner-1',
@@ -155,6 +168,77 @@ describe('VersionsService', () => {
     expect(completed.status).toBe('REJECTED');
     await expect(service.publish('game-1', 'owner-1', created.id)).rejects.toThrow(
       ConflictException,
+    );
+  });
+
+  it('rolls back to a previous READY version without deleting later builds', async () => {
+    const archive = await html5Zip();
+    const checksum = createHash('sha256').update(archive).digest('hex');
+    const versions = new Map<string, StoredVersion>();
+    const storage = new MemoryObjectStorage();
+    const current = { ...game };
+    const service = serviceFor(current, versions, storage);
+    async function ship(name: string) {
+      const created = await service.createUpload(
+        'game-1',
+        'owner-1',
+        { filename: name, byteSize: archive.length, checksumSha256: checksum },
+        'http://localhost:3001',
+      );
+      await service.receiveUpload(created.uploadUrl.split('/').at(-1)!, archive);
+      await service.complete('game-1', created.id, 'owner-1', checksum);
+      await service.publish('game-1', 'owner-1', created.id);
+      return created.id;
+    }
+    const first = await ship('one.zip');
+    const second = await ship('two.zip');
+    expect(current.activeVersionId).toBe(second);
+    const rolled = await service.rollback('game-1', 'owner-1', first);
+    expect(rolled.visibility).toBe('PUBLIC');
+    expect(current.activeVersionId).toBe(first);
+    expect(versions.get(second)?.status).toBe('READY');
+    await expect(service.rollback('game-1', 'owner-1', first)).rejects.toThrow(
+      ConflictException,
+    );
+  });
+
+  it('returns a presigned PUT URL when object storage can sign', async () => {
+    const storage = new MemoryObjectStorage();
+    storage.presignPut = async (key, seconds) =>
+      `https://r2.example/${key}?exp=${seconds}`;
+    const service = serviceFor(game, new Map(), storage);
+    const created = await service.createUpload(
+      'game-1',
+      'owner-1',
+      {
+        filename: 'orbit.zip',
+        byteSize: 12,
+        checksumSha256: 'a'.repeat(64),
+      },
+      'http://localhost:3001',
+    );
+    expect(created.uploadUrl).toMatch(
+      /^https:\/\/r2\.example\/quarantine\/game-1\/[a-f0-9]+\/orbit\.zip\?exp=900$/,
+    );
+  });
+
+  it('lists owned versions and forbids other developers', async () => {
+    const versions = new Map<string, StoredVersion>();
+    const service = serviceFor(game, versions);
+    await service.createUpload(
+      'game-1',
+      'owner-1',
+      {
+        filename: 'orbit.zip',
+        byteSize: 12,
+        checksumSha256: 'a'.repeat(64),
+      },
+      'http://localhost:3001',
+    );
+    const listed = await service.listOwned('game-1', 'owner-1');
+    expect(listed).toHaveLength(1);
+    await expect(service.listOwned('game-1', 'owner-2')).rejects.toThrow(
+      ForbiddenException,
     );
   });
 });

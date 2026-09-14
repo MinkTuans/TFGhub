@@ -4,6 +4,7 @@ import { dirname, posix, resolve, sep } from 'node:path';
 export abstract class ObjectStorage {
   abstract put(key: string, body: Buffer): Promise<void>;
   abstract get(key: string): Promise<Buffer | null>;
+  presignPut?(key: string, expiresSeconds: number): Promise<string | null>;
 }
 
 export type ObjectBucket = {
@@ -34,6 +35,10 @@ export class MemoryObjectStorage extends ObjectStorage {
   async get(key: string): Promise<Buffer | null> {
     const value = this.objects.get(assertSafeStorageKey(key));
     return value ? Buffer.from(value) : null;
+  }
+
+  async presignPut(_key: string, _expiresSeconds: number): Promise<string | null> {
+    return null;
   }
 }
 
@@ -68,7 +73,12 @@ export class LocalObjectStorage extends ObjectStorage {
 }
 
 export class R2ObjectStorage extends ObjectStorage {
-  constructor(private readonly bucket: ObjectBucket) {
+  constructor(
+    private readonly bucket: ObjectBucket,
+    private readonly signer?: {
+      presignPut(key: string, expiresSeconds: number): Promise<string>;
+    },
+  ) {
     super();
   }
 
@@ -78,6 +88,11 @@ export class R2ObjectStorage extends ObjectStorage {
 
   async get(key: string): Promise<Buffer | null> {
     return this.bucket.get(assertSafeStorageKey(key));
+  }
+
+  async presignPut(key: string, expiresSeconds: number): Promise<string | null> {
+    if (!this.signer) return null;
+    return this.signer.presignPut(assertSafeStorageKey(key), expiresSeconds);
   }
 }
 
@@ -126,7 +141,22 @@ export async function createR2ObjectStorage(): Promise<R2ObjectStorage | null> {
     credentials: { accessKeyId, secretAccessKey },
     forcePathStyle: process.env.CLOUDFLARE_R2_USE_PATH_STYLE_ENDPOINT !== 'false',
   });
-  return new R2ObjectStorage(r2BucketFromS3(client, bucket));
+  const signer = {
+    async presignPut(key: string, expiresSeconds: number) {
+      const { getSignedUrl } = await import('@aws-sdk/s3-request-presigner');
+      const { PutObjectCommand } = await import('@aws-sdk/client-s3');
+      return getSignedUrl(
+        client,
+        new PutObjectCommand({
+          Bucket: bucket,
+          Key: key,
+          ContentType: 'application/octet-stream',
+        }),
+        { expiresIn: expiresSeconds },
+      );
+    },
+  };
+  return new R2ObjectStorage(r2BucketFromS3(client, bucket), signer);
 }
 
 export function createObjectStorage(): ObjectStorage {

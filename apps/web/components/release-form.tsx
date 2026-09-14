@@ -17,11 +17,20 @@ async function sha256Hex(bytes: ArrayBuffer): Promise<string> {
     .join("");
 }
 
-export function ReleaseForm({ game }: { game: GameSummary }) {
+export function ReleaseForm({
+  game,
+  versions = [],
+}: {
+  game: GameSummary;
+  versions?: GameVersionSummary[];
+}) {
   const router = useRouter();
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
   const [version, setVersion] = useState<GameVersionSummary | null>(null);
+  const readyPast = versions.filter(
+    (item) => item.status === "READY" && item.id !== version?.id,
+  );
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -66,6 +75,23 @@ export function ReleaseForm({ game }: { game: GameSummary }) {
         caught instanceof ApiError
           ? caught.message
           : "Unable to upload this build. Please try again.",
+      );
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function rollback(versionId: string) {
+    setPending(true);
+    setError("");
+    try {
+      await api.post(`/games/${game.id}/rollback`, { versionId });
+      router.refresh();
+    } catch (caught) {
+      setError(
+        caught instanceof ApiError
+          ? caught.message
+          : "Unable to roll back this build.",
       );
     } finally {
       setPending(false);
@@ -124,6 +150,24 @@ export function ReleaseForm({ game }: { game: GameSummary }) {
       )}
       {game.visibility === "PUBLIC" && (
         <p className="badge">This game is public.</p>
+      )}
+      {game.visibility === "PUBLIC" && readyPast.length > 0 && (
+        <div>
+          <h3>Previous READY builds</h3>
+          {readyPast.map((item) => (
+            <p key={item.id}>
+              {item.filename}{" "}
+              <button
+                type="button"
+                className="button"
+                disabled={pending}
+                onClick={() => rollback(item.id)}
+              >
+                Roll back to this version
+              </button>
+            </p>
+          ))}
+        </div>
       )}
     </section>
   );

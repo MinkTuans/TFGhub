@@ -26,6 +26,8 @@ export const PublishGameInput = z.object({
   versionId: z.string().min(1).max(64),
 });
 
+export const RollbackGameInput = PublishGameInput;
+
 export const GameVersionSummary = z.object({
   id: z.string(),
   gameId: z.string(),
@@ -45,5 +47,6 @@ export type GameVersionStatus = z.infer<typeof GameVersionStatus>;
 export type CreateGameVersionInput = z.infer<typeof CreateGameVersionInput>;
 export type CompleteGameVersionInput = z.infer<typeof CompleteGameVersionInput>;
 export type PublishGameInput = z.infer<typeof PublishGameInput>;
+export type RollbackGameInput = z.infer<typeof RollbackGameInput>;
 export type GameVersionSummary = z.infer<typeof GameVersionSummary>;
 export type CreateGameVersionResponse = z.infer<typeof CreateGameVersionResponse>;

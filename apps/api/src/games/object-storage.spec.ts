@@ -51,6 +51,25 @@ describe('R2ObjectStorage', () => {
     ).rejects.toThrow(/storage key/);
     expect([...objects.keys()]).toEqual(['quarantine/game-1/orbit.zip']);
   });
+
+  it('returns a direct-upload URL from the signer', async () => {
+    const storage = new R2ObjectStorage(
+      {
+        async put() {},
+        async get() {
+          return null;
+        },
+      },
+      {
+        async presignPut(key, seconds) {
+          return `https://r2.example/${key}?exp=${seconds}`;
+        },
+      },
+    );
+    await expect(storage.presignPut('quarantine/a.zip', 900)).resolves.toBe(
+      'https://r2.example/quarantine/a.zip?exp=900',
+    );
+  });
 });
 
 describe('createObjectStorage', () => {

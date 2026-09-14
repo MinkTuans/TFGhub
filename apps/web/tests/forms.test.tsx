@@ -106,6 +106,37 @@ test("release form asks for a zip before calling the API", () => {
   expect(fetch).not.toHaveBeenCalled();
 });
 
+test("release form does not offer rollback on a draft", () => {
+  render(
+    <ReleaseForm
+      game={{
+        id: "game-1",
+        slug: "orbit-orchard",
+        title: "Orbit Orchard",
+        description: "",
+        visibility: "DRAFT",
+        accessMode: "GUEST_ALLOWED",
+        moderationState: "CLEAR",
+        createdAt: "2026-09-05T12:00:00.000Z",
+        updatedAt: "2026-09-05T12:00:00.000Z",
+      }}
+      versions={[
+        {
+          id: "ver-1",
+          gameId: "game-1",
+          status: "READY",
+          filename: "orbit.zip",
+          byteSize: 12,
+          checksumSha256: "a".repeat(64),
+          findings: "",
+          createdAt: "2026-09-05T12:00:00.000Z",
+        },
+      ]}
+    />,
+  );
+  expect(screen.queryByText("Previous READY builds")).toBeNull();
+});
+
 test("donation form rejects amounts under one dollar before calling the API", () => {
   const fetch = vi.fn();
   vi.stubGlobal("fetch", fetch);

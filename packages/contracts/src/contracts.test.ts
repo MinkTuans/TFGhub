@@ -7,6 +7,7 @@ import {
   CreateGameVersionInput,
   PublishGameInput,
   RegisterInput,
+  RollbackGameInput,
 } from './index';
 
 describe('contracts', () => {
@@ -53,6 +54,13 @@ describe('contracts', () => {
   it('requires a version id to publish', () => {
     expect(() => PublishGameInput.parse({})).toThrow();
     expect(PublishGameInput.parse({ versionId: 'ver-1' })).toEqual({
+      versionId: 'ver-1',
+    });
+  });
+
+  it('requires a version id to roll back', () => {
+    expect(() => RollbackGameInput.parse({})).toThrow();
+    expect(RollbackGameInput.parse({ versionId: 'ver-1' })).toEqual({
       versionId: 'ver-1',
     });
   });

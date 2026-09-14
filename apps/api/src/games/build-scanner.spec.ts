@@ -81,6 +81,17 @@ describe('scanHtml5Zip', () => {
     });
   });
 
+  it('rejects a disguised MZ payload even without an exe extension', async () => {
+    const archive = await zipWith({
+      'index.html': '<html></html>',
+      'sprite.bin': 'MZ\x90\x00this-looks-like-a-pe',
+    });
+    await expect(scanHtml5Zip(archive)).resolves.toEqual({
+      ok: false,
+      findings: 'Malware indicator (MZ) in sprite.bin',
+    });
+  });
+
   it('rejects non-zip bytes', async () => {
     await expect(scanHtml5Zip(Buffer.from('not-a-zip'))).resolves.toEqual({
       ok: false,

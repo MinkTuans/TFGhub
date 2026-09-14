@@ -124,7 +124,7 @@ Content-Type: application/json
 {"filename":"orbit.zip","byteSize":2048,"checksumSha256":"<64 lowercase hex chars>"}
 ```
 
-`201 Created` returns the version summary plus a 15-minute `uploadUrl`. PUT the raw zip bytes to that URL (`Content-Type: application/octet-stream`). The API stores the object in Cloudflare R2 when `CLOUDFLARE_R2_BUCKET` and keys are set, otherwise under `STORAGE_DIR`. Then complete:
+`201 Created` returns the version summary plus a 15-minute `uploadUrl`. PUT the raw zip bytes to that URL (`Content-Type: application/octet-stream`). When R2 is configured, `uploadUrl` is a presigned object URL (no session cookie; the bucket must allow CORS PUT from `WEB_ORIGIN`). Otherwise it is `/uploads/:token` on the API and the object lands in `STORAGE_DIR` or memory. Then complete:
 
 ```http
 POST /games/cmexamplegame1/versions/cmexamplever1/complete
@@ -148,9 +148,11 @@ Content-Type: application/json
 
 `201 Created` sets `visibility` to `PUBLIC` and records `activeVersionId`. Only `READY` versions owned by the caller can be published. A `REJECTED` or `UPLOADING` version returns `409`. A failed scan does not replace a previously published version.
 
+`GET /games/:id/versions` lists owned builds. `POST /games/:id/rollback` with `{ "versionId": "<previous READY id>" }` switches the live pointer back; later READY builds stay stored. When Cloudflare R2 is configured, `uploadUrl` is a short-lived presigned PUT to the bucket. Completion still verifies checksum then hands the zip to `ScanWorker`.
+
 ## Play a published build
 
-`GET /games/by-slug/:slug` includes `playUrl` (`/runtime/:slug/index.html`) when the game has a READY active version. `GET /runtime/:slug/` and `GET /runtime/:slug/*` stream files from that zip. Drafts, quarantined games, and rejected builds return `404`. Responses send `Content-Security-Policy` with `frame-ancestors` set to `WEB_ORIGIN` and do not use the platform session cookie. The public game page loads the build in a sandboxed iframe (`allow-scripts allow-pointer-lock` only).
+`GET /games/by-slug/:slug` includes `playUrl` (`/runtime/:slug/index.html`) when the game has a READY active version. `GET /runtime/:slug/` and `GET /runtime/:slug/*` stream files from that zip. Drafts, quarantined games, and rejected builds return `404`. Responses send `Content-Security-Policy` with `frame-ancestors` set to `WEB_ORIGIN` and `connect-src 'none'`, and do not use the platform session cookie. The public game page loads the build in a sandboxed iframe (`allow-scripts allow-pointer-lock` only).
 
 ## Sandbox donation
 

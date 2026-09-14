@@ -19,7 +19,7 @@ import {
   VersionsRepository,
   type OwnedGame,
   type StoredVersion,
-} from '../src/games/versions.service.js';
+} from '../src/games/versions.repository.js';
 
 const testSecret = 'versions-e2e-tests-only-a-long-explicit-signing-secret';
 const dates = {
@@ -134,6 +134,9 @@ describe('Game version upload and publish HTTP boundary', () => {
             activeVersionId: game.activeVersionId,
           };
         },
+        async listByGame(gameId: string) {
+          return [...versions.values()].filter((row) => row.gameId === gameId);
+        },
         async findPublishedRuntime(slug: string) {
           const game = [...games.values()].find(
             (item) =>
@@ -220,7 +223,41 @@ describe('Game version upload and publish HTTP boundary', () => {
     const page = await instance.get('/runtime/orbit-orchard/index.html').expect(200);
     expect(page.headers['content-type']).toMatch(/text\/html/);
     expect(page.headers['content-security-policy']).toContain('frame-ancestors');
+    expect(page.headers['content-security-policy']).toContain("connect-src 'none'");
     expect(page.text).toContain('play');
     await instance.get('/runtime/missing-game/index.html').expect(404);
+    expect(page.headers['set-cookie']).toBeUndefined();
+    await instance.get('/runtime/orbit-orchard/../secret.txt').expect(404);
+
+    const secondZip = await html5Zip();
+    const secondSum = createHash('sha256').update(secondZip).digest('hex');
+    const v2 = await instance
+      .post(`/games/${gameId}/versions`)
+      .send({ filename: 'two.zip', byteSize: secondZip.length, checksumSha256: secondSum })
+      .expect(201);
+    await instance
+      .put(v2.body.uploadUrl.replace('http://localhost:3001', ''))
+      .set('Content-Type', 'application/octet-stream')
+      .send(secondZip)
+      .expect(200);
+    await instance
+      .post(`/games/${gameId}/versions/${v2.body.id}/complete`)
+      .send({ checksumSha256: secondSum })
+      .expect(201);
+    await instance
+      .post(`/games/${gameId}/publish`)
+      .send({ versionId: v2.body.id })
+      .expect(201);
+    const rolled = await instance
+      .post(`/games/${gameId}/rollback`)
+      .send({ versionId: created.body.id })
+      .expect(201);
+    expect(rolled.body.visibility).toBe('PUBLIC');
+    const listed = await instance.get(`/games/${gameId}/versions`).expect(200);
+    expect(listed.body.length).toBe(2);
+    await instance
+      .post(`/games/${gameId}/rollback`)
+      .send({ versionId: created.body.id })
+      .expect(409);
   });
 });

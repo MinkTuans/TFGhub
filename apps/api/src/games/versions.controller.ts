@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Get,
   HttpCode,
   Param,
   Post,
@@ -13,6 +14,7 @@ import {
   CompleteGameVersionInput,
   CreateGameVersionInput,
   PublishGameInput,
+  RollbackGameInput,
 } from '@indieforge/contracts';
 import type { Request } from 'express';
 import { type AuthenticatedUser } from '../auth/auth.service.js';
@@ -50,6 +52,25 @@ export class VersionsController {
     const input = CompleteGameVersionInput.safeParse(body);
     if (!input.success) throw new BadRequestException('Invalid completion input');
     return this.versions.complete(gameId, versionId, user.id, input.data.checksumSha256);
+  }
+
+  @Get('games/:gameId/versions')
+  @UseGuards(JwtAuthGuard)
+  list(@CurrentUser() user: AuthenticatedUser, @Param('gameId') gameId: string) {
+    return this.versions.listOwned(gameId, user.id);
+  }
+
+  @Post('games/:gameId/rollback')
+  @HttpCode(201)
+  @UseGuards(JwtAuthGuard)
+  rollback(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('gameId') gameId: string,
+    @Body() body: unknown,
+  ) {
+    const input = RollbackGameInput.safeParse(body);
+    if (!input.success) throw new BadRequestException('Invalid rollback input');
+    return this.versions.rollback(gameId, user.id, input.data.versionId);
   }
 
   @Post('games/:gameId/publish')

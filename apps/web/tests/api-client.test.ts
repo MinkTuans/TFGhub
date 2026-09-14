@@ -45,6 +45,35 @@ test("preserves a JSON HTTP failure instead of returning it as success", async (
   });
 });
 
+test("putBytes includes cookies on the platform upload slot", async () => {
+  const fetch = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
+  vi.stubGlobal("fetch", fetch);
+  await api.putBytes("http://localhost:3001/uploads/token", new ArrayBuffer(8));
+  expect(fetch).toHaveBeenCalledWith(
+    "http://localhost:3001/uploads/token",
+    expect.objectContaining({
+      method: "PUT",
+      credentials: "include",
+    }),
+  );
+});
+
+test("putBytes omits cookies on a presigned object URL", async () => {
+  const fetch = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
+  vi.stubGlobal("fetch", fetch);
+  await api.putBytes(
+    "https://r2.example/quarantine/a.zip?X-Amz-Signature=1",
+    new ArrayBuffer(8),
+  );
+  expect(fetch).toHaveBeenCalledWith(
+    "https://r2.example/quarantine/a.zip?X-Amz-Signature=1",
+    expect.objectContaining({
+      method: "PUT",
+      credentials: "omit",
+    }),
+  );
+});
+
 test("preserves status for non-JSON failures and accepts an empty success", async () => {
   vi.stubGlobal(
     "fetch",

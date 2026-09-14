@@ -15,8 +15,10 @@ import {
 } from './public-games.service.js';
 import { RuntimeController } from './runtime.controller.js';
 import { RuntimeService } from './runtime.service.js';
+import { ScanWorker } from './scan-worker.js';
 import { VersionsController } from './versions.controller.js';
-import { VersionsRepository, VersionsService } from './versions.service.js';
+import { VersionsRepository } from './versions.repository.js';
+import { VersionsService } from './versions.service.js';
 
 export const gameSummarySelect = {
   id: true,
@@ -52,6 +54,7 @@ const publicGameSelect = {
     GamesService,
     PublicGamesService,
     VersionsService,
+    ScanWorker,
     RuntimeService,
     {
       provide: GamesRepository,
@@ -145,6 +148,11 @@ const publicGameSelect = {
             updatedAt: game.updatedAt.toISOString(),
           };
         },
+        listByGame: (gameId) =>
+          database.gameVersion.findMany({
+            where: { gameId },
+            orderBy: { createdAt: 'desc' },
+          }),
         findPublishedRuntime: async (slug) => {
           const game = await database.game.findFirst({
             where: {

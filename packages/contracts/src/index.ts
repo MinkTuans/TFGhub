@@ -15,6 +15,7 @@ export {
   GameVersionStatus,
   GameVersionSummary,
   PublishGameInput,
+  RollbackGameInput,
 } from './versions.js';
 export {
   CreateDonationInput,

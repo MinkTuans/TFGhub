@@ -11,6 +11,15 @@ export class ApiError extends Error {
 const baseUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 type Options = { headers?: HeadersInit };
 
+function isPlatformUploadUrl(url: string): boolean {
+  if (url.startsWith("/")) return true;
+  try {
+    return new URL(url).origin === new URL(baseUrl).origin;
+  } catch {
+    return false;
+  }
+}
+
 async function request<T>(
   method: string,
   path: string,
@@ -59,7 +68,7 @@ export const api = {
   putBytes: async (url: string, body: ArrayBuffer) => {
     const response = await fetch(url, {
       method: "PUT",
-      credentials: "include",
+      credentials: isPlatformUploadUrl(url) ? "include" : "omit",
       cache: "no-store",
       headers: { "Content-Type": "application/octet-stream" },
       body,
