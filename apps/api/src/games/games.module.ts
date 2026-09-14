@@ -3,7 +3,7 @@ import { database } from '@indieforge/database';
 import { AuthModule } from '../auth/auth.module.js';
 import { GamesController } from './games.controller.js';
 import { GamesRepository, GamesService } from './games.service.js';
-import { MemoryObjectStorage, ObjectStorage } from './object-storage.js';
+import { createObjectStorage, ObjectStorage } from './object-storage.js';
 import { PublicGamesController } from './public-games.controller.js';
 import {
   PublicGamesRepository,
@@ -92,7 +92,7 @@ const publicGameSelect = {
     },
     {
       provide: ObjectStorage,
-      useClass: MemoryObjectStorage,
+      useFactory: createObjectStorage,
     },
     {
       provide: VersionsRepository,
