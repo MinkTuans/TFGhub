@@ -26,6 +26,15 @@ The final command keeps the API and web development servers running. Open the we
 
 See [the development guide](docs/development.md) for the complete workflow and [the foundation API guide](docs/api/foundation.md) for endpoint examples.
 
+Production on this host uses `compose.production.yml` (Caddy on port 80, web `/api` reverse-proxied to the Nest API). Copy `.env.production.example` to `.env.production`, set secrets, then:
+
+```bash
+sudo docker compose -p deploy-ip-preview --env-file .env.production -f compose.production.yml build
+sudo docker compose -p deploy-ip-preview --env-file .env.production -f compose.production.yml up -d
+```
+
+Set `COOKIE_SECURE=false` for HTTP on a bare IP. Named volumes keep Postgres and uploaded zips across rebuilds.
+
 ## Scope of this slice
 
 This slice adds HTML5 zip upload, checksum verification, isolated archive scanning, publishing a READY version, sandboxed iframe play, object storage on local disk or Cloudflare R2, and sandbox donations. The browser PUTs the zip to `/uploads/:token` unless Cloudflare R2 is configured, in which case create-version returns a short-lived presigned PUT URL. A test donation uses an idempotency key and a sandbox webhook so it completes exactly once. Play pages send a pseudonymous session and heartbeats; studio shows valid plays, active minutes, and the 30/70 allocation score. Players can report games; malware reports quarantine immediately. Moderators dismiss, quarantine, or restore; creators can appeal. Scan runs in `ScanWorker` (MZ/PE indicators included). Creators can roll back a public game to a previous READY build. A rejected or failed scan never becomes the live version.

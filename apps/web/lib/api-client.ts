@@ -8,7 +8,12 @@ export class ApiError extends Error {
   }
 }
 
-const baseUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+const baseUrl =
+  (typeof window === "undefined"
+    ? process.env.API_INTERNAL_URL
+    : undefined) ??
+  process.env.NEXT_PUBLIC_API_URL ??
+  "http://localhost:3001";
 type Options = { headers?: HeadersInit };
 
 function isPlatformUploadUrl(url: string): boolean {

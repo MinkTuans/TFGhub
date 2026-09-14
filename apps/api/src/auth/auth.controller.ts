@@ -16,10 +16,12 @@ import { CurrentUser } from './current-user.decorator.js';
 import { ACCESS_COOKIE, JwtAuthGuard } from './jwt-auth.guard.js';
 
 function cookieOptions(): CookieOptions {
+  const flag = process.env.COOKIE_SECURE;
   return {
     httpOnly: true,
     sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
+    secure:
+      flag === 'true' ? true : flag === 'false' ? false : process.env.NODE_ENV === 'production',
     path: '/',
   };
 }
