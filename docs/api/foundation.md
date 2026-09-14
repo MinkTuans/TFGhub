@@ -124,7 +124,7 @@ Content-Type: application/json
 {"filename":"orbit.zip","byteSize":2048,"checksumSha256":"<64 lowercase hex chars>"}
 ```
 
-`201 Created` returns the version summary plus a 15-minute `uploadUrl`. PUT the raw zip bytes to that URL (`Content-Type: application/octet-stream`). Then complete:
+`201 Created` returns the version summary plus a 15-minute `uploadUrl`. PUT the raw zip bytes to that URL (`Content-Type: application/octet-stream`). The API stores the object in Cloudflare R2 when `CLOUDFLARE_R2_BUCKET` and keys are set, otherwise under `STORAGE_DIR`. Then complete:
 
 ```http
 POST /games/cmexamplegame1/versions/cmexamplever1/complete

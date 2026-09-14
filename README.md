@@ -28,4 +28,4 @@ See [the development guide](docs/development.md) for the complete workflow and [
 
 ## Scope of this slice
 
-This slice adds HTML5 zip upload, checksum verification, in-process archive scanning, publishing a READY version, and sandboxed iframe play of the published zip. Malware workers, R2 direct-to-bucket uploads, analytics, and donations are still later work. A rejected or failed scan never becomes the live version.
+This slice adds HTML5 zip upload, checksum verification, in-process archive scanning, publishing a READY version, sandboxed iframe play, and object storage on local disk or Cloudflare R2. Browser still PUTs to `/uploads/:token`; the API writes the zip into R2 when `CLOUDFLARE_R2_*` is set. Direct-to-bucket signed URLs, malware workers, analytics, and donations are still later work. A rejected or failed scan never becomes the live version.
