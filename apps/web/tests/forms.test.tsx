@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 import { AuthForm } from "../components/auth-form";
 import { GameForm } from "../components/game-form";
+import { DonateForm } from "../components/donate-form";
 import { ReleaseForm } from "../components/release-form";
 
 // Navigation needs a Next router; the form, validation and HTTP client stay real.
@@ -101,5 +102,21 @@ test("release form asks for a zip before calling the API", () => {
     screen.getByRole("button", { name: "Upload and scan" }).closest("form")!,
   );
   expect(screen.getByRole("alert")).toHaveTextContent("Choose a .zip HTML5 build.");
+  expect(fetch).not.toHaveBeenCalled();
+});
+
+test("donation form rejects amounts under one dollar before calling the API", () => {
+  const fetch = vi.fn();
+  vi.stubGlobal("fetch", fetch);
+  render(<DonateForm slug="orbit-orchard" />);
+  fireEvent.change(screen.getByLabelText("Sandbox donation (USD)"), {
+    target: { value: "0.50" },
+  });
+  fireEvent.submit(
+    screen.getByRole("button", { name: "Send sandbox donation" }).closest("form")!,
+  );
+  expect(screen.getByRole("alert")).toHaveTextContent(
+    "Enter at least $1.00 (sandbox USD).",
+  );
   expect(fetch).not.toHaveBeenCalled();
 });

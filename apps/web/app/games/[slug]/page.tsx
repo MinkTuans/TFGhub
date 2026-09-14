@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import type { PublicGameSummary } from "@indieforge/contracts";
+import { DonateForm } from "../../../components/donate-form";
 import { api, ApiError } from "../../../lib/api-client";
 
 export default async function GamePage({
@@ -35,6 +36,7 @@ export default async function GamePage({
             referrerPolicy="no-referrer"
           />
         )}
+        <DonateForm slug={game.slug} />
       </article>
     </main>
   );

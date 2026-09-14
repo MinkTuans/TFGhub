@@ -16,3 +16,9 @@ export {
   GameVersionSummary,
   PublishGameInput,
 } from './versions.js';
+export {
+  CreateDonationInput,
+  DonationStatus,
+  DonationSummary,
+  SandboxDonationWebhookInput,
+} from './donations.js';

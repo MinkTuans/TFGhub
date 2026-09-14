@@ -1,16 +1,17 @@
 import Link from "next/link";
-import type { GameSummary } from "@indieforge/contracts";
+import type { DonationSummary, GameSummary } from "@indieforge/contracts";
 import { ProfileForm, type Profile } from "../../components/profile-form";
 import { ApiError } from "../../lib/api-client";
 import { privateGet } from "../../lib/session";
 
 export default async function StudioPage() {
-  const [games, profile] = await Promise.all([
+  const [games, profile, donations] = await Promise.all([
     privateGet<GameSummary[]>("/games/mine"),
     privateGet<Profile>("/developers/me").catch((error) => {
       if (error instanceof ApiError && error.status === 404) return null;
       throw error;
     }),
+    privateGet<DonationSummary[]>("/donations/received"),
   ]);
   return (
     <main>
@@ -19,6 +20,21 @@ export default async function StudioPage() {
       <section aria-labelledby="profile-heading">
         <h2 id="profile-heading">Developer profile</h2>
         <ProfileForm profile={profile} />
+      </section>
+      <section aria-labelledby="donations-heading">
+        <h2 id="donations-heading">Sandbox donations</h2>
+        {donations.length === 0 ? (
+          <p>No completed test donations yet.</p>
+        ) : (
+          <ul>
+            {donations.map((donation) => (
+              <li key={donation.id}>
+                {(donation.netCents / 100).toFixed(2)} USD net on {donation.gameSlug}{" "}
+                (fee {(donation.feeCents / 100).toFixed(2)})
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
       <section aria-labelledby="games-heading">
         <div className="section-heading">

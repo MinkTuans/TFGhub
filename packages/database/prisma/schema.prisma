@@ -38,6 +38,12 @@ enum GameVersionStatus {
   REJECTED
 }
 
+enum DonationStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+}
+
 model User {
   id           String            @id @default(cuid())
   email        String            @unique
@@ -46,6 +52,8 @@ model User {
   createdAt    DateTime          @default(now())
   profile      DeveloperProfile?
   games        Game[]
+  donationsGiven    Donation[] @relation("DonationDonor")
+  donationsReceived Donation[] @relation("DonationRecipient")
 }
 
 model DeveloperProfile {
@@ -69,7 +77,29 @@ model Game {
   updatedAt       DateTime        @updatedAt
   owner           User            @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   versions        GameVersion[]
+  donations       Donation[]
   activeVersion   GameVersion?    @relation("ActiveGameVersion", fields: [activeVersionId], references: [id], onDelete: SetNull)
+}
+
+model Donation {
+  id               String         @id @default(cuid())
+  gameId           String
+  donorId          String
+  recipientId      String
+  amountCents      Int
+  feeCents         Int
+  currency         String         @default("USD")
+  status           DonationStatus @default(PENDING)
+  idempotencyKey   String
+  provider         String         @default("sandbox")
+  providerEventId  String?        @unique
+  createdAt        DateTime       @default(now())
+  game             Game           @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  donor            User           @relation("DonationDonor", fields: [donorId], references: [id], onDelete: Cascade)
+  recipient        User           @relation("DonationRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+
+  @@unique([donorId, idempotencyKey])
+  @@index([recipientId, createdAt])
 }
 
 model GameVersion {

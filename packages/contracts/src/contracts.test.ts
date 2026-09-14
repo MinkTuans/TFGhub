@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   CompleteGameVersionInput,
+  CreateDonationInput,
   CreateGameInput,
   CreateGameVersionInput,
   PublishGameInput,
@@ -53,5 +54,23 @@ describe('contracts', () => {
     expect(PublishGameInput.parse({ versionId: 'ver-1' })).toEqual({
       versionId: 'ver-1',
     });
+  });
+
+  it('accepts a sandbox donation of at least 100 cents', () => {
+    expect(
+      CreateDonationInput.parse({
+        amountCents: 500,
+        idempotencyKey: 'donate-key-1',
+      }),
+    ).toEqual({ amountCents: 500, idempotencyKey: 'donate-key-1' });
+  });
+
+  it('rejects a donation below one dollar', () => {
+    expect(() =>
+      CreateDonationInput.parse({
+        amountCents: 99,
+        idempotencyKey: 'donate-key-1',
+      }),
+    ).toThrow();
   });
 });

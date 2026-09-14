@@ -152,6 +152,33 @@ Content-Type: application/json
 
 `GET /games/by-slug/:slug` includes `playUrl` (`/runtime/:slug/index.html`) when the game has a READY active version. `GET /runtime/:slug/` and `GET /runtime/:slug/*` stream files from that zip. Drafts, quarantined games, and rejected builds return `404`. Responses send `Content-Security-Policy` with `frame-ancestors` set to `WEB_ORIGIN` and do not use the platform session cookie. The public game page loads the build in a sandboxed iframe (`allow-scripts allow-pointer-lock` only).
 
+## Sandbox donation
+
+Authenticated players donate to a public, clear game they do not own:
+
+```http
+POST /games/orbit-orchard/donations
+Cookie: indieforge_access=...
+Content-Type: application/json
+
+{"amountCents":500,"idempotencyKey":"donate-key-1"}
+```
+
+`201 Created` is `PENDING`. Reusing the same `idempotencyKey` for that donor returns the existing row. Complete the test payment:
+
+```http
+POST /donations/<id>/sandbox-pay
+Cookie: indieforge_access=...
+```
+
+or the provider webhook (`x-sandbox-secret` must match `SANDBOX_DONATION_WEBHOOK_SECRET`):
+
+```http
+POST /donations/webhooks/sandbox
+```
+
+A 10% platform fee (`DONATION_FEE_BPS`, default 1000) is disclosed on the receipt. Duplicate webhook `eventId` values do not credit twice. `GET /donations/received` lists `SUCCEEDED` gifts for the creator.
+
 ## List owned games
 
 ```http
