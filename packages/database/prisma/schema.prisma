@@ -44,6 +44,21 @@ enum DonationStatus {
   FAILED
 }
 
+enum ReportCategory {
+  MALWARE
+  PROHIBITED
+  COPYRIGHT
+  IMPERSONATION
+  MISLEADING
+}
+
+enum ReportStatus {
+  OPEN
+  DISMISSED
+  APPEALED
+  RESTORED
+}
+
 model User {
   id           String            @id @default(cuid())
   email        String            @unique
@@ -54,6 +69,7 @@ model User {
   games        Game[]
   donationsGiven    Donation[] @relation("DonationDonor")
   donationsReceived Donation[] @relation("DonationRecipient")
+  reportsFiled      Report[]   @relation("ReportReporter")
 }
 
 model DeveloperProfile {
@@ -71,14 +87,16 @@ model Game {
   description     String          @default("")
   visibility      GameVisibility  @default(DRAFT)
   accessMode      GameAccessMode  @default(GUEST_ALLOWED)
-  moderationState ModerationState @default(CLEAR)
-  activeVersionId String?         @unique
+  moderationState  ModerationState @default(CLEAR)
+  moderationReason String          @default("")
+  activeVersionId  String?         @unique
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
   owner           User            @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   versions        GameVersion[]
   donations       Donation[]
   playSessions    PlaySession[]
+  reports         Report[]
   activeVersion   GameVersion?    @relation("ActiveGameVersion", fields: [activeVersionId], references: [id], onDelete: SetNull)
 }
 
@@ -133,6 +151,23 @@ model PlaySession {
   heartbeats      PlayHeartbeat[]
 
   @@index([gameId, visitorId, createdAt])
+}
+
+model Report {
+  id                String         @id @default(cuid())
+  gameId            String
+  reporterId        String
+  category          ReportCategory
+  evidence          String
+  status            ReportStatus   @default(OPEN)
+  appealMessage     String         @default("")
+  resolutionReason  String         @default("")
+  createdAt         DateTime       @default(now())
+  game              Game           @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  reporter          User           @relation("ReportReporter", fields: [reporterId], references: [id], onDelete: Cascade)
+
+  @@index([status, createdAt])
+  @@index([gameId, reporterId])
 }
 
 model PlayHeartbeat {

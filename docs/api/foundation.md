@@ -197,6 +197,16 @@ POST /analytics/sessions/<id>/heartbeats
 
 Only visible + recently active beats at least 10 seconds apart add 15 seconds. Duplicate `eventId` values are ignored. `GET /analytics/studio` (cookie) returns valid plays, active minutes, and `score = 0.3 * normalizedPlays + 0.7 * normalizedMinutes` across the creator's games.
 
+## Reports and quarantine
+
+```http
+POST /games/orbit-orchard/reports
+Cookie: indieforge_access=...
+{"category":"MALWARE","evidence":"The zip executed an unexpected binary"}
+```
+
+`MALWARE` sets `moderationState=QUARANTINED` immediately (public catalog and runtime require `CLEAR`). Other categories `FLAG` the game. Moderators (`MODERATOR` or `ADMIN`) use `GET /moderation/reports` and `POST .../quarantine|dismiss|restore`. Creators appeal with `POST /moderation/reports/:id/appeal` and see open cases at `GET /reports/mine`.
+
 ## List owned games
 
 ```http

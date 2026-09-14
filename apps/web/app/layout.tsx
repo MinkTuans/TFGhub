@@ -22,6 +22,7 @@ export default function RootLayout({
           <nav aria-label="Main navigation">
             <Link href="/discover">Discover</Link>
             <Link href="/studio">Studio</Link>
+            <Link href="/moderation">Moderation</Link>
             <Link href="/login">Log in</Link>
           </nav>
         </header>

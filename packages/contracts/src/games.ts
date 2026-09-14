@@ -21,6 +21,7 @@ export const GameSummary = z.object({
   visibility: z.enum(['DRAFT', 'PUBLIC', 'UNLISTED']),
   accessMode: z.enum(['GUEST_ALLOWED', 'AUTH_REQUIRED']),
   moderationState: z.enum(['CLEAR', 'FLAGGED', 'QUARANTINED']),
+  moderationReason: z.string().optional(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 });

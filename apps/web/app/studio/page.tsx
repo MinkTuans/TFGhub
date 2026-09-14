@@ -2,14 +2,16 @@ import Link from "next/link";
 import type {
   DonationSummary,
   GameSummary,
+  ReportSummary,
   StudioAnalyticsResponse,
 } from "@indieforge/contracts";
+import { AppealForm } from "../../components/appeal-form";
 import { ProfileForm, type Profile } from "../../components/profile-form";
 import { ApiError } from "../../lib/api-client";
 import { privateGet } from "../../lib/session";
 
 export default async function StudioPage() {
-  const [games, profile, donations, analytics] = await Promise.all([
+  const [games, profile, donations, analytics, reports] = await Promise.all([
     privateGet<GameSummary[]>("/games/mine"),
     privateGet<Profile>("/developers/me").catch((error) => {
       if (error instanceof ApiError && error.status === 404) return null;
@@ -17,6 +19,7 @@ export default async function StudioPage() {
     }),
     privateGet<DonationSummary[]>("/donations/received"),
     privateGet<StudioAnalyticsResponse>("/analytics/studio"),
+    privateGet<ReportSummary[]>("/reports/mine"),
   ]);
   return (
     <main>
@@ -25,6 +28,24 @@ export default async function StudioPage() {
       <section aria-labelledby="profile-heading">
         <h2 id="profile-heading">Developer profile</h2>
         <ProfileForm profile={profile} />
+      </section>
+      <section aria-labelledby="moderation-heading">
+        <h2 id="moderation-heading">Reports on your games</h2>
+        {reports.length === 0 ? (
+          <p>No open reports.</p>
+        ) : (
+          reports.map((report) => (
+            <article className="card" key={report.id}>
+              <h3>{report.gameTitle}</h3>
+              <p className="badge">
+                {report.moderationState}: {report.moderationReason || report.category}
+              </p>
+              {report.moderationState === "QUARANTINED" && (
+                <AppealForm id={report.id} />
+              )}
+            </article>
+          ))
+        )}
       </section>
       <section aria-labelledby="analytics-heading">
         <h2 id="analytics-heading">Play analytics</h2>

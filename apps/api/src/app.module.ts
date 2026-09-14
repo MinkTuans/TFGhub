@@ -7,6 +7,7 @@ import { AuthModule } from './auth/auth.module.js';
 import { DevelopersModule } from './developers/developers.module.js';
 import { DonationsModule } from './donations/donations.module.js';
 import { GamesModule } from './games/games.module.js';
+import { ReportsModule } from './reports/reports.module.js';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { GamesModule } from './games/games.module.js';
     GamesModule,
     DonationsModule,
     AnalyticsModule,
+    ReportsModule,
   ],
   controllers: [AppController, HealthController],
   providers: [AppService],

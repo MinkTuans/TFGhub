@@ -9,6 +9,7 @@ import {
   PasswordHasher,
 } from './auth.service.js';
 import { JwtAuthGuard } from './jwt-auth.guard.js';
+import { RolesGuard } from './roles.guard.js';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { JwtAuthGuard } from './jwt-auth.guard.js';
   providers: [
     AuthService,
     JwtAuthGuard,
+    RolesGuard,
     { provide: PasswordHasher, useClass: Argon2PasswordHasher },
     {
       provide: AuthUsersRepository,
@@ -42,6 +44,6 @@ import { JwtAuthGuard } from './jwt-auth.guard.js';
       }),
     },
   ],
-  exports: [AuthService, JwtAuthGuard, JwtModule],
+  exports: [AuthService, JwtAuthGuard, RolesGuard, JwtModule],
 })
 export class AuthModule {}

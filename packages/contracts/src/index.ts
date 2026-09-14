@@ -29,3 +29,11 @@ export {
   StartPlaySessionInput,
   StudioAnalyticsResponse,
 } from './analytics.js';
+export {
+  AppealReportInput,
+  CreateReportInput,
+  ReportCategory,
+  ReportStatus,
+  ReportSummary,
+  ResolveReportInput,
+} from './reports.js';

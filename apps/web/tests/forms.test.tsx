@@ -3,6 +3,7 @@ import { afterEach, expect, test, vi } from "vitest";
 import { AuthForm } from "../components/auth-form";
 import { GameForm } from "../components/game-form";
 import { DonateForm } from "../components/donate-form";
+import { ReportForm } from "../components/report-form";
 import { ReleaseForm } from "../components/release-form";
 
 // Navigation needs a Next router; the form, validation and HTTP client stay real.
@@ -117,6 +118,22 @@ test("donation form rejects amounts under one dollar before calling the API", ()
   );
   expect(screen.getByRole("alert")).toHaveTextContent(
     "Enter at least $1.00 (sandbox USD).",
+  );
+  expect(fetch).not.toHaveBeenCalled();
+});
+
+test("report form rejects short evidence before calling the API", () => {
+  const fetch = vi.fn();
+  vi.stubGlobal("fetch", fetch);
+  render(<ReportForm slug="orbit-orchard" />);
+  fireEvent.change(screen.getByLabelText("Evidence"), {
+    target: { value: "short" },
+  });
+  fireEvent.submit(
+    screen.getByRole("button", { name: "Submit report" }).closest("form")!,
+  );
+  expect(screen.getByRole("alert")).toHaveTextContent(
+    "Choose a category and describe the issue in at least 8 characters.",
   );
   expect(fetch).not.toHaveBeenCalled();
 });
