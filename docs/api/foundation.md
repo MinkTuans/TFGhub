@@ -114,6 +114,40 @@ Content-Type: application/json
 
 The body must contain at least one of `title` (1–80 characters), `description` (at most 2,000 characters), or `accessMode` (`GUEST_ALLOWED` or `AUTH_REQUIRED`). `slug`, ownership, visibility, and moderation state cannot be changed by this endpoint. Only the owner may update the game: a missing session returns `401`, and an authenticated non-owner or an unknown game returns `403`.
 
+## Upload a version
+
+```http
+POST /games/cmexamplegame1/versions
+Cookie: indieforge_access=...
+Content-Type: application/json
+
+{"filename":"orbit.zip","byteSize":2048,"checksumSha256":"<64 lowercase hex chars>"}
+```
+
+`201 Created` returns the version summary plus a 15-minute `uploadUrl`. PUT the raw zip bytes to that URL (`Content-Type: application/octet-stream`). Then complete:
+
+```http
+POST /games/cmexamplegame1/versions/cmexamplever1/complete
+Cookie: indieforge_access=...
+Content-Type: application/json
+
+{"checksumSha256":"<same sha256>"}
+```
+
+`201 Created`. Status becomes `READY` when the zip contains `index.html` and no blocked paths/types, otherwise `REJECTED` with `findings`. Checksum mismatch returns `400`.
+
+## Publish
+
+```http
+POST /games/cmexamplegame1/publish
+Cookie: indieforge_access=...
+Content-Type: application/json
+
+{"versionId":"cmexamplever1"}
+```
+
+`201 Created` sets `visibility` to `PUBLIC` and records `activeVersionId`. Only `READY` versions owned by the caller can be published. A `REJECTED` or `UPLOADING` version returns `409`. A failed scan does not replace a previously published version.
+
 ## List owned games
 
 ```http

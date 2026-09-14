@@ -3,11 +3,14 @@ import { database } from '@indieforge/database';
 import { AuthModule } from '../auth/auth.module.js';
 import { GamesController } from './games.controller.js';
 import { GamesRepository, GamesService } from './games.service.js';
+import { MemoryObjectStorage, ObjectStorage } from './object-storage.js';
 import { PublicGamesController } from './public-games.controller.js';
 import {
   PublicGamesRepository,
   PublicGamesService,
 } from './public-games.service.js';
+import { VersionsController } from './versions.controller.js';
+import { VersionsRepository, VersionsService } from './versions.service.js';
 
 export const gameSummarySelect = {
   id: true,
@@ -32,10 +35,11 @@ const publicGameSelect = {
 
 @Module({
   imports: [AuthModule],
-  controllers: [GamesController, PublicGamesController],
+  controllers: [GamesController, PublicGamesController, VersionsController],
   providers: [
     GamesService,
     PublicGamesService,
+    VersionsService,
     {
       provide: GamesRepository,
       useFactory: (): GamesRepository => ({
@@ -77,12 +81,65 @@ const publicGameSelect = {
           database.game.findFirst({ where, select: publicGameSelect }),
       }),
     },
+    {
+      provide: ObjectStorage,
+      useClass: MemoryObjectStorage,
+    },
+    {
+      provide: VersionsRepository,
+      useFactory: (): VersionsRepository => ({
+        create: (input) =>
+          database.gameVersion.create({
+            data: {
+              ...input,
+              status: 'UPLOADING',
+            },
+          }),
+        findById: (id) => database.gameVersion.findUnique({ where: { id } }),
+        findByUploadToken: (uploadToken) =>
+          database.gameVersion.findUnique({ where: { uploadToken } }),
+        save: (version) =>
+          database.gameVersion.update({
+            where: { id: version.id },
+            data: {
+              status: version.status,
+              findings: version.findings,
+              uploadToken: version.uploadToken,
+              uploadExpiresAt: version.uploadExpiresAt,
+            },
+          }),
+        findGame: (id) =>
+          database.game.findUnique({
+            where: { id },
+            select: {
+              id: true,
+              ownerId: true,
+              visibility: true,
+              moderationState: true,
+              activeVersionId: true,
+            },
+          }),
+        publish: async (gameId, versionId) => {
+          const game = await database.game.update({
+            where: { id: gameId },
+            data: { visibility: 'PUBLIC', activeVersionId: versionId },
+            select: gameSummarySelect,
+          });
+          return {
+            ...game,
+            createdAt: game.createdAt.toISOString(),
+            updatedAt: game.updatedAt.toISOString(),
+          };
+        },
+      }),
+    },
   ],
   exports: [
     GamesService,
     GamesRepository,
     PublicGamesService,
     PublicGamesRepository,
+    VersionsService,
   ],
 })
 export class GamesModule {}

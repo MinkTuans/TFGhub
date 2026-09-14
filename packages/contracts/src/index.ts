@@ -8,3 +8,11 @@ export {
   PublicGameSummary,
   UpdateGameInput,
 } from './games.js';
+export {
+  CompleteGameVersionInput,
+  CreateGameVersionInput,
+  CreateGameVersionResponse,
+  GameVersionStatus,
+  GameVersionSummary,
+  PublishGameInput,
+} from './versions.js';

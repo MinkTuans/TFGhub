@@ -42,6 +42,7 @@ export default async function StudioPage() {
                       : "Unlisted"}
                 </p>
                 <p className="description">{game.description}</p>
+                <Link href={`/studio/games/${game.id}`}>Manage release</Link>
               </article>
             ))}
           </div>

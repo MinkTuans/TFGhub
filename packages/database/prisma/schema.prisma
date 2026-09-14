@@ -31,6 +31,13 @@ enum ModerationState {
   QUARANTINED
 }
 
+enum GameVersionStatus {
+  UPLOADING
+  SCANNING
+  READY
+  REJECTED
+}
+
 model User {
   id           String            @id @default(cuid())
   email        String            @unique
@@ -57,7 +64,28 @@ model Game {
   visibility      GameVisibility  @default(DRAFT)
   accessMode      GameAccessMode  @default(GUEST_ALLOWED)
   moderationState ModerationState @default(CLEAR)
+  activeVersionId String?         @unique
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
   owner           User            @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  versions        GameVersion[]
+  activeVersion   GameVersion?    @relation("ActiveGameVersion", fields: [activeVersionId], references: [id], onDelete: SetNull)
+}
+
+model GameVersion {
+  id              String            @id @default(cuid())
+  gameId          String
+  status          GameVersionStatus @default(UPLOADING)
+  filename        String
+  byteSize        Int
+  checksumSha256  String
+  storageKey      String
+  findings        String            @default("")
+  uploadToken     String?           @unique
+  uploadExpiresAt DateTime?
+  createdAt       DateTime          @default(now())
+  game            Game              @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  publishedFor    Game?             @relation("ActiveGameVersion")
+
+  @@index([gameId, createdAt])
 }

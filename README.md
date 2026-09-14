@@ -28,4 +28,4 @@ See [the development guide](docs/development.md) for the complete workflow and [
 
 ## Scope of this slice
 
-Build upload, malware scanning, game runtime hosting, analytics, donations, and game publishing are planned, but are not delivered here. In particular, new games are always drafts: the public catalog endpoints only return already-public, clear games and this slice has no endpoint to publish a draft.
+This slice adds HTML5 zip upload, checksum verification, in-process archive scanning, and publishing a READY version to the public catalog. Malware workers, R2 direct-to-bucket uploads, sandboxed runtime hosting, analytics, and donations are still later work. A rejected or failed scan never becomes the live version.

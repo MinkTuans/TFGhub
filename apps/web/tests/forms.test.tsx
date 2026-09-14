@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 import { AuthForm } from "../components/auth-form";
 import { GameForm } from "../components/game-form";
+import { ReleaseForm } from "../components/release-form";
 
 // Navigation needs a Next router; the form, validation and HTTP client stay real.
 vi.mock("next/navigation", () => ({
@@ -76,4 +77,29 @@ test("draft creation keeps input visible after a duplicate slug rejection", asyn
   );
   expect(screen.getByLabelText("Title")).toHaveValue("My game");
   expect(screen.getByRole("button", { name: "Create draft" })).toBeEnabled();
+});
+
+test("release form asks for a zip before calling the API", () => {
+  const fetch = vi.fn();
+  vi.stubGlobal("fetch", fetch);
+  render(
+    <ReleaseForm
+      game={{
+        id: "game-1",
+        slug: "orbit-orchard",
+        title: "Orbit Orchard",
+        description: "",
+        visibility: "DRAFT",
+        accessMode: "GUEST_ALLOWED",
+        moderationState: "CLEAR",
+        createdAt: "2026-09-05T12:00:00.000Z",
+        updatedAt: "2026-09-05T12:00:00.000Z",
+      }}
+    />,
+  );
+  fireEvent.submit(
+    screen.getByRole("button", { name: "Upload and scan" }).closest("form")!,
+  );
+  expect(screen.getByRole("alert")).toHaveTextContent("Choose a .zip HTML5 build.");
+  expect(fetch).not.toHaveBeenCalled();
 });

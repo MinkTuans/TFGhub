@@ -56,4 +56,16 @@ export const api = {
     request<T>("PUT", path, body, options),
   patch: <T>(path: string, body: unknown, options?: Options) =>
     request<T>("PATCH", path, body, options),
+  putBytes: async (url: string, body: ArrayBuffer) => {
+    const response = await fetch(url, {
+      method: "PUT",
+      credentials: "include",
+      cache: "no-store",
+      headers: { "Content-Type": "application/octet-stream" },
+      body,
+    });
+    if (!response.ok) {
+      throw new ApiError(response.status, `Upload failed (${response.status})`);
+    }
+  },
 };
