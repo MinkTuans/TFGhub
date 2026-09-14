@@ -201,6 +201,15 @@ footer {
   text-align: center;
   font-size: 0.85rem;
 }
+.play-frame {
+  display: block;
+  width: 100%;
+  min-height: 420px;
+  aspect-ratio: 16 / 10;
+  margin: 24px 0;
+  border: 1px solid #dce3d8;
+  background: #102018;
+}
 @media (max-width: 560px) {
   .site-header {
     flex-direction: column;

@@ -17,12 +17,24 @@ export default async function GamePage({
     if (error instanceof ApiError && error.status === 404) notFound();
     throw error;
   }
+  const apiOrigin = (
+    process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001"
+  ).replace(/\/$/, "");
   return (
     <main className="narrow">
       <article>
         <h1>{game.title}</h1>
         <p>By {game.developer.displayName}</p>
         <p className="description">{game.description}</p>
+        {game.playUrl && (
+          <iframe
+            className="play-frame"
+            title={`Play ${game.title}`}
+            src={`${apiOrigin}${game.playUrl}`}
+            sandbox="allow-scripts allow-pointer-lock"
+            referrerPolicy="no-referrer"
+          />
+        )}
       </article>
     </main>
   );

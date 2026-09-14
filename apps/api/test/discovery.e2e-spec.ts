@@ -230,6 +230,7 @@ describe('Public game discovery HTTP boundary', () => {
       description: 'A public game',
       developer: { displayName: 'Demo developer' },
       createdAt: '2026-09-05T12:00:00.000Z',
+      playUrl: null,
     });
     expect(response.body.email).toBeUndefined();
     expect(response.body.developer.email).toBeUndefined();

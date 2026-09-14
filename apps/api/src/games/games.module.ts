@@ -9,6 +9,8 @@ import {
   PublicGamesRepository,
   PublicGamesService,
 } from './public-games.service.js';
+import { RuntimeController } from './runtime.controller.js';
+import { RuntimeService } from './runtime.service.js';
 import { VersionsController } from './versions.controller.js';
 import { VersionsRepository, VersionsService } from './versions.service.js';
 
@@ -30,16 +32,23 @@ const publicGameSelect = {
   title: true,
   description: true,
   createdAt: true,
+  activeVersionId: true,
   owner: { select: { profile: { select: { displayName: true } } } },
 } as const;
 
 @Module({
   imports: [AuthModule],
-  controllers: [GamesController, PublicGamesController, VersionsController],
+  controllers: [
+    GamesController,
+    PublicGamesController,
+    VersionsController,
+    RuntimeController,
+  ],
   providers: [
     GamesService,
     PublicGamesService,
     VersionsService,
+    RuntimeService,
     {
       provide: GamesRepository,
       useFactory: (): GamesRepository => ({
@@ -130,6 +139,18 @@ const publicGameSelect = {
             createdAt: game.createdAt.toISOString(),
             updatedAt: game.updatedAt.toISOString(),
           };
+        },
+        findPublishedRuntime: async (slug) => {
+          const game = await database.game.findFirst({
+            where: {
+              slug,
+              visibility: 'PUBLIC',
+              moderationState: 'CLEAR',
+              activeVersion: { is: { status: 'READY' } },
+            },
+            select: { activeVersion: { select: { storageKey: true } } },
+          });
+          return game?.activeVersion ?? null;
         },
       }),
     },

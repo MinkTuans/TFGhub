@@ -37,6 +37,7 @@ export const PublicGameSummary = z.object({
   description: z.string(),
   developer: z.object({ displayName: z.string() }),
   createdAt: z.string().datetime(),
+  playUrl: z.string().nullable().optional(),
 });
 
 export const DiscoverGamesResponse = z.object({

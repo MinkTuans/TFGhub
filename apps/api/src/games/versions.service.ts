@@ -52,6 +52,9 @@ export abstract class VersionsRepository {
   abstract save(version: StoredVersion): Promise<StoredVersion>;
   abstract findGame(id: string): Promise<OwnedGame | null>;
   abstract publish(gameId: string, versionId: string): Promise<GameSummary>;
+  abstract findPublishedRuntime(
+    slug: string,
+  ): Promise<{ storageKey: string } | null>;
 }
 
 function summary(version: StoredVersion): GameVersionSummary {

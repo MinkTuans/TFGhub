@@ -28,4 +28,4 @@ See [the development guide](docs/development.md) for the complete workflow and [
 
 ## Scope of this slice
 
-This slice adds HTML5 zip upload, checksum verification, in-process archive scanning, and publishing a READY version to the public catalog. Malware workers, R2 direct-to-bucket uploads, sandboxed runtime hosting, analytics, and donations are still later work. A rejected or failed scan never becomes the live version.
+This slice adds HTML5 zip upload, checksum verification, in-process archive scanning, publishing a READY version, and sandboxed iframe play of the published zip. Malware workers, R2 direct-to-bucket uploads, analytics, and donations are still later work. A rejected or failed scan never becomes the live version.

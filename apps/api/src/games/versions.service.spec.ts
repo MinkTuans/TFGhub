@@ -49,6 +49,9 @@ function makeRepo(game: OwnedGame, versions: Map<string, StoredVersion>): Versio
     async findGame(id) {
       return id === game.id ? game : null;
     },
+    async findPublishedRuntime() {
+      return null;
+    },
     async publish(gameId, versionId) {
       game.activeVersionId = versionId;
       game.visibility = 'PUBLIC';

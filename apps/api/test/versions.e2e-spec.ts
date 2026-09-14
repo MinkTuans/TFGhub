@@ -54,6 +54,7 @@ describe('Game version upload and publish HTTP boundary', () => {
     users = new Map();
     games = new Map();
     versions = new Map();
+    const storage = new MemoryObjectStorage();
 
     const module = await Test.createTestingModule({ imports: [AppModule] })
       .overrideProvider(AuthUsersRepository)
@@ -95,7 +96,7 @@ describe('Game version upload and publish HTTP boundary', () => {
         },
       })
       .overrideProvider(ObjectStorage)
-      .useValue(new MemoryObjectStorage())
+      .useValue(storage)
       .overrideProvider(VersionsRepository)
       .useValue({
         async create(input: Omit<StoredVersion, 'id' | 'status' | 'findings' | 'createdAt'> & { uploadToken: string }) {
@@ -132,6 +133,18 @@ describe('Game version upload and publish HTTP boundary', () => {
             moderationState: game.moderationState,
             activeVersionId: game.activeVersionId,
           };
+        },
+        async findPublishedRuntime(slug: string) {
+          const game = [...games.values()].find(
+            (item) =>
+              item.slug === slug &&
+              item.visibility === 'PUBLIC' &&
+              item.activeVersionId,
+          );
+          if (!game?.activeVersionId) return null;
+          const version = versions.get(game.activeVersionId);
+          if (!version || version.status !== 'READY') return null;
+          return { storageKey: version.storageKey };
         },
         async publish(gameId: string, versionId: string) {
           const game = games.get(gameId)!;
@@ -203,5 +216,11 @@ describe('Game version upload and publish HTTP boundary', () => {
       .send({ versionId: created.body.id })
       .expect(201);
     expect(published.body.visibility).toBe('PUBLIC');
+
+    const page = await instance.get('/runtime/orbit-orchard/index.html').expect(200);
+    expect(page.headers['content-type']).toMatch(/text\/html/);
+    expect(page.headers['content-security-policy']).toContain('frame-ancestors');
+    expect(page.text).toContain('play');
+    await instance.get('/runtime/missing-game/index.html').expect(404);
   });
 });

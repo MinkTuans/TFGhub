@@ -148,6 +148,10 @@ Content-Type: application/json
 
 `201 Created` sets `visibility` to `PUBLIC` and records `activeVersionId`. Only `READY` versions owned by the caller can be published. A `REJECTED` or `UPLOADING` version returns `409`. A failed scan does not replace a previously published version.
 
+## Play a published build
+
+`GET /games/by-slug/:slug` includes `playUrl` (`/runtime/:slug/index.html`) when the game has a READY active version. `GET /runtime/:slug/` and `GET /runtime/:slug/*` stream files from that zip. Drafts, quarantined games, and rejected builds return `404`. Responses send `Content-Security-Policy` with `frame-ancestors` set to `WEB_ORIGIN` and do not use the platform session cookie. The public game page loads the build in a sandboxed iframe (`allow-scripts allow-pointer-lock` only).
+
 ## List owned games
 
 ```http

@@ -6,6 +6,7 @@ export type PublicGame = {
   title: string;
   description: string;
   createdAt: Date;
+  activeVersionId?: string | null;
   owner: { profile: { displayName: string } | null };
 };
 
@@ -118,6 +119,12 @@ export class PublicGamesService {
     const game = await this.games.findBySlug({
       where: { slug, visibility: 'PUBLIC', moderationState: 'CLEAR' },
     });
-    return game ? summary(game) : null;
+    if (!game) return null;
+    return {
+      ...summary(game),
+      playUrl: game.activeVersionId
+        ? `/runtime/${game.slug}/index.html`
+        : null,
+    };
   }
 }
