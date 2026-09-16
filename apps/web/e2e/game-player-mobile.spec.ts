@@ -12,7 +12,7 @@ async function playerPage(page: import("@playwright/test").Page) {
       <div class="game-player__stage"><div class="game-player__fit" style="--player-ratio:1"><iframe title="Mobile game" sandbox="allow-scripts allow-pointer-lock"></iframe></div></div>
     </section></div></main>`);
   await page.locator("iframe").evaluate(frame => {
-    frame.srcdoc = `<style>body{margin:0}button{height:48px;width:100%}</style><div style="height:900px">Instructions and board</div><button onclick="this.textContent='Played'">Play</button>`;
+    (frame as HTMLIFrameElement).srcdoc = `<style>body{margin:0}button{height:48px;width:100%}</style><div style="height:900px">Instructions and board</div><button onclick="this.textContent='Played'">Play</button>`;
   });
   await expect(page.frameLocator("iframe").getByRole("button")).toBeAttached();
 }
