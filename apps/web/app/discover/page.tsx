@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { DiscoverGamesResponse } from "@indieforge/contracts";
+import { EmptyState } from "../../components/empty-state";
 import { GameCard } from "../../components/game-card";
 import { api, ApiError } from "../../lib/api-client";
 
@@ -36,7 +37,7 @@ export default async function DiscoverPage({
       <form action="/discover" className="search-form">
         <label>
           Tìm kiếm game
-          <input name="query" defaultValue={query} maxLength={200} />
+          <input name="query" placeholder="Tên game hoặc ý tưởng bạn muốn khám phá…" defaultValue={query} maxLength={200} />
         </label>
         <button>Tìm kiếm</button>
       </form>
@@ -48,24 +49,30 @@ export default async function DiscoverPage({
           </Link>
         </div>
       )}
-      {data &&
-        (data.games.length === 0 ? (
-          <section className="discover-state" aria-labelledby="discover-empty-title">
-            <h2 id="discover-empty-title">Chưa có game phù hợp.</h2>
-            <p>Thử một từ khóa khác, hoặc xem tất cả game đang có trên TFG.</p>
-            <Link href="/discover">Xem tất cả game</Link>
-          </section>
-        ) : (
-          <div className="grid">
-            {data.games.map((game) => (
-              <GameCard key={game.slug} game={game} />
-            ))}
+      {data && (
+        <section className="catalog-results" aria-label="Kết quả khám phá">
+          <div className="catalog-results__heading">
+            <div>
+              <h2>{query ? `Kết quả cho “${query}”` : "Game mới nhất"}</h2>
+              <p>{data.games.length} game trong trang này</p>
+            </div>
+            <span className="badge">Chơi trên trình duyệt</span>
           </div>
-        ))}
+          {data.games.length === 0 ? (
+            <EmptyState title="Chưa có game phù hợp." description="Thử một từ khóa khác, hoặc xem tất cả game đang có trên TFG.">
+              <Link href="/discover">Xem tất cả game</Link>
+            </EmptyState>
+          ) : (
+            <div className="grid catalog-grid">
+              {data.games.map((game) => <GameCard key={game.slug} game={game} />)}
+            </div>
+          )}
+        </section>
+      )}
       {data?.nextCursor && (
-        <Link className="button button-ghost" href={`/discover?${next}`}>
-          Trang tiếp theo
-        </Link>
+        <nav className="catalog-pagination" aria-label="Phân trang game">
+          <Link className="button button-ghost" href={`/discover?${next}`}>Trang tiếp theo</Link>
+        </nav>
       )}
     </main>
   );

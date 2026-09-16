@@ -1,3 +1,5 @@
+import Link from "next/link";
+import { GameCover } from "../../../components/game-cover";
 import { notFound } from "next/navigation";
 import type { DiscoverGamesResponse, PublicGameSummary } from "@indieforge/contracts";
 import { api, ApiError, resolvePublicApiBaseUrl } from "../../../lib/api-client";
@@ -44,10 +46,25 @@ export default async function GamePage({
         )}
         <RelatedGames games={related?.games ?? []} currentSlug={game.slug} />
       </div>
-      <article className="game-page__details">
-        <h2>Về game này</h2>
-        <p>Bởi {game.developer.displayName}</p>
-        <p className="description">{game.description}</p>
+      <article className="game-page__details game-details">
+        <div className="game-details__about">
+          <div className="game-details__cover"><GameCover game={game} /></div>
+          <div>
+            <p className="eyebrow">Được tạo bởi cộng đồng TFG</p>
+            <h2>Về game này</h2>
+            <p className="game-card__developer">Bởi {game.developer.displayName}</p>
+            <p className="description">{game.description || "Nhà sáng tạo chưa thêm mô tả cho game này."}</p>
+            <Link href="/discover">Khám phá thêm game</Link>
+          </div>
+        </div>
+        <aside className="game-details__info" aria-labelledby="game-info-title">
+          <h2 id="game-info-title">Thông tin game</h2>
+          <dl>
+            <div><dt>Nền tảng</dt><dd>Trình duyệt</dd></div>
+            <div><dt>Ngày tạo</dt><dd><time dateTime={game.createdAt}>{new Intl.DateTimeFormat("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "UTC" }).format(new Date(game.createdAt))}</time></dd></div>
+            <div><dt>Bản chơi</dt><dd>{game.artifactReady && game.artifactVersion > 0 ? `Bản dựng #${game.artifactVersion}` : "Chưa sẵn sàng"}</dd></div>
+          </dl>
+        </aside>
       </article>
     </main>
   );

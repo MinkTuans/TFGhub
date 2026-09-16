@@ -290,6 +290,20 @@ await testingModule.get(ArtifactStorage).install("seed-game", 1, [{
   content: '<!doctype html><html lang="vi"><meta charset="utf-8"><title>Tiny Quest</title><style>html,body{margin:0;width:100%;height:100%;overflow:hidden}body{display:grid;place-items:center;background:#101527;color:#eef2ff;font-family:sans-serif}h1{font-size:clamp(1rem,5vw,3rem)}</style><h1>Tiny Quest</h1></html>',
 }]);
 const app = testingModule.createNestApplication();
+// Test-only fault injection; never registered by the production API entry point.
+let apiFault = "off";
+app.use((request, response, next) => {
+  if ((apiFault === "session" && request.path === "/auth/me") ||
+      (apiFault === "game" && request.path === "/games/by-slug/tiny-quest")) {
+    response.status(503).json({ message: "test-only upstream failure" });
+    return;
+  }
+  if (apiFault === "discover-delay" && request.path === "/discover") {
+    setTimeout(next, 2000);
+    return;
+  }
+  next();
+});
 configureApp(app);
 await app.listen(3101, "localhost");
 
@@ -308,6 +322,17 @@ function forward(request, onResponse) {
 }
 
 const gateway = createServer((request, response) => {
+  const url = new URL(request.url, "http://localhost:3100");
+  if (request.method === "POST" && url.pathname === "/__test/api-fault") {
+    const fault = url.searchParams.get("mode");
+    if (!["off", "session", "game", "discover-delay"].includes(fault)) {
+      response.writeHead(400).end();
+      return;
+    }
+    apiFault = fault;
+    response.writeHead(204).end();
+    return;
+  }
   const upstream = forward(request, (reply) => {
     // rawHeaders preserves repeated headers, including multiple Set-Cookie.
     response.writeHead(reply.statusCode, reply.rawHeaders);

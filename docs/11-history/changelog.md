@@ -2,6 +2,10 @@
 
 This release-oriented summary records major architecture/product milestones. It is not a deployment ledger; a development commit does not prove production rollout.
 
+## 2026-09-16 — Recoverable routes and catalog remaster (development only)
+
+Added loading skeletons and page/root error recovery using Next's re-fetching retry, verified against controlled API failures in the production browser build. Discover now has explicit responsive columns, contextual result counts and shared empty states; game details show existing public metadata beside the preserved sandbox player. No production API/schema/session changes. Validation and remaining remaster scope: [plan](../superpowers/plans/2026-09-16-ui-remaster.md).
+
 ## 2026-09-16 — UI remaster foundation (development only)
 
 Added warm light-mode colors, wider shared content containers, a structured Home hero and actual catalog empty/error states, role-aware footer links, and mobile navigation with keyboard/history handling. Dark/system theme preferences, routes and API/authentication remain intact. This is the first layer of the broader remaster, not a completed redesign or deployment. Progress and exact verification caveats: [remaster plan](../superpowers/plans/2026-09-16-ui-remaster.md).

@@ -96,3 +96,18 @@ test("keeps the home concept and gives an empty community a real next action", a
   expect(screen.getByRole("heading", { name: "Chưa có game công khai" })).toBeVisible();
   expect(screen.queryByRole("alert")).not.toBeInTheDocument();
 });
+
+test("keeps the search and opaque cursor when moving to the next catalog page", async () => {
+  getGames.mockResolvedValue({ games: [{
+    slug: "tiny-quest", title: "Tiny Quest", description: "Demo", developer: { displayName: "Minh" },
+    artifactVersion: 1, artifactReady: true, coverVersion: 0, coverContentType: null,
+    viewportWidth: 16, viewportHeight: 9, createdAt: "2026-09-07T07:00:00Z",
+  }], nextCursor: "opaque/+ next" });
+  render(await DiscoverPage({ searchParams: Promise.resolve({ query: "tiny & quest", cursor: "previous" }) }));
+  expect(screen.getByText("1 game trong trang này")).toBeVisible();
+  expect(screen.getByText("Kết quả cho “tiny & quest”")).toBeVisible();
+  const next = screen.getByRole("link", { name: "Trang tiếp theo" });
+  const url = new URL(next.getAttribute("href")!, "https://example.test");
+  expect(url.searchParams.get("query")).toBe("tiny & quest");
+  expect(url.searchParams.get("cursor")).toBe("opaque/+ next");
+});

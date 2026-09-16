@@ -163,3 +163,14 @@ test("propagates primary game failures", async () => {
   vi.mocked(api.get).mockRejectedValue(new ApiError(503, "game unavailable"));
   await expect(GamePage({ params: Promise.resolve({ slug: "tiny-quest" }) })).rejects.toThrow("game unavailable");
 });
+
+test("adds product information from the public summary without inventing release history", async () => {
+  vi.mocked(api.get).mockImplementation(async (path) => path.startsWith("/discover") ? { games: [], nextCursor: null } : game);
+  render(await GamePage({ params: Promise.resolve({ slug: game.slug }) }));
+  expect(screen.getByRole("heading", { name: "Thông tin game" })).toBeVisible();
+  expect(screen.getByText("Trình duyệt")).toBeVisible();
+  expect(screen.getByText("Bản dựng #1")).toBeVisible();
+  expect(screen.getByText("07/09/2026")).toHaveAttribute("dateTime", game.createdAt);
+  expect(screen.getByTitle("Chơi Tiny Quest")).toHaveAttribute("sandbox", "allow-scripts allow-pointer-lock");
+  expect(screen.queryByText("Lịch sử phát hành")).not.toBeInTheDocument();
+});
