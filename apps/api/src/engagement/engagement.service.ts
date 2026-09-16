@@ -14,6 +14,7 @@ import type {
   EngagementComments,
   EngagementStats,
   GameAnalytics,
+  GameScoreResult,
   PlaySession,
 } from '@indieforge/contracts';
 import type { AuthenticatedUser } from '../auth/auth.service.js';
@@ -352,12 +353,23 @@ export class EngagementService {
         await tx.gamePlayRequest.create({
           data: { gameId: game.id, participantKey, requestId, playId: play.id },
         });
+      const personalBest = game.scoresEnabled
+        ? await this.personalBest(tx, game.id, participantKey)
+        : null;
       return {
         playId: play.id,
         token: digest(`play:${play.id}`),
         scoresEnabled: game.scoresEnabled,
+        personalBest,
       };
     });
+  }
+  private async personalBest(tx: Tx, gameId: string, participantKey: string) {
+    const best = await tx.gameScore.aggregate({
+      where: { play: { gameId, participantKey } },
+      _max: { score: true },
+    });
+    return best._max.score;
   }
   private async session(tx: Tx, slug: string, playId: string, token: string) {
     const game = await this.lockedGame(tx, slug);
@@ -417,7 +429,7 @@ export class EngagementService {
     slug: string,
     playId: string,
     input: { token: string; score: number },
-  ) {
+  ): Promise<GameScoreResult> {
     return this.db.$transaction(async (tx) => {
       const { game, play } = await this.session(tx, slug, playId, input.token);
       if (!game.scoresEnabled)
@@ -435,7 +447,12 @@ export class EngagementService {
         where: { play: { gameId: game.id } },
         _max: { score: true },
       });
-      return { highScore: best._max.score! };
+      const personalBest = await this.personalBest(
+        tx,
+        game.id,
+        play.participantKey,
+      );
+      return { highScore: best._max.score!, personalBest };
     });
   }
 }

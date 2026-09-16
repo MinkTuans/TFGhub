@@ -28,6 +28,11 @@ export type PlaySession = {
   playId: string;
   token: string;
   scoresEnabled: boolean;
+  personalBest: number | null;
+};
+export type GameScoreResult = {
+  highScore: number;
+  personalBest: number | null;
 };
 export type EngagementViewer = { rating: number | null };
 export const gameRatingInputSchema = z

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type CSSProperties } from "react";
-import type { PlaySession } from "@indieforge/contracts";
+import type { GameScoreResult, PlaySession } from "@indieforge/contracts";
 import { resolveApiBaseUrl } from "../lib/api-client";
 import { ActivePlayClock, createPlayRequestId, readGameScore } from "../lib/play-telemetry";
 
@@ -17,6 +17,10 @@ async function telemetry<T>(path: string, body: unknown, method = "POST", keepal
   });
   if (!response.ok) throw new Error("Activity unavailable");
   return response.json() as Promise<T>;
+}
+
+function postScoreState(frame: Window | null, current: PlaySession | null) {
+  if (frame && current) frame.postMessage({ type: "tfg:score-state", personalBest: current.personalBest }, "*");
 }
 
 function PlayerSession({
@@ -37,15 +41,22 @@ function PlayerSession({
   const bestScore = useRef<number | null>(null);
   const submittedScore = useRef<number | null>(null);
   const scoreBusy = useRef(false);
+  const flushScore = useRef<(keepalive?: boolean) => void>(() => {});
   const path = slug ? `/engagement/games/${encodeURIComponent(slug)}/plays` : "";
 
   async function frameLoaded() {
-    if (!slug || started.current) return;
+    if (!slug) return;
+    if (started.current) {
+      postScoreState(frameRef.current?.contentWindow ?? null, session.current);
+      return;
+    }
     started.current = true;
     try {
       const value = await telemetry<PlaySession>(path, { requestId: createPlayRequestId() });
       if (!mounted.current) return;
       session.current = value;
+      postScoreState(frameRef.current?.contentWindow ?? null, value);
+      flushScore.current();
       window.dispatchEvent(new CustomEvent("tfg:engagement-change", { detail: { slug } }));
       if (document.visibilityState === "visible" && document.hasFocus()) clock.current.resume(performance.now());
     } catch { /* Activity recording must never prevent playing. */ }
@@ -67,25 +78,52 @@ function PlayerSession({
       if (visible()) clock.current.resume(performance.now());
       else record(clock.current.pause(performance.now()), true);
     };
-    const hide = () => record(clock.current.pause(performance.now()), true);
+    const saveScore = (keepalive = false) => {
+      const current = session.current, score = bestScore.current;
+      if (!current?.scoresEnabled || score === null || (scoreBusy.current && !keepalive) ||
+        (submittedScore.current !== null && score <= submittedScore.current)) return;
+      if (!keepalive) scoreBusy.current = true;
+      let accepted = false;
+      void telemetry<GameScoreResult>(`${path}/${encodeURIComponent(current.playId)}/score`, {
+        token: current.token, score,
+      }, "POST", keepalive).then(result => {
+        accepted = true;
+        submittedScore.current = Math.max(submittedScore.current ?? 0, score);
+        // Unload saves can finish before older requests. Never regress their acknowledgement.
+        if (result.personalBest !== null) current.personalBest = Math.max(current.personalBest ?? 0, result.personalBest);
+        if (mounted.current) {
+          postScoreState(frameRef.current?.contentWindow ?? null, current);
+          window.dispatchEvent(new CustomEvent("tfg:engagement-change", { detail: { slug } }));
+        }
+      }).catch(() => {}).finally(() => {
+        if (!keepalive) {
+          scoreBusy.current = false;
+          if (accepted && mounted.current) saveScore();
+        }
+      });
+    };
+    flushScore.current = saveScore;
+    const hide = () => {
+      record(clock.current.pause(performance.now()), true);
+      saveScore(true);
+    };
     const message = (event: MessageEvent) => {
-      const score = readGameScore(event, frameRef.current?.contentWindow ?? null);
-      if (score !== null) bestScore.current = Math.max(bestScore.current ?? 0, score);
+      const frame = frameRef.current?.contentWindow ?? null;
+      if (frame && event.source === frame && event.data?.type === "tfg:score-ready") {
+        postScoreState(frame, session.current);
+      }
+      const score = readGameScore(event, frame);
+      if (score !== null) {
+        bestScore.current = Math.max(bestScore.current ?? 0, score);
+        saveScore();
+      }
     };
     const heartbeat = window.setInterval(() => {
       activity();
       if (visible()) record(clock.current.take(performance.now()));
     }, 15000);
-    // Coalesce game messages; the API retains only the highest score per play.
-    const scores = window.setInterval(() => {
-      const current = session.current, score = bestScore.current;
-      if (!current?.scoresEnabled || score === null || scoreBusy.current ||
-        (submittedScore.current !== null && score <= submittedScore.current)) return;
-      scoreBusy.current = true;
-      void telemetry(`${path}/${encodeURIComponent(current.playId)}/score`, { token: current.token, score })
-        .then(() => { submittedScore.current = score; if (mounted.current) window.dispatchEvent(new CustomEvent("tfg:engagement-change", { detail: { slug } })); }).catch(() => {})
-        .finally(() => { scoreBusy.current = false; });
-    }, 1000);
+    // Retry failures without a tight loop; successful writes drain the coalesced best immediately.
+    const scores = window.setInterval(() => saveScore(), 1000);
     document.addEventListener("visibilitychange", activity);
     window.addEventListener("focus", activity);
     window.addEventListener("blur", activity);
@@ -93,6 +131,7 @@ function PlayerSession({
     window.addEventListener("message", message);
     return () => {
       mounted.current = false; hide();
+      flushScore.current = () => {};
       window.clearInterval(heartbeat); window.clearInterval(scores);
       document.removeEventListener("visibilitychange", activity);
       window.removeEventListener("focus", activity); window.removeEventListener("blur", activity);

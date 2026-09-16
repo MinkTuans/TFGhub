@@ -1,5 +1,5 @@
-import { createHash } from 'node:crypto';
-import { describe, it, expect, vi } from 'vitest';
+import { createHash, createHmac } from 'node:crypto';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 import * as implementation from './engagement.service.js';
 const game = {
   id: 'g',
@@ -66,6 +66,7 @@ describe('play capability updates', () => {
       id: 'p',
       gameId: 'g',
       userId: null,
+      participantKey: 'participant',
       tokenHash: createHash('sha256').update('token').digest('hex'),
       expiresAt: new Date(Date.now() + 60000),
       sequence: 2,
@@ -80,13 +81,11 @@ describe('play capability updates', () => {
       },
       gamePlay: {
         findUnique: vi.fn().mockResolvedValue(play),
-        update: vi
-          .fn()
-          .mockImplementation(({ data }) =>
-            Promise.resolve({
-              activeSeconds: play.activeSeconds + data.activeSeconds.increment,
-            }),
-          ),
+        update: vi.fn().mockImplementation(({ data }) =>
+          Promise.resolve({
+            activeSeconds: play.activeSeconds + data.activeSeconds.increment,
+          }),
+        ),
       },
       gameScore: {
         findUnique: vi.fn().mockResolvedValue({ score: 99 }),
@@ -145,11 +144,128 @@ describe('play capability updates', () => {
       service.score('game', 'p', { token: 'token', score: 1 }),
     ).rejects.toThrow('Scores are disabled');
   });
+  it('returns the participant record separately from the global record', async () => {
+    const { service, tx } = setup({}, { scoresEnabled: true });
+    tx.gameScore.aggregate.mockImplementation(async ({ where }) => ({
+      _max: { score: where.play.participantKey === 'participant' ? 120 : 999 },
+    }));
+    await expect(
+      service.score('game', 'p', { token: 'token', score: 1 }),
+    ).resolves.toEqual({ highScore: 999, personalBest: 120 });
+    expect(tx.gameScore.aggregate).toHaveBeenCalledWith({
+      where: { play: { gameId: 'g', participantKey: 'participant' } },
+      _max: { score: true },
+    });
+  });
   it('retains maximum score for a play', async () => {
     const { service, tx } = setup({}, { scoresEnabled: true });
     await expect(
       service.score('game', 'p', { token: 'token', score: 1 }),
-    ).resolves.toEqual({ highScore: 99 });
+    ).resolves.toEqual({ highScore: 99, personalBest: 99 });
     expect(tx.gameScore.upsert.mock.calls[0][0].update.score).toBe(99);
+  });
+});
+
+describe('persisted personal best', () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  function setup(scoresEnabled = true) {
+    vi.stubEnv('JWT_SECRET', 'score-persistence-test-secret');
+    const tx = {
+      $queryRaw: vi.fn(),
+      game: {
+        findUnique: vi
+          .fn()
+          .mockImplementation(({ where }) =>
+            Promise.resolve({ ...game, id: where.slug, scoresEnabled }),
+          ),
+      },
+      gamePlayRequest: {
+        findUnique: vi.fn().mockResolvedValue(null),
+        create: vi.fn().mockResolvedValue({}),
+      },
+      gamePlay: {
+        findFirst: vi.fn().mockResolvedValue(null),
+        create: vi.fn().mockImplementation(({ data }) => Promise.resolve(data)),
+      },
+      gameScore: {
+        aggregate: vi.fn().mockResolvedValue({ _max: { score: 41 } }),
+      },
+    };
+    return {
+      tx,
+      service: new implementation.EngagementService({
+        $transaction: (fn: (v: unknown) => unknown) => fn(tx),
+      } as never),
+    };
+  }
+
+  it.each([
+    { gameId: 'snake', userId: 'alice', guest: 'browser-a' },
+    { gameId: 'snake', userId: 'bob', guest: 'browser-a' },
+    { gameId: 'other', userId: 'alice', guest: 'browser-a' },
+    { gameId: 'snake', userId: undefined, guest: 'browser-a' },
+    { gameId: 'snake', userId: undefined, guest: 'browser-b' },
+  ])(
+    'scopes restored records to $gameId / $userId / $guest',
+    async ({ gameId, userId, guest }) => {
+      const { service, tx } = setup();
+      const result = await service.start(
+        gameId,
+        userId ? ({ id: userId } as never) : undefined,
+        guest,
+        'request',
+      );
+      expect(result).toMatchObject({ personalBest: 41, scoresEnabled: true });
+      expect(tx.gameScore.aggregate).toHaveBeenCalledWith({
+        where: {
+          play: {
+            gameId,
+            participantKey: createHmac(
+              'sha256',
+              'score-persistence-test-secret',
+            )
+              .update(
+                `engagement:${userId ? `user:${userId}` : `guest:${guest}`}`,
+              )
+              .digest('base64url'),
+          },
+        },
+        _max: { score: true },
+      });
+    },
+  );
+
+  it.each([null, 0])(
+    'preserves an absent or zero record (%s)',
+    async (score) => {
+      const { service, tx } = setup();
+      tx.gameScore.aggregate.mockResolvedValue({ _max: { score } } as never);
+      await expect(
+        service.start('snake', undefined, 'guest', 'request'),
+      ).resolves.toMatchObject({ personalBest: score });
+    },
+  );
+
+  it('does not expose saved scores while scoring is disabled', async () => {
+    const { service, tx } = setup(false);
+    await expect(
+      service.start('snake', undefined, 'guest', 'request'),
+    ).resolves.toMatchObject({ personalBest: null, scoresEnabled: false });
+    expect(tx.gameScore.aggregate).not.toHaveBeenCalled();
+  });
+
+  it('refreshes the personal record when an existing launch is retried', async () => {
+    const { service, tx } = setup();
+    tx.gamePlayRequest.findUnique.mockResolvedValue({
+      play: { id: 'existing', expiresAt: new Date(Date.now() + 60000) },
+    } as never);
+    tx.gameScore.aggregate.mockResolvedValueOnce({ _max: { score: 8 } });
+    await expect(
+      service.start('snake', undefined, 'guest', 'same-request'),
+    ).resolves.toMatchObject({ playId: 'existing', personalBest: 8 });
+    await expect(
+      service.start('snake', undefined, 'guest', 'same-request'),
+    ).resolves.toMatchObject({ playId: 'existing', personalBest: 41 });
   });
 });

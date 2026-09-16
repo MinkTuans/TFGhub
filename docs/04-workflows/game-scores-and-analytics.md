@@ -22,6 +22,26 @@ The wildcard supports deployment under different parent origins; this message co
 
 `score` must be an integer from 0 to 2,147,483,647. The platform retains the highest score per play and shows the game's maximum only while score collection is enabled. Messages are coalesced. Sessions expire after six hours; unavailable/quarantined games and disabled accounts cannot continue submitting activity.
 
+## Restore a personal record after reload
+
+Play-session responses include `personalBest: number | null`, scoped to the current game and signed-in account or anonymous browser cookie. Score acknowledgements return `{ highScore, personalBest }`; the global maximum is separate from the personal record. No stored record or disabled scoring yields `null`. Accounts can recover their record on another device after signing in; guests lose their association if they clear cookies or switch browsers. Guest records are not automatically merged into an account.
+
+Games must use the platform bridge rather than iframe `localStorage`, which is unavailable under the sandbox:
+
+```js
+window.addEventListener('message', (event) => {
+  if (event.source !== window.parent || event.data?.type !== 'tfg:score-state') return;
+  const best = event.data.personalBest;
+  if (Number.isInteger(best) && best >= 0 && best <= 2147483647) {
+    // Update the game's personal-record display, without resetting the current run.
+    showPersonalBest(best);
+  }
+});
+window.parent.postMessage({ type: 'tfg:score-ready' }, '*');
+```
+
+The parent sends state after starting a play, on this readiness message and after accepting a score. The iframe receives no session token. Report each new record promptly with `tfg:score`; the parent saves immediately, coalesces in-flight improvements, retries failed saves and attempts a keepalive flush on page exit. Persistence is guaranteed only after the server accepts the write; offline play or abrupt process termination can still lose an unsent update. A new run starts at zero; this protocol restores the record, not the board or current run.
+
 Scores are client/game reported, not verified against cheating. They must not be treated as trusted evidence for payments or prizes. No ranked leaderboard is included in this release. Games without scoring should leave the setting disabled; they show no invented score.
 
 ## Ratings and comments
