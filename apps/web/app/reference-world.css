@@ -117,11 +117,17 @@ footer { background: linear-gradient(180deg, #0b1b37db, #070f24); border-top: 1p
   .home-hero__lede { max-width: 23rem; font-size: .95rem; }
   .home-community { padding: 1.1rem; margin-inline: 0; }
   .home-community .catalog-grid { grid-template-columns: 1fr; }
+  .discover-page .search-form { flex-direction: row; gap: .5rem; }
+  .discover-page .search-form label { min-width: 0; }
+  .discover-page .search-form button { flex-shrink: 0; padding-inline: .75rem; white-space: nowrap; }
   .discover-page .catalog-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .7rem; }
+  .discover-page .game-card__action { position: static; display: block; margin-top: .5rem; padding: .5rem .25rem; font-size: .75rem; text-align: center; white-space: nowrap; opacity: 1; transform: none; }
+  .discover-page .game-cover__fallback { padding: .6rem; }
+  .discover-page .game-cover__fallback strong { font-size: 2rem; line-height: 1; }
   .discover-page .game-card__body { padding: .65rem .15rem; }
-  .discover-page .game-card__title { font-size: .95rem; }
+  .discover-page .game-card__title { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; font-size: .95rem; }
   .discover-page .game-card__developer { font-size: .7rem; }
-  .game-card__description { display: none; }
+  .discover-page .game-card .description { display: none; }
   .home-hero__notes { flex-direction: column; gap: 0; }
   .auth-layout { display: flex; flex-direction: column; gap: 2rem; min-height: 720px; padding-block: 1rem 6rem; }
   .auth-story { display: none; }
