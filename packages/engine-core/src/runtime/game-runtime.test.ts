@@ -260,3 +260,32 @@ it("diagnoses unsupported physical transforms and dialogue triggers explicitly",
   expect(r.state.diagnostics.join(" ")).toContain("transformed");
   expect(r.state.diagnostics.join(" ")).toContain("ON_DIALOGUE_END");
 });
+it("uses a diameter bounding rectangle for valid circle colliders", () => {
+  const f = fixture();
+  const collider = f.item.components.find((c) => c.type === "Collider")!;
+  collider.properties = {
+    shape: "CIRCLE",
+    radius: 8,
+    offsetX: 0,
+    offsetY: 0,
+    isTrigger: true,
+    collisionLayerId: null,
+  };
+  const playerCollider = f.player.components.find(
+    (c) => c.type === "Collider",
+  )!;
+  playerCollider.properties = {
+    shape: "CIRCLE",
+    radius: 8,
+    offsetX: 0,
+    offsetY: 0,
+    isTrigger: false,
+    collisionLayerId: null,
+  };
+  const r = createGameRuntime(f.project);
+  for (let i = 0; i < 90; i++) r.tick(1 / 60, { right: true });
+  expect(r.state.score).toBe(10);
+  expect(
+    r.properties(r.scene().objects[0], "Transform")!.x,
+  ).toBeLessThanOrEqual(64);
+});

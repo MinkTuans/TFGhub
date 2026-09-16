@@ -389,8 +389,9 @@ export function createGameRuntime(snapshot: EngineProjectV2) {
     return {
       x: t.x + (c.offsetX ?? 0),
       y: t.y + (c.offsetY ?? 0),
-      width: c.width,
-      height: c.height,
+      // Collider offsets identify its top-left, as in the canonical render model.
+      width: c.shape === "CIRCLE" ? c.radius * 2 : c.width,
+      height: c.shape === "CIRCLE" ? c.radius * 2 : c.height,
     };
   }
   function overlap(a: GameObjectV2, b: GameObjectV2) {
