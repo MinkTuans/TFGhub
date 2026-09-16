@@ -289,3 +289,86 @@ it("uses a diameter bounding rectangle for valid circle colliders", () => {
     r.properties(r.scene().objects[0], "Transform")!.x,
   ).toBeLessThanOrEqual(64);
 });
+it("freezes external events and script commands while paused or finished and allows restart", () => {
+  const f = fixture();
+  f.project.events.push(
+    f.event({ type: "ON_KEY_PRESS", key: "x", repeat: false }, [
+      { type: "ADD_SCORE", amount: 1 },
+    ]),
+  );
+  const variable = {
+    id: id(),
+    name: "value",
+    type: "NUMBER" as const,
+    initialValue: 0,
+  };
+  f.project.variables.global.push(variable);
+  const script = {
+    id: id(),
+    version: 1 as const,
+    name: "script",
+    language: "JAVASCRIPT" as const,
+    source: "",
+    capabilities: ["SET_VARIABLE"] as any[],
+    attachments: [],
+  };
+  f.project.scripts.push(script);
+  const r = createGameRuntime(f.project);
+  r.setPaused(true);
+  r.emit("ON_KEY_PRESS", { key: "x" });
+  r.tick(1 / 60, { right: true });
+  expect(r.state.score).toBe(0);
+  expect(r.properties(r.scene().objects[0], "Transform")!.x).toBe(20);
+  expect(
+    r.command(script.id, {
+      type: "SET_VARIABLE",
+      variableId: variable.id,
+      value: 1,
+    }),
+  ).toBe(false);
+  r.setPaused(false);
+  r.emit("ON_KEY_PRESS", { key: "x" });
+  expect(r.state.score).toBe(1);
+  r.state.status = "won";
+  r.emit("ON_KEY_PRESS", { key: "x" });
+  expect(r.state.score).toBe(1);
+  expect(
+    r.command(script.id, {
+      type: "SET_VARIABLE",
+      variableId: variable.id,
+      value: 2,
+    }),
+  ).toBe(false);
+  r.state.status = "lost";
+  r.emit("ON_KEY_PRESS", { key: "x" });
+  expect(r.state.score).toBe(1);
+  r.restart();
+  r.emit("ON_KEY_PRESS", { key: "x" });
+  expect(r.state.score).toBe(1);
+});
+it("diagnoses configured audio and direct interactable event routing", () => {
+  const f = fixture();
+  f.player.components.push(
+    {
+      id: id(),
+      version: 1,
+      type: "AudioSource",
+      properties: {
+        ...(v2ComponentRegistry.AudioSource.defaults() as object),
+        autoplay: true,
+      },
+    },
+    {
+      id: id(),
+      version: 1,
+      type: "Interactable",
+      properties: {
+        ...(v2ComponentRegistry.Interactable.defaults() as object),
+        eventId: f.project.events[0].id,
+      },
+    },
+  );
+  const r = createGameRuntime(f.project);
+  expect(r.state.diagnostics.join(" ")).toContain("AudioSource");
+  expect(r.state.diagnostics.join(" ")).toContain("Interactable.eventId");
+});

@@ -155,6 +155,7 @@ function browserPlayer(
     keys.clear();
     touch.clear();
     paused = false;
+    document.getElementById("pause")!.textContent = "Tạm dừng";
     accumulator = 0;
     dialogue.hidden = true;
     workerRuns = 0;
@@ -163,6 +164,7 @@ function browserPlayer(
   document.getElementById("restart")!.addEventListener("click", reset);
   document.getElementById("pause")!.addEventListener("click", () => {
     paused = !paused;
+    runtime.setPaused(paused);
     keys.clear();
     touch.clear();
     document.getElementById("pause")!.textContent = paused
@@ -192,12 +194,16 @@ function browserPlayer(
   }
   addEventListener("keydown", (e) => {
     const key = e.key.toLowerCase();
+    if (key === "r" && !e.repeat) {
+      reset();
+      return;
+    }
+    if (paused || runtime.state.status !== "playing") return;
     if (["arrowup", "arrowdown", "arrowleft", "arrowright", " "].includes(key))
       e.preventDefault();
     keys.add(key);
     runtime.emit("ON_KEY_PRESS", { key: e.key, repeat: e.repeat });
     if (key === "e" || key === " ") interact();
-    if (key === "r" && !e.repeat) reset();
   });
   addEventListener("keyup", (e) => keys.delete(e.key.toLowerCase()));
   addEventListener("blur", () => {

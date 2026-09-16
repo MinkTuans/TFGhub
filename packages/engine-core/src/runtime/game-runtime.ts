@@ -16,6 +16,7 @@ export type RuntimeEffect = { type: string; [key: string]: unknown };
 export function createGameRuntime(snapshot: EngineProjectV2) {
   const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value));
   let project = clone(snapshot);
+  let paused = false;
   const state = {
     sceneId: project.entrySceneId,
     score: 0,
@@ -405,7 +406,7 @@ export function createGameRuntime(snapshot: EngineProjectV2) {
     );
   }
   function tick(delta: number, input: RuntimeInput = {}) {
-    if (state.status !== "playing") return;
+    if (paused || state.status !== "playing") return;
     budget = 2000;
     const dt = Math.max(0, Math.min(Number.isFinite(delta) ? delta : 0, 0.05));
     state.time += dt * 1000;
@@ -536,6 +537,14 @@ export function createGameRuntime(snapshot: EngineProjectV2) {
           )
         )
           diagnostic(`Unsupported component: ${c.type}`);
+        if (c.type === "AudioSource")
+          diagnostic(
+            "AudioSource autoplay/loop/volume unsupported; use PLAY_AUDIO or api.playAudio",
+          );
+        if (c.type === "Interactable" && (c.properties as any).eventId)
+          diagnostic(
+            "Interactable.eventId routing unsupported; use an ON_INTERACT event",
+          );
         if (c.type === "Movement" && (c.properties as any).controls === "AI")
           diagnostic("AI movement unsupported");
         if (
@@ -561,6 +570,7 @@ export function createGameRuntime(snapshot: EngineProjectV2) {
         effect({ type: "RUN_SCRIPT", scriptId: s.id });
   }
   function restart() {
+    paused = false;
     project = clone(snapshot);
     state.sceneId = project.entrySceneId;
     state.score = 0;
@@ -584,6 +594,7 @@ export function createGameRuntime(snapshot: EngineProjectV2) {
     start();
   }
   function command(scriptId: string, raw: unknown) {
+    if (paused || state.status !== "playing") return false;
     budget = 2000;
     const s = project.scripts.find((s) => s.id === scriptId);
     if (!raw || typeof raw !== "object") return false;
@@ -622,10 +633,14 @@ export function createGameRuntime(snapshot: EngineProjectV2) {
     properties,
     tick,
     restart,
+    setPaused: (value: boolean) => {
+      paused = value;
+    },
     command,
     diagnostic,
     condition,
     emit: (type: string, data: Record<string, any> = {}) => {
+      if (paused || state.status !== "playing") return;
       budget = 2000;
       emit(type, data);
     },
