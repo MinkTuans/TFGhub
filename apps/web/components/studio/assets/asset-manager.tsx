@@ -484,24 +484,25 @@ export function AssetManager({
     [available, onAssetsChange],
   );
 
-  function changed(asset: GameAsset | null, removedId?: string) {
-    if (removedId) {
-      setAssets((current) => current.filter((item) => item.id !== removedId));
-      const key = referenceKey(removedId);
-      const operation = referenceInflight.current.get(key);
-      if (operation) cancelReferenceRequest(key, operation);
-      referenceCache.current.delete(key);
-      setReferenceVersion((version) => version + 1);
-    } else if (asset) {
-      const replace = (items: GameAsset[]) =>
-        items.map((item) => (item.id === asset.id ? asset : item));
-      setAssets(replace);
-      const key = referenceKey(asset.id);
-      if (referenceCache.current.has(key)) {
-        referenceCache.current.set(key, { status: "RESOLVED", asset });
-        setReferenceVersion((version) => version + 1);
-      }
-    }
+  function removeFromList(assetId: string) {
+    setAssets((current) => current.filter((item) => item.id !== assetId));
+  }
+
+  function resolveReference(asset: GameAsset) {
+    const key = referenceKey(asset.id);
+    const operation = referenceInflight.current.get(key);
+    if (operation) cancelReferenceRequest(key, operation);
+    referenceCache.current.set(key, { status: "RESOLVED", asset });
+    setReferenceVersion((version) => version + 1);
+  }
+
+  function evictAsset(assetId: string) {
+    removeFromList(assetId);
+    const key = referenceKey(assetId);
+    const operation = referenceInflight.current.get(key);
+    if (operation) cancelReferenceRequest(key, operation);
+    referenceCache.current.delete(key);
+    setReferenceVersion((version) => version + 1);
   }
 
   function retryReference(assetId: string) {
@@ -531,8 +532,13 @@ export function AssetManager({
       displayName,
     });
     request.current += 1;
-    if (matchesCurrentQuery(updated)) changed(updated);
-    else changed(null, updated.id);
+    if (matchesCurrentQuery(updated))
+      setAssets((current) =>
+        current.map((item) => (item.id === updated.id ? updated : item)),
+      );
+    else removeFromList(updated.id);
+    if (referenceContext.current.declared.has(updated.id))
+      resolveReference(updated);
     await latestLoad.current();
   }
 
@@ -550,7 +556,7 @@ export function AssetManager({
     if (!declared)
       return client.tombstone(state.identity.gameId, asset.id).then(async () => {
         request.current += 1;
-        changed(null, asset.id);
+        evictAsset(asset.id);
         await latestLoad.current();
       });
     if (deletion.current)

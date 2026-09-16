@@ -775,6 +775,76 @@ test("a delayed PATCH cannot replace a newer completed search with its captured 
   expect(queries.at(-1)?.search).toBe("Hero");
 });
 
+test("a filtered rename cannot evict metadata for a still-declared semantic reference", async () => {
+  const { AssetManager } = await assetModule();
+  const hero = asset(909, { displayName: "Referenced hero" });
+  const client = clientFor(() => [hero]);
+  client.get = vi.fn(async () => structuredClone(hero));
+  let finishPatch!: () => void;
+  client.update = vi.fn(
+    (_gameId, _assetId, changes) =>
+      new Promise<GameAssetSummary>((resolve) => {
+        finishPatch = () => {
+          hero.displayName = changes.displayName!;
+          resolve(structuredClone(hero));
+        };
+      }),
+  );
+  function Workspace() {
+    const [metadata, setMetadata] = useState<GameAssetSummary[]>([]);
+    return (
+      <>
+        <output aria-label="Referenced metadata">
+          {metadata.map((item) => item.displayName).join(",")}
+        </output>
+        <AssetManager client={client} onAssetsChange={setMetadata} />
+      </>
+    );
+  }
+  render(
+    <Wrapper document={withPlacedItem(hero)}>
+      <Workspace />
+    </Wrapper>,
+  );
+  const manager = await screen.findByRole("region", { name: "Tài nguyên" });
+  const card = await within(manager).findByRole("group", {
+    name: "Asset Referenced hero",
+  });
+  fireEvent.click(within(card).getByRole("button", { name: "Đổi tên" }));
+  fireEvent.change(within(card).getByRole("textbox", { name: "Tên asset" }), {
+    target: { value: "Referenced villain" },
+  });
+  fireEvent.click(within(card).getByRole("button", { name: "Lưu tên" }));
+  await waitFor(() => expect(client.update).toHaveBeenCalledTimes(1));
+
+  fireEvent.change(within(manager).getByRole("searchbox", { name: "Tìm asset" }), {
+    target: { value: "Unrelated" },
+  });
+  await waitFor(() =>
+    expect(
+      within(manager).queryByRole("group", { name: "Asset Referenced hero" }),
+    ).not.toBeInTheDocument(),
+  );
+  await waitFor(() => expect(client.get).toHaveBeenCalledTimes(1));
+  expect(screen.getByLabelText("Referenced metadata")).toHaveTextContent(
+    "Referenced hero",
+  );
+
+  await act(async () => finishPatch());
+  await waitFor(() =>
+    expect(screen.getByLabelText("Referenced metadata")).toHaveTextContent(
+      "Referenced villain",
+    ),
+  );
+  expect(within(manager).getByRole("searchbox", { name: "Tìm asset" })).toHaveValue(
+    "Unrelated",
+  );
+  expect(
+    within(manager).queryByRole("group", { name: "Asset Referenced villain" }),
+  ).not.toBeInTheDocument();
+  expect(within(manager).queryByText("Đang tải tham chiếu…")).not.toBeInTheDocument();
+});
+
 test("a delayed DELETE cannot discard the newer filter and loaded-page snapshot", async () => {
   const { AssetManager } = await assetModule();
   const doomed = asset(1100, { displayName: "Delete pending" });
