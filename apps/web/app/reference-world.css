@@ -159,6 +159,11 @@ footer { background: linear-gradient(180deg, #0b1b37db, #070f24); border-top: 1p
   }
 }
 
+@media (max-width: 900px), (pointer: coarse) {
+  /* Short phone screens can scroll the page; do not crush the board and touch controls. */
+  .game-player:not(:fullscreen) { min-height: 32rem; }
+}
+
 /* Daylight surfaces echo the harbor's ivory stone and clear marine colors. */
 [data-theme="light"] .home-hero__copy h1 { text-shadow: none; }
 [data-theme="light"] .home-hero__lede { color: var(--text); }

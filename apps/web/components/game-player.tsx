@@ -191,9 +191,13 @@ function PlayerSession({
       <div ref={stageRef} className="game-player__stage">
         <div
           className="game-player__fit"
-          style={{ "--player-ratio": ratio, aspectRatio: String(ratio), ...fit } as CSSProperties}
+          style={{
+            "--player-ratio": ratio,
+            "--player-fit-width": fit ? `${fit.width}px` : undefined,
+            "--player-fit-height": fit ? `${fit.height}px` : undefined,
+          } as CSSProperties}
         >
-          {launched ? <iframe ref={frameRef} onLoad={() => { void frameLoaded(); }} title={`Chơi ${title}`} src={src} scrolling="no" sandbox="allow-scripts allow-pointer-lock" /> : (
+          {launched ? <iframe ref={frameRef} onLoad={() => { void frameLoaded(); }} title={`Chơi ${title}`} src={src} sandbox="allow-scripts allow-pointer-lock" /> : (
             <div style={{ display: "grid", placeContent: "center", height: "100%", minHeight: 160, padding: "1rem", textAlign: "center" }}>
               <button type="button" onClick={() => setLaunched(true)}>Bắt đầu chơi</button>
               <p className="hint" style={{ margin: ".75rem 0 0", lineHeight: 1.5 }}>Lượt chơi được ghi nhận khi bạn mở game.</p>

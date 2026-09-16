@@ -110,7 +110,9 @@ Check 1280×720, 1440×900, and 1920×1080 in light and dark themes. The brand i
 `TFG`, and navigation, account forms, Studio, moderation, and player controls
 use Vietnamese. Home presents all four creation methods; Discover shows real
 covers or a deterministic 16:9 fallback. Narrow windows collapse the player
-sidebars below the game; dedicated mobile interaction is outside this release.
+sidebars below the game. On phones (up to 900px wide or coarse-pointer devices),
+the game uses the entire player stage. Short screens retain a 32rem inline
+player and can scroll the page; long game documents must remain scrollable.
 
 The `Giao diện` control cycles `system` → `light` → `dark`. The default follows
 the operating system, including system changes while the page is open. Manual
@@ -119,8 +121,8 @@ If storage is unavailable, the control still works for the current page.
 
 At each desktop size, the entire three-column player must fit below the header:
 two disabled ad slots on the left, the game in the center, and up to six related
-games excluding the current slug on the right. Confirm the iframe has
-`scrolling="no"` and `sandbox="allow-scripts allow-pointer-lock"`. Verify a
+games excluding the current slug on the right. Confirm the iframe allows document scrolling and retains
+`sandbox="allow-scripts allow-pointer-lock"`. Verify a
 non-16:9 viewport as well as the default 16×9: the game retains its declared
 ratio without stretching or cropping. Click `Mở toàn màn hình`, then
 `Thoát toàn màn hình` (and also test Escape); the same iframe and game state

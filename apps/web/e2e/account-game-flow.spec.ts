@@ -196,7 +196,7 @@ for (const theme of ["light", "dark"] as const) {
         expect(box!.x).toBeGreaterThanOrEqual(0);
         expect(box!.x + box!.width).toBeLessThanOrEqual(viewport.width);
         const frame = page.getByTitle("Chơi Tiny Quest", { exact: true });
-        await expect(frame).toHaveAttribute("scrolling", "no");
+        await expect(frame).not.toHaveAttribute("scrolling", "no");
         await expect(frame).toHaveAttribute("sandbox", "allow-scripts allow-pointer-lock");
         await expect(frame.contentFrame().getByRole("heading", { name: "Tiny Quest", exact: true })).toBeVisible();
         const frameBox = await frame.boundingBox();

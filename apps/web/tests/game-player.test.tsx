@@ -46,12 +46,12 @@ function resizeStage(width: number, height: number) {
   act(() => resize([{ target: observed, contentRect: { width, height } } as ResizeObserverEntry], {} as ResizeObserver));
 }
 
-test("keeps the signed redirect source and restricted sandbox with iframe scrolling disabled", () => {
+test("keeps the signed redirect source and restricted sandbox without blocking game document scrolling", () => {
   render(<GamePlayer {...props} />);
   const iframe = screen.getByTitle("Chơi Tiny Quest");
   expect(iframe).toHaveAttribute("src", "/api/play/tiny-quest/");
   expect(iframe).toHaveAttribute("sandbox", "allow-scripts allow-pointer-lock");
-  expect(iframe).toHaveAttribute("scrolling", "no");
+  expect(iframe).not.toHaveAttribute("scrolling", "no");
   expect(screen.getByRole("button", { name: "Mở toàn màn hình" })).toBeVisible();
 });
 
@@ -115,7 +115,9 @@ test.each([
 ])("contains a %sx%s game in a %sx%s available box", (viewportWidth, viewportHeight, width, height, expectedWidth, expectedHeight) => {
   render(<GamePlayer {...props} viewportWidth={viewportWidth} viewportHeight={viewportHeight} />);
   resizeStage(width, height);
-  expect(screen.getByTitle("Chơi Tiny Quest").parentElement).toHaveStyle({ width: `${expectedWidth}px`, height: `${expectedHeight}px` });
+  const style = (screen.getByTitle("Chơi Tiny Quest").parentElement as HTMLElement).style;
+  expect(style.getPropertyValue("--player-fit-width")).toBe(`${expectedWidth}px`);
+  expect(style.getPropertyValue("--player-fit-height")).toBe(`${expectedHeight}px`);
 });
 
 test("refits on fullscreen resize and disconnects measurement on unmount", () => {
@@ -124,8 +126,8 @@ test("refits on fullscreen resize and disconnects measurement on unmount", () =>
   resizeStage(800, 600);
   changeFullscreen(screen.getByRole("region", { name: "Chơi Tiny Quest" }));
   resizeStage(1920, 1000);
-  expect(iframe.parentElement).toHaveStyle({ height: "1000px" });
-  expect(Number.parseFloat(iframe.parentElement!.style.width)).toBeCloseTo(1777.7778);
+  expect(iframe.parentElement!.style.getPropertyValue("--player-fit-height")).toBe("1000px");
+  expect(Number.parseFloat(iframe.parentElement!.style.getPropertyValue("--player-fit-width"))).toBeCloseTo(1777.7778);
   expect(screen.getByTitle("Chơi Tiny Quest")).toBe(iframe);
   unmount();
   expect(disconnect).toHaveBeenCalledOnce();
