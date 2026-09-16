@@ -53,7 +53,8 @@ test("retains creator sections when Home featured games cannot load", async () =
   render(await Home());
 
   expect(screen.getByText("ZIP HTML5")).toBeVisible();
-  expect(screen.queryByRole("heading", { name: "Game nổi bật" })).not.toBeInTheDocument();
+  expect(screen.getByRole("alert")).toHaveTextContent("Không thể tải game lúc này");
+  expect(screen.getByRole("link", { name: "Thử tải lại" })).toHaveAttribute("href", "/");
 });
 
 test("renders Vietnamese Discover search and empty copy", async () => {
@@ -83,4 +84,15 @@ test("renders Vietnamese recovery copy when Discover fails", async () => {
     "href",
     "/discover?query=bad",
   );
+});
+
+
+test("keeps the home concept and gives an empty community a real next action", async () => {
+  getGames.mockResolvedValue({ games: [], nextCursor: null });
+  render(await Home());
+  expect(screen.getByText("A HOME FOR SMALL GAMES")).toBeVisible();
+  expect(screen.getByRole("heading", { level: 1, name: "Every great game starts with a small idea." })).toBeVisible();
+  expect(screen.getByRole("link", { name: "Tạo tài khoản" })).toHaveAttribute("href", "/register");
+  expect(screen.getByRole("heading", { name: "Chưa có game công khai" })).toBeVisible();
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
 });

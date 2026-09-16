@@ -1,0 +1,52 @@
+# TFG UI remaster — audit and implementation plan
+
+Status: in progress. User authorizes implementation and commits in `deploy-ip-preview`; no deployment performed for this task.
+
+## Direction and constraints
+
+The 25-part brief is the specification. The two supplied screenshots are baseline references, not a request to copy the existing navy/purple colors. Use warm off-white and green for light mode, retain functioning dark/system preferences. Preserve TFG branding and Vietnamese UI copy; retain the explicitly requested English Home concept. No schema, API, authentication, permission, publication or editor-state changes. No invented games, metrics, genres, creator profiles or release history. Use existing components and dependencies. User explicitly requests audit followed by implementation, with no renewed approval needed.
+
+## Current architecture and audit
+
+Next.js 16.3.4 App Router / React 19.2.8 in `apps/web`, plain global CSS with Tailwind import, semantic theme/spacing tokens. Next installed layout/error guides read. Server pages call `api.get`; private reads forward HTTP-only cookies through `privateGet`, redirecting 401 to login. Root `optionalSession` determines role-sensitive navigation. Client forms retain existing mutation contracts. ENGINE editor uses separate Studio shell/CSS and canonical revisions.
+
+Routes: `/`, `/discover`, `/games/[slug]`, `/login`, `/register`, `/profile`, `/studio`, `/studio/games/new`, `/studio/games/[id]`, `/moderation`, and not-found. No dedicated public creator, category or release-history route. No root loading/error boundaries yet.
+
+Reusable components: GameCard/GameCover, FeatureIcon/TfgLogo, SiteNavigation/ThemeToggle/LogoutButton, AuthForm/ProfileForm/GameForm, GameWorkspace and source editors, CoverUploader/GamePreview/GamePlayer/RelatedGames, ModerationQueue, ENGINE Studio components. CSS already supplies buttons, forms, badges, panels, skeletons, focus and reduced-motion behavior; avoid a parallel component system.
+
+Data: discovery supports query/cursor/limit, newest catalog entries, covers and developer displayName. It has no genre/platform/status filters or most-played sort, public creator ID/profile link, screenshots or changelog. Owner games expose review/visibility/artifact states and timestamps. Analytics/donations/ENGINE releases are not delivered; tables in schema are not working features. Registration only accepts email/password; display name requires the existing profile endpoint with honest partial-failure handling.
+
+## Ordered delivery layers
+
+- [x] 1. Foundation and Home (`app/globals.css`, `app/page.tsx`, `components/empty-state.tsx`, `components/site-footer.tsx`, `app/layout.tsx`). Warm palette, 1200–1400px content, structured hero, real latest games, explicit empty/error states, creation methods and publication steps. Footer links only existing routes with role-sensitive moderation. Test API success/empty/failure and footer role visibility, then web lint/typecheck and browser widths.
+- [ ] 2. Navigation and route resilience (`components/site-navigation.tsx`, `app/loading.tsx`, `app/error.tsx`, `app/global-error.tsx`). Mobile disclosure/drawer with Escape/close/focus behavior; preserve role/current-route/logout behavior. Shared loading skeleton and safe retry boundaries, including root session failure. Test keyboard and route transitions plus failure recovery.
+- [ ] 3. Catalog and game detail (`app/discover/page.tsx`, `components/game-card.tsx`, `app/games/[slug]/page.tsx`). Search/cursor preservation; explicit 4/2/1 responsive grid, hierarchy and actual metadata around existing sandbox player. Do not add unsupported filters or replace the functional player-first route. Test empty/error/pagination and player controls.
+- [ ] 4. Accounts/profile (`components/auth-form.tsx`, `app/login/page.tsx`, `app/register/page.tsx`, `app/profile/page.tsx`). Shared split layout, password visibility/confirmation, submitting/validation; inspect registration/profile contracts before adding display name. Test login/register/profile/logout and failure states.
+- [ ] 5. Studio and create/manage (`app/studio/page.tsx`, `app/studio/games/new/page.tsx`, `components/game-form.tsx`, `components/game-workspace.tsx`). Creator summary, actual game counts, searchable/filterable owner games, clear draft-to-release actions; preserve all editors and ENGINE preview. Test owner data/empty/filter/action routes and existing asset workflow.
+- [ ] 6. Moderation (`app/moderation/page.tsx`, `components/moderation-queue.tsx`). Queue hierarchy and review disclosure, accurate statuses and rejection validation; retain artifactVersion/submittedAt stale-review protection. No unsupported approved/rejected-history tabs. Test approve/reject/error/access.
+- [ ] 7. Final route/browser audit. Run web suite, lint, typecheck, production build; test all routes at 1440/1024/768/390px, both themes, reduced motion, keyboard, loading/empty/error/success, no overflow/console errors/broken links. Keep screenshots and exact results. Commit only verified changes. Deployment is a separate step, never repeat it without tested changes.
+
+## Risks and verification evidence
+
+Global tokens affect editor chrome/player too: preserve specialized sizing and validate contrast in both themes. Home must distinguish API failure from empty catalog and must not label newest as trending/featured. Root session failure can happen before page error boundaries. Public game contracts cannot provide owner-only information. Existing regression tests may encode superseded copy; update those only where the brief explicitly changes it.
+
+Starting revision: `9d2c8aa`, clean worktree. No implementation/test success claimed at audit time.
+
+
+## Checkpoint — 2026-09-16, foundation slice
+
+Implemented layer 1 and mobile navigation portion of layer 2. Added `EmptyState` and role-aware `SiteFooter`, Home two-column concept with actual catalog/empty/error, warm light tokens and 1280/1344px widths, mobile disclosure with Escape/focus and route close. No backend/schema/dependency edits. Independent review identified stale menu reopening after A→B→A history; reproduced with a failing test, fixed by discarding stored disclosure state when pathname changes; app-shell now 25/25 passing.
+
+Validation in progress: focused Home/footer/card/shell initially 45/45; final production `next build` after review fix passed, all existing routes retained. Changed-file lint passes. Full web lint has zero errors and one pre-existing `aria-description` warning at Studio hierarchy-panel.tsx:190. Full unit run: 458/459 passed, only Canvas zoom test exceeded 5000ms during concurrent browser/build load; rerunning isolated before deciding root cause. Browser initial run: 7/8 passed (including 390/768/1440px and existing shell regression checks), 1024px recorded transient root `optionalSession` fetch timeout. This is not a clean browser result; rerun without concurrent build/tests. Screenshots under `apps/web/test-results/remaster-shell-*` cover light/dark at all widths; inspected 1440/390 light, layout has no horizontal overflow. Test games are isolated harness fixtures, never added to product data.
+
+Next: finish isolated checks, commit this slice; then layer 2 loading/error/global-error (installed Next 16.3.4 uses `retry`, not older `reset`), catalog/details, auth/profile and Studio. Root session outage currently escapes page boundaries: global-error is required and still outstanding. No deployment performed.
+
+
+### Verified outcome at 05:02 UTC
+
+- Final production build after menu fix: PASS (Next compilation, TypeScript, generation and full route inventory).
+- Changed-file ESLint: PASS, zero findings. Full lint warning above remains recorded.
+- Full unit run: 458/459; isolated rerun of the entire failing Canvas file: 56/56 PASS, unchanged code and original timeout. No clean full-suite rerun claimed.
+- Final isolated Playwright: **10/10 PASS in 41.9s**, `remaster-shell.spec.ts`, `final-review.spec.ts`, `game-player-contrast.spec.ts`. All four widths pass navigation, layout overflow and no pageerror checks; light/dark screenshots captured. Player fullscreen contrast >=4.5 in both themes. Initial transient API timeout did not reproduce without concurrent build/test load; production logic untouched.
+- Independent reviewer verified A→B→A menu fix and reported no remaining important findings for this slice.
+- No deploy. Layer 2 mobile navigation is delivered; loading/error/global-error and layers 3–7 remain open.

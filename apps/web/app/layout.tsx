@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { AdsenseScript } from "../components/adsense-script";
+import { SiteFooter } from "../components/site-footer";
 import { SiteNavigation } from "../components/site-navigation";
 import { TfgLogo } from "../components/tfg-logo";
 import { ThemeToggle } from "../components/theme-toggle";
@@ -51,7 +52,7 @@ export default async function RootLayout({
           </div>
         </header>
         {children}
-        <footer>TFG — Không gian cho người chơi và nhà sáng tạo độc lập.</footer>
+        <SiteFooter session={session} />
       </body>
     </html>
   );

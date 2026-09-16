@@ -2,6 +2,10 @@
 
 This release-oriented summary records major architecture/product milestones. It is not a deployment ledger; a development commit does not prove production rollout.
 
+## 2026-09-16 — UI remaster foundation (development only)
+
+Added warm light-mode colors, wider shared content containers, a structured Home hero and actual catalog empty/error states, role-aware footer links, and mobile navigation with keyboard/history handling. Dark/system theme preferences, routes and API/authentication remain intact. This is the first layer of the broader remaster, not a completed redesign or deployment. Progress and exact verification caveats: [remaster plan](../superpowers/plans/2026-09-16-ui-remaster.md).
+
 ## 2026-09-10–11 — Immutable Studio assets
 
 Added owner-scoped asset upload, metadata, content/thumbnail reads, tombstoning, integrity validation, and Studio Asset Manager interactions. Hardened upload reservation identity. Evidence: `1860920`, `a4fca5d`, `abcd315`, `1c43155`, `f2cdc9d`.
