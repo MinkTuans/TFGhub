@@ -10,4 +10,4 @@ Spec: docs/superpowers/specs/2026-09-16-game-engagement-design.md
 - [x] Web: read Nextdocs/spec; failing functional tests; detail community+metrics/share, analytics/chart/settings, creator links and moderation comments; responsive styles/errors; verify tests/types/lint. Own apps/web except game-player.tsx and play-telemetry helper/tests (root).
 - [x] Root: failing launch/visibility/source-check tests; GamePlayer telemetry and helper; scoreintegrationdocs; disposable DB realHTTP+browser, migration upgrade.
 - [x] Independent review each slice and integrated behavior; fix concrete findings.
-- [ ] Root: production build/backup/migrate/deploy/read-only live checks, report and cleanup. No real data mutation for tests.
+- [x] Root: production build/backup/migrate/deploy/read-only live checks, report and cleanup. No real data mutation for tests.

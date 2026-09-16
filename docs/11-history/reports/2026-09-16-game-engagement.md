@@ -1,6 +1,6 @@
 # Game engagement and creator analytics — 2026-09-16
 
-Status: local verification complete; production build/deployment pending.
+Status: completed and verified live at http://161.248.81.59 on 2026-09-16. Code commit `4517d08`.
 
 ## Scope
 
@@ -19,8 +19,16 @@ No fabricated activity/revenue or retroactive totals. Favorites, ranked leaderbo
 - Independent review identified HTTP-only compatibility issues in UUID and guestcookie security plus missing publicstats refreshevent; all fixed with regressions and re-reviewed. No outstanding blockers.
 - Initial browser harness initScript attempted localStorage inside sandboxframe; restricted it to topwindow, then reran successfully. Product sandbox was preserved.
 
-Evidence is ephemeral at `/tmp/tfg-game-engagement/`; all mutation tests used disposable database/artifact storage. Production smoke must remain read-only and must not launch games or create fake activity.
+Evidence is ephemeral at `/tmp/tfg-game-engagement/`; all mutation tests used disposable database/artifact storage. Production smoke remained read-only: no game launches or fake activity.
 
 ## Deployment
 
-Pending API/web production build, consistent backup, additive migration, deployment and live verification.
+- Docker API/web production builds passed, including Next compilation and TypeScript.
+- Validated consistent backup: `backups/20260916T142324-831352.database.dump`, `.artifacts.tar.gz` and `.sha256` manifest.
+- Additive migration `20260916150000_game_engagement` applied successfully.
+- API image `sha256:8a315d81964f23fe2289a903d9052144ef7ea76660ae27e4f1ae37cd1bf32564`.
+- Web image `sha256:ae84b2f0e2317de518ea83fc6433e65a9071b5106007c9a9776e5d88fdccf09a`.
+- Rollback images retained as `indieforge-api:rollback-before-engagement-20260916` and `indieforge-web:rollback-before-engagement-20260916`.
+- API/web healthy; public health check OK.
+- Live read-only browser passed on390/1440px in dark/light: public engagement and explicitlaunch button, no iframe autoload, guest analytics redirect, admin privateanalytics30-day table, scoped moderatorcomments without earnings, no page errors/horizontal overflow. Browser API interception asserted GET-only; no fake production plays/comments/ratings or setting changes.
+- Preview processes and disposablePostgreSQL stopped. Temporary fixture sessions and short-lived live token deleted; token not printed. No prior completed admin/library/password deployment repeated.

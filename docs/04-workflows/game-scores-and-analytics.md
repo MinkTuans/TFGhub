@@ -1,6 +1,6 @@
 # Game activity, scores and analytics
 
-Status: implementation in progress; deployment report is authoritative for rollout.
+Status: deployed; see the [rollout report](../11-history/reports/2026-09-16-game-engagement.md).
 
 ## What is counted
 
