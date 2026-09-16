@@ -19,6 +19,7 @@ export function SiteFooter({ session }: { session: SessionUser | null }) {
         <nav aria-label="Dành cho người sáng tạo">
           <h2>Sáng tạo</h2>
           <Link href="/studio">Xưởng sáng tạo</Link>
+          <Link href="/huong-dan">Hướng dẫn tạo game pixel</Link>
           <Link href={session ? "/profile" : "/register"}>{session ? "Hồ sơ của bạn" : "Tạo tài khoản"}</Link>
           {canModerate && <Link href="/moderation">Kiểm duyệt</Link>}
         </nav>

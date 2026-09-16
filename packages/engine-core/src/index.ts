@@ -138,3 +138,7 @@ export {
   applyProjectMutationsWithHistory,
 } from "./v2/mutations.js";
 export { collectProjectAssetReferences } from "./v2/asset-references.js";
+
+export { createPixelAdventure } from "./templates/pixel-adventure.js";
+export { BUILTIN_PIXEL_SPRITES, type BuiltinPixelSprite } from "./templates/pixel-art.js";
+export { compileEngineHtml } from "./runtime/engine-html.js";

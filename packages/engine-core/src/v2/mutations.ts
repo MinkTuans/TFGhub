@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { StableId } from "../stable-id.js";
+import { ScriptResourceV2 } from "./script-schema.js";
 import { EngineProjectV2 } from "./project-schema.js";
 import {
   ComponentInstanceV2,
@@ -89,6 +90,10 @@ export const SceneMutation = z
 
 // Add command variants only alongside their reducer and authoring consumer.
 export const ProjectMutation = z.discriminatedUnion("type", [
+  z.object({type: z.literal("script.upsert"), script: ScriptResourceV2, beforeScriptId: StableId.nullable().optional()}).strict(),
+  z.object({type: z.literal("script.delete"), scriptId: StableId}).strict(),
+  z.object({type: z.literal("project.settings"), settings: EngineProjectV2.innerType().shape.settings}).strict(),
+  z.object({type: z.literal("project.replace"), project: EngineProjectV2}).strict(),
   z
     .object({
       type: z.literal("asset.declare"),
@@ -563,6 +568,23 @@ function applyBatch(
   for (const command of commands) {
     if (withHistory) undo.unshift(structuredClone(inverse(next, command)));
     switch (command.type) {
+      case "script.upsert": {
+        const index = next.scripts.findIndex(script => script.id === command.script.id);
+        if (index >= 0) next.scripts[index] = command.script;
+        else insert(next.scripts, command.script, command.beforeScriptId ?? null);
+        break;
+      }
+      case "script.delete":
+        target(next.scripts, command.scriptId);
+        next.scripts = next.scripts.filter(script => script.id !== command.scriptId);
+        break;
+      case "project.settings":
+        next.settings = command.settings;
+        break;
+      case "project.replace":
+        if (next.projectId !== command.project.projectId) throw new Error("Project identity cannot change");
+        Object.assign(next, command.project);
+        break;
       case "asset.declare":
         if (next.assetIds.includes(command.assetId))
           throw new Error("Asset is already declared");
@@ -839,6 +861,14 @@ function inverse(
   const scene =
     "sceneId" in command ? target(before.scenes, command.sceneId) : null;
   switch (command.type) {
+    case "script.upsert": {
+      const script = before.scripts.find(script => script.id === command.script.id);
+      return script ? {type: "script.upsert", script} : {type: "script.delete", scriptId: command.script.id};
+    }
+    case "script.delete":
+      return {type: "script.upsert", script: target(before.scripts, command.scriptId), beforeScriptId: nextId(before.scripts, command.scriptId)};
+    case "project.settings": return {type: "project.settings", settings: before.settings};
+    case "project.replace": return {type: "project.replace", project: before};
     case "asset.declare":
       return { type: "asset.forget", assetId: command.assetId };
     case "asset.forget":

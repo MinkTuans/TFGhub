@@ -8,6 +8,7 @@ import {
   ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common';
+import { EngineBuildService } from './engine-build.service.js';
 import { GameProjectInput } from '@indieforge/contracts';
 import { JwtService } from '@nestjs/jwt';
 import { extname } from 'node:path';
@@ -195,6 +196,7 @@ export class GameContentService {
     @Inject(GamesRepository) private readonly games: GamesRepository,
     @Inject(ArtifactStorage) private readonly storage: ArtifactStorage,
     @Inject(JwtService) private readonly tokens: JwtService,
+    @Inject(EngineBuildService) private readonly engine?: EngineBuildService,
   ) {}
 
   private async serialized<T>(
@@ -252,6 +254,26 @@ export class GameContentService {
   async build(gameId: string, userId: string) {
     return this.serialized(gameId, async () => {
       const game = await this.owned(gameId, userId);
+      if (game.sourceType === 'ENGINE') {
+        if (!this.engine)
+          throw new ServiceUnavailableException('Engine builder unavailable');
+        const build = await this.engine.prepare(gameId, userId, game.updatedAt);
+        try {
+          const result = await this.install(game, build.files, {
+            viewportWidth: build.viewport.width,
+            viewportHeight: build.viewport.height,
+            engineBuild: {
+              id: build.buildId,
+              revisionNumber: build.revisionNumber,
+              contentHash: build.contentHash,
+            },
+          });
+          return result;
+        } catch (error) {
+          await this.engine.fail(build.buildId);
+          throw error;
+        }
+      }
       const project = this.project(game, game.projectData);
       const files =
         project.sourceType === 'CODE'
@@ -272,7 +294,14 @@ export class GameContentService {
     });
   }
 
-  private async install(game: StoredGame, files: ArtifactFile[]) {
+  private async install(
+    game: StoredGame,
+    files: ArtifactFile[],
+    dimensions: Pick<
+      WorkspaceUpdate,
+      'viewportWidth' | 'viewportHeight' | 'engineBuild'
+    > = {},
+  ) {
     const artifactVersion = game.artifactVersion + 1;
     try {
       await this.storage.install(game.id, artifactVersion, files);
@@ -305,6 +334,7 @@ export class GameContentService {
         ...resetReview,
         artifactVersion,
         artifactReady: true,
+        ...dimensions,
       });
     } catch (error) {
       // A lost commit response can leave the original transaction in flight.

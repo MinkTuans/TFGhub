@@ -289,6 +289,19 @@ export class PrismaEngineProjectsRepository extends EngineProjectsRepository {
           assets: { create: references },
         },
       });
+      // Invalidate artifacts in the same transaction as the canonical head advance.
+      // Idempotent mutation retries return above, without touching review state.
+      await transaction.game.updateMany({
+        where: { id: input.gameId, sourceType: 'ENGINE' },
+        data: {
+          artifactReady: false,
+          visibility: 'DRAFT',
+          reviewState: 'DRAFT',
+          reviewNote: null,
+          submittedAt: null,
+          reviewedAt: null,
+        },
+      });
       return { status: 'SAVED' as const, revision: storedRevision(revision) };
     });
   }
@@ -399,6 +412,19 @@ export class PrismaEngineProjectsRepository extends EngineProjectsRepository {
           mutationId: input.mutationId,
           baseRevisionNumber: input.baseRevision,
           resultRevisionNumber: revisionNumber,
+        },
+      });
+      // Invalidate artifacts in the same transaction as the canonical head advance.
+      // Idempotent mutation retries return above, without touching review state.
+      await transaction.game.updateMany({
+        where: { id: input.gameId, sourceType: 'ENGINE' },
+        data: {
+          artifactReady: false,
+          visibility: 'DRAFT',
+          reviewState: 'DRAFT',
+          reviewNote: null,
+          submittedAt: null,
+          reviewedAt: null,
         },
       });
       return { status: 'SAVED', revision: storedRevision(revision) };

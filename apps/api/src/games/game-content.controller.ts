@@ -84,6 +84,7 @@ function sendArtifact(
       `img-src ${sources} data:`,
       `media-src ${sources}`,
       `font-src ${sources}`,
+      "worker-src blob:",
       "connect-src 'none'",
       "frame-src 'none'",
       "object-src 'none'",

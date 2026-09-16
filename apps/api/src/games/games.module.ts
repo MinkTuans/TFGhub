@@ -1,3 +1,9 @@
+import { EngineProjectsModule } from '../engine-projects/engine-projects.module.js';
+import { GameAssetsModule } from '../game-assets/game-assets.module.js';
+import {
+  EngineBuildService,
+  EngineBuildRecords,
+} from './engine-build.service.js';
 import { Module } from '@nestjs/common';
 import { database } from '@indieforge/database';
 import { AuthModule } from '../auth/auth.module.js';
@@ -94,7 +100,13 @@ const publicGameSelect = {
 } as const;
 
 @Module({
-  imports: [AuthModule, GameArtifactsModule, GameCoversModule],
+  imports: [
+    AuthModule,
+    GameArtifactsModule,
+    GameCoversModule,
+    EngineProjectsModule,
+    GameAssetsModule,
+  ],
   controllers: [
     GamesController,
     PublicGamesController,
@@ -103,6 +115,8 @@ const publicGameSelect = {
     ModerationController,
   ],
   providers: [
+    EngineBuildService,
+    EngineBuildRecords,
     GamesService,
     GameCoverService,
     GameCoverOwnerGuard,
@@ -220,13 +234,44 @@ const publicGameSelect = {
           }),
         updateWorkspace: (id, expectedUpdatedAt, input) =>
           database.$transaction(async (tx) => {
+            const { engineBuild, ...data } = input;
+            // Lock before checking the head: saves take the same game lock first.
+            await tx.$queryRaw`SELECT "id" FROM "Game" WHERE "id" = ${id} FOR UPDATE`;
             const result = await tx.game.updateMany({
-              where: { id, updatedAt: expectedUpdatedAt },
-              data: input,
+              where: {
+                id,
+                updatedAt: expectedUpdatedAt,
+                ...(engineBuild
+                  ? {
+                      engineProject: {
+                        headRevisionNumber: engineBuild.revisionNumber,
+                      },
+                    }
+                  : {}),
+              },
+              data,
             });
-            return result.count === 1
-              ? tx.game.findUnique({ where: { id }, select: gameSummarySelect })
-              : null;
+            if (result.count !== 1) return null;
+            if (engineBuild) {
+              const completed = await tx.gameBuild.updateMany({
+                where: { id: engineBuild.id, gameId: id, state: 'BUILDING' },
+                data: {
+                  state: 'READY',
+                  completedAt: new Date(),
+                  contentHash: engineBuild.contentHash,
+                  manifest: {
+                    artifactVersion: input.artifactVersion!,
+                    entry: 'index.html',
+                  },
+                },
+              });
+              if (completed.count !== 1)
+                throw new Error('Build provenance changed');
+            }
+            return tx.game.findUnique({
+              where: { id },
+              select: gameSummarySelect,
+            });
           }),
         submit: (id) =>
           database.$transaction(async (tx) => {

@@ -6,7 +6,7 @@ An authenticated creator creates a draft, saves project data or uploads an HTML5
 
 ## ENGINE lifecycle
 
-Creating an ENGINE game atomically creates the Game, EngineProject, and first revision. Studio loads that revision; validated typed mutations create immutable result revisions. Conflicts are surfaced for explicit discard/reapply rather than silent overwrite. ENGINE production build/release execution is not yet complete.
+Creating an ENGINE game atomically creates the Game, EngineProject, and first revision. Studio loads that revision; validated typed mutations create immutable result revisions. Conflicts are surfaced for explicit discard/reapply rather than silent overwrite. Choose the pixel adventure template or a blank project; use the task tabs to import assets, write JavaScript, design scenes and build a playable artifact. The existing submit/moderation workflow publishes ENGINE games. See the [detailed Vietnamese tutorial](pixel-studio-guide.md), also available publicly at `/huong-dan` and inside Studio. Editing a canonical revision invalidates the previous artifact until rebuilt.
 
 ## Project assets
 

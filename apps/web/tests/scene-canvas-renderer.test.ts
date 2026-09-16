@@ -232,6 +232,17 @@ describe("Canvas2D scene drawing", () => {
     expect(calls).toContainEqual({ name: "stroke", args: [] });
   });
 
+  it("renders reserved pixel frames without missing-asset placeholders", async () => {
+    const { renderScene } = await renderer();
+    const source = scene();
+    source.objects = [source.objects[0]];
+    Object.assign(source.objects[0].components[1].properties, {assetId: null, frame: "tfg:hero"});
+    const {context, calls} = recordingContext();
+    renderScene(context, buildRenderList(source), camera, {pixelArt: true});
+    expect(calls.filter(call => call.name === "fillRect").length).toBeGreaterThan(30);
+    expect(calls.filter(call => call.name === "stroke")).toEqual([]);
+  });
+
   it("draws a supplied image with component flips, and unresolved named frames remain placeholders", async () => {
     const { renderScene } = await renderer();
     const source = scene();

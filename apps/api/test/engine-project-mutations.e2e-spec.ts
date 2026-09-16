@@ -112,6 +112,41 @@ describeDatabase('mutation batches on PostgreSQL', () => {
     await database.$disconnect();
   });
 
+  it('invalidates an old artifact on revision advance but not on idempotent replay', async () => {
+    await database.game.update({
+      where: { id: gameId },
+      data: {
+        artifactReady: true,
+        artifactVersion: 1,
+        visibility: 'PUBLIC',
+        reviewState: 'APPROVED',
+      },
+    });
+    const input = batch('New version');
+    await owner.post(endpoint()).send(input).expect(201);
+    const changed = await database.game.findUniqueOrThrow({
+      where: { id: gameId },
+    });
+    expect(changed).toMatchObject({
+      artifactReady: false,
+      visibility: 'DRAFT',
+      reviewState: 'DRAFT',
+    });
+    await database.game.update({
+      where: { id: gameId },
+      data: { artifactReady: true },
+    });
+    const rebuilt = await database.game.findUniqueOrThrow({
+      where: { id: gameId },
+    });
+    await owner.post(endpoint()).send(input).expect(201);
+    const replayed = await database.game.findUniqueOrThrow({
+      where: { id: gameId },
+    });
+    expect(replayed.artifactReady).toBe(true);
+    expect(replayed.updatedAt).toEqual(rebuilt.updatedAt);
+  });
+
   it('commits one immutable authoritative revision and idempotency row for an ordered batch', async () => {
     const input = batch('First');
     input.mutations.push({ ...input.mutations[0], name: '  Final  ' });

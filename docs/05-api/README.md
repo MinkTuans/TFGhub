@@ -44,7 +44,7 @@ Game source types are `UPLOAD`, `CODE`, `STORY`, `PLATFORMER`, and `ENGINE`. Leg
 | Method | Route | Access | Purpose |
 | --- | --- | --- | --- |
 | PUT | `/games/:id/project` | Owner | Save validated CODE/STORY/PLATFORMER data |
-| POST | `/games/:id/build` | Owner | Compile a legacy project into an artifact |
+| POST | `/games/:id/build` | Owner | Compile legacy source or the canonical ENGINE head into an artifact |
 | POST | `/games/:id/upload` | Owner, multipart | Install HTML5 ZIP content |
 | POST | `/games/:id/submit` | Owner | Submit ready content for review |
 | GET | `/games/:id/preview/*` | Owner or moderator | Redirect to scoped artifact capability |
@@ -198,3 +198,7 @@ Public eligible-game reads: `GET /engagement/games/:slug/stats` and `/comments?o
 Explicit play launch uses `POST /engagement/games/:slug/plays {requestId}` (201), returning a game-scoped play ID/token. Guests receive an HTTP-only browser cookie; its Secure flag follows the existing `COOKIE_SECURE` override. Existing invalid/inactive login cookies are rejected, not silently treated as guests. The authenticated-only game access rule also applies. `PATCH .../plays/:playId {token,sequence,activeSeconds}` credits bounded server-elapsed active time with duplicate-sequence rejection. `POST .../plays/:playId/score {token,score}` (201) retains the highest submitted integer when scoring is enabled. Expiry, game eligibility/readiness and active user state are checked. Tokens never appear in public data.
 
 Owner/ADMIN routes: `GET /games/:id/analytics`, `PATCH /games/:id/engagement-settings {scoresEnabled}`. Owner/MODERATOR/ADMIN may read `GET /games/:id/community-comments`; deleting via `DELETE /games/:id/community-comments/:commentId` requires the comment author or MODERATOR/ADMIN. Private and capability responses use no-store. Database-backed start receipts, score/heartbeat locking and comment cooldowns apply across processes.
+
+### Pixel Studio additions
+
+`POST /games/engine-projects` accepts optional `template: "BLANK" | "PIXEL_ADVENTURE"` (omission preserves blank creation). Mutations additionally support `script.upsert {script,beforeScriptId?}`, `script.delete {scriptId}`, `project.settings {settings}` and `project.replace {project}`. Replacement retains the existing project identity; every declared asset must belong to the project. ENGINE builds copy at most 100 MiB of assets and retain revision/asset provenance in GameBuild. Artifact CSP additionally allows blob workers; creator scripts run there with declared capabilities and bounded lifetime, never in API or editor host.

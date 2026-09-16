@@ -3,6 +3,7 @@ import type { GameSummary } from "./games.js";
 import type { EngineProjectReadResponse } from "./engine-projects.js";
 
 export const CreateEngineGameInput = z.object({
+  template: z.enum(["BLANK", "PIXEL_ADVENTURE"]).optional(),
   title: z.string().trim().min(1).max(80).default("Game chưa có tên"),
 });
 

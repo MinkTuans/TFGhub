@@ -2945,3 +2945,33 @@ describe("scene and layer authoring", () => {
     20_000,
   );
 });
+
+
+describe("script and project authoring", () => {
+  it("round trips script creation, update and ordered deletion", () => {
+    const original = project();
+    const script = { id: id("0900"), version: 1 as const, name: "Hello", language: "JAVASCRIPT" as const, source: 'api.showDialogue("Hi")', capabilities: ["SHOW_DIALOGUE" as const], attachments: [] };
+    const created = engine.applyProjectMutationsWithHistory(original, [{type: "script.upsert", script}]);
+    expect(created.document.scripts).toEqual([script]);
+    expect(engine.applyProjectMutations(created.document, created.undo)).toEqual(original);
+    const updated = engine.applyProjectMutationsWithHistory(created.document, [{type: "script.upsert", script: {...script, source: ""}}]);
+    expect(engine.applyProjectMutations(updated.document, updated.undo)).toEqual(created.document);
+    const second = {...script, id: id("0901"), name: "Second"};
+    const ordered = engine.applyProjectMutations(created.document, [{type: "script.upsert", script: second}]);
+    const deletion = engine.applyProjectMutationsWithHistory(ordered, [{type: "script.delete", scriptId: script.id}]);
+    expect(engine.applyProjectMutations(deletion.document, deletion.undo)).toEqual(ordered);
+    expect(() => engine.applyProjectMutations(original, [{type: "script.upsert", script: {...script, attachments: [{id: id("0902"), type: "SCENE", sceneId: id("0999")}]} }])).toThrow();
+    const removed = engine.applyProjectMutationsWithHistory(created.document, [{type: "script.delete", scriptId: script.id}]);
+    expect(engine.applyProjectMutations(removed.document, removed.undo)).toEqual(created.document);
+  });
+  it("replaces same-identity documents and settings with exact undo", () => {
+    const original = project();
+    const replacement = {...original, settings: {...original.settings, pixelArt: true}};
+    for (const command of [{type: "project.replace" as const, project: replacement}, {type: "project.settings" as const, settings: replacement.settings}]) {
+      const result = engine.applyProjectMutationsWithHistory(original, [command]);
+      expect(result.document.settings.pixelArt).toBe(true);
+      expect(engine.applyProjectMutations(result.document, result.undo)).toEqual(original);
+    }
+    expect(() => engine.applyProjectMutations(original, [{type: "project.replace", project: {...replacement, projectId: id("0999")}}])).toThrow();
+  });
+});

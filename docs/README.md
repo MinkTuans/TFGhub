@@ -17,7 +17,7 @@ This directory is the authoritative documentation hub for developers and AI agen
 | --- | --- |
 | Context | [Overview](01-project/overview.md), [repository map](01-project/repository-map.md), [glossary](12-reference/glossary.md) |
 | Architecture | [System](02-architecture/system-architecture.md), [Engine and Studio](02-architecture/engine-and-studio.md), [decisions](02-architecture/architectural-decisions.md) |
-| Product | [Current capabilities](03-features/current-capabilities.md), [workflows](04-workflows/authoring-publishing-and-assets.md) |
+| Product | [Current capabilities](03-features/current-capabilities.md), [workflows](04-workflows/authoring-publishing-and-assets.md), [hướng dẫn Pixel Studio](04-workflows/pixel-studio-guide.md) |
 | Interfaces | [API](05-api/README.md), [database](06-database/schema-and-migrations.md), [configuration](12-reference/configuration.md) |
 | AI and rules | [Agent context](07-ai/agent-context.md), [skills and prompts](07-ai/skills-and-prompts.md), [agent rules](08-rules/agent-rules.md) |
 | Delivery | [Development/testing](09-development/setup-and-testing.md), [troubleshooting](09-development/troubleshooting.md), [deployment](10-deployment/runbook.md) |

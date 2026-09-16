@@ -13,7 +13,7 @@ import type {
   CreateEngineGameInput,
   CreateEngineGameResponse,
 } from '@indieforge/contracts';
-import { EngineProjectV2 } from '@indieforge/engine-core';
+import { EngineProjectV2, createPixelAdventure } from '@indieforge/engine-core';
 import { createHash, randomUUID } from 'node:crypto';
 import { canonicalize } from '../engine-projects/canonicalize.js';
 import type { StoredEngineRevision } from '../engine-projects/engine-projects.repository.js';
@@ -54,6 +54,9 @@ export type StoredGame = {
 };
 
 export type WorkspaceUpdate = {
+  engineBuild?: { id: string; revisionNumber: number; contentHash: string };
+  viewportWidth?: number;
+  viewportHeight?: number;
   projectData?: GameProjectInput;
   artifactVersion?: number;
   artifactReady?: boolean;
@@ -136,8 +139,15 @@ export abstract class GamesRepository {
     input: WorkspaceUpdate,
   ): Promise<StoredGame | null>;
   abstract submit(id: string): Promise<StoredGame | null>;
-  abstract approve(id: string, revision: SubmittedRevision): Promise<StoredGame | null>;
-  abstract reject(id: string, revision: SubmittedRevision, reviewNote: string): Promise<StoredGame | null>;
+  abstract approve(
+    id: string,
+    revision: SubmittedRevision,
+  ): Promise<StoredGame | null>;
+  abstract reject(
+    id: string,
+    revision: SubmittedRevision,
+    reviewNote: string,
+  ): Promise<StoredGame | null>;
   abstract updateOwned(
     id: string,
     ownerId: string,
@@ -220,47 +230,52 @@ export class GamesService {
   ): Promise<CreateEngineGameResponse> {
     const sceneId = randomUUID();
     const document = canonicalize(
-      EngineProjectV2.parse({
-        schemaVersion: 2,
-        projectId: randomUUID(),
-        engineFamily: 'TFG_ENGINE',
-        entrySceneId: sceneId,
-        settings: { viewport: { width: 1280, height: 720 }, pixelArt: false },
-        assetIds: [],
-        scenes: [
-          {
-            id: sceneId,
-            name: 'Cảnh 1',
-            key: 'scene-1',
-            order: 0,
-            type: 'MIXED',
-            width: 1280,
-            height: 720,
-            background: { color: '#102040', assetId: null },
+      input.template === 'PIXEL_ADVENTURE'
+        ? createPixelAdventure(randomUUID(), randomUUID)
+        : EngineProjectV2.parse({
+            schemaVersion: 2,
+            projectId: randomUUID(),
+            engineFamily: 'TFG_ENGINE',
+            entrySceneId: sceneId,
             settings: {
-              gravityX: 0,
-              gravityY: 0,
-              grid: { enabled: true, size: 32, snap: true },
+              viewport: { width: 1280, height: 720 },
+              pixelArt: false,
             },
-            layers: [
+            assetIds: [],
+            scenes: [
               {
-                id: randomUUID(),
-                name: 'World',
+                id: sceneId,
+                name: 'Cảnh 1',
+                key: 'scene-1',
                 order: 0,
-                type: 'WORLD',
-                visible: true,
-                locked: false,
+                type: 'MIXED',
+                width: 1280,
+                height: 720,
+                background: { color: '#102040', assetId: null },
+                settings: {
+                  gravityX: 0,
+                  gravityY: 0,
+                  grid: { enabled: true, size: 32, snap: true },
+                },
+                layers: [
+                  {
+                    id: randomUUID(),
+                    name: 'World',
+                    order: 0,
+                    type: 'WORLD',
+                    visible: true,
+                    locked: false,
+                  },
+                ],
+                objects: [],
               },
             ],
-            objects: [],
-          },
-        ],
-        variables: { global: [], player: [], scene: {} },
-        prefabs: [],
-        events: [],
-        modules: [],
-        scripts: [],
-      }),
+            variables: { global: [], player: [], scene: {} },
+            prefabs: [],
+            events: [],
+            modules: [],
+            scripts: [],
+          }),
     ) as EngineProjectV2;
     const serialized = JSON.stringify(document);
     const snapshot = {

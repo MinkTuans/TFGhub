@@ -1,3 +1,4 @@
+import { BUILTIN_PIXEL_SPRITES } from "@indieforge/contracts";
 import type {
   Bounds,
   EngineProjectV2Type,
@@ -99,7 +100,15 @@ function drawPrimitive(
           primitive.assetId && !primitive.frame
             ? images?.get(primitive.assetId)
             : undefined;
-        if (!drawImage(context, image, rect)) placeholder(context, rect);
+        const builtin = !primitive.assetId && primitive.frame ? BUILTIN_PIXEL_SPRITES[primitive.frame] : undefined;
+        if (builtin) {
+          const pw = width / builtin.width, ph = height / builtin.height;
+          builtin.pixels.forEach((row, py) => [...row].forEach((color, px) => {
+            if (color === "." || !builtin.palette[color]) return;
+            context.fillStyle = builtin.palette[color]!;
+            context.fillRect(px * pw, py * ph, pw, ph);
+          }));
+        } else if (!drawImage(context, image, rect)) placeholder(context, rect);
         break;
       }
       case "shape":

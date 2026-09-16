@@ -79,3 +79,5 @@ export type { AdminCategory, AdminDocumentSummary, AdminDocument, AdminDocumentL
 export * from "./admin-management.js";
 
 export * from "./game-engagement.js";
+
+export { createPixelAdventure, BUILTIN_PIXEL_SPRITES } from "@indieforge/engine-core";
