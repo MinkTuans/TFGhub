@@ -17,7 +17,7 @@ async function createProject(page: Page) {
   const register = await page.request.post(api("/auth/register"), {
     data: {
       email: `studio-shell-${suffix}@example.test`,
-      password: "studio-password123",
+      password: "Studio-password123!",
     },
   });
   expect(register.status()).toBe(201);

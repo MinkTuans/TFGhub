@@ -17,7 +17,7 @@ export function PasswordField({ name, label, autoComplete, disabled, describedBy
       <label htmlFor={id}>{label}</label>
       <div className="password-field__control">
         <input id={id} name={name} type={visible ? "text" : "password"}
-          minLength={10} maxLength={128} autoComplete={autoComplete}
+          minLength={8} maxLength={128} autoComplete={autoComplete}
           aria-describedby={describedBy} disabled={disabled} required />
         <button type="button" className="button-ghost" disabled={disabled}
           aria-label={`${visible ? "Ẩn" : "Hiện"} ${target}`} aria-controls={id}

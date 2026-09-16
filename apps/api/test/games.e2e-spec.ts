@@ -260,7 +260,7 @@ describe('Developer profile and game draft HTTP boundary', () => {
     const instance = request.agent(app.getHttpServer());
     await instance
       .post('/auth/register')
-      .send({ email, password: 'password123' })
+      .send({ email, password: 'Password123!' })
       .expect(201);
     return instance;
   }
@@ -398,7 +398,7 @@ describe('Developer profile and game draft HTTP boundary', () => {
     try {
       const context = await browser.newContext();
       await context.request.post(`${origin}/auth/login`, {
-        data: { email: 'owner@example.com', password: 'password123' },
+        data: { email: 'owner@example.com', password: 'Password123!' },
       });
       const page = await context.newPage();
       const requests: BrowserRequest[] = [];

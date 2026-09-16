@@ -90,7 +90,7 @@ describeDatabase(
         const email = `assets-${label}-${randomUUID()}@example.test`;
         const registered = await agent
           .post('/auth/register')
-          .send({ email, password: 'password123' })
+          .send({ email, password: 'Password123!' })
           .expect(201);
         const user = await database.user.findUniqueOrThrow({
           where: { email },

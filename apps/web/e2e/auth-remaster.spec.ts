@@ -7,7 +7,7 @@ for (const width of [390, 768, 1024, 1440]) {
     for (const mode of ["login", "register"]) {
       await page.goto(`/${mode}`);
       const password = page.getByLabel("Mật khẩu", { exact: true });
-      await password.fill("private-password123");
+      await password.fill("Private-password123!");
       await page.getByRole("button", { name: "Hiện mật khẩu", exact: true }).click();
       await expect(password).toHaveAttribute("type", "text");
       await page.getByRole("button", { name: "Ẩn mật khẩu", exact: true }).click();
@@ -33,12 +33,12 @@ test("a failed profile save after registration retries only that save", async ({
   await page.goto("/register");
   await page.getByLabel("Tên hiển thị").fill("Recovery creator");
   await page.getByLabel("Thư điện tử").fill(`recovery-${randomUUID()}@example.com`);
-  await page.getByLabel("Mật khẩu", { exact: true }).fill("password123");
+  await page.getByLabel("Mật khẩu", { exact: true }).fill("Abcdef1!");
   await page.getByLabel("Xác nhận mật khẩu").fill("does-not-match");
   await page.getByRole("button", { name: "Tạo tài khoản", exact: true }).click();
   await expect(page.getByRole("main").getByRole("alert")).toContainText("Mật khẩu xác nhận chưa khớp.");
   expect(registrations).toBe(0);
-  await page.getByLabel("Xác nhận mật khẩu").fill("password123");
+  await page.getByLabel("Xác nhận mật khẩu").fill("Abcdef1!");
   await page.getByRole("button", { name: "Tạo tài khoản", exact: true }).click();
   await expect(page.getByRole("main").getByRole("alert")).toContainText("Không thể lưu hồ sơ");
   await expect(page.getByRole("status")).toContainText("Tài khoản đã được tạo");

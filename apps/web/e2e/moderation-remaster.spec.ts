@@ -7,7 +7,7 @@ for (const width of [390, 768, 1024, 1440]) {
     page.on("pageerror", (error) => errors.push(error.message));
     await page.setViewportSize({ width, height: 1000 });
     const suffix = randomUUID();
-    expect((await page.request.post("/api/auth/register", { data: { email: `review-${suffix}@example.com`, password: "password123" } })).ok()).toBe(true);
+    expect((await page.request.post("/api/auth/register", { data: { email: `review-${suffix}@example.com`, password: "Password123!" } })).ok()).toBe(true);
     const created = await page.request.post("/api/games", { data: { title: "Review layout", slug: `review-${suffix}`, sourceType: "CODE", description: "A submitted game to check." } });
     expect(created.ok()).toBe(true);
     const { id } = await created.json();
@@ -15,7 +15,7 @@ for (const width of [390, 768, 1024, 1440]) {
     expect((await page.request.post(`/api/games/${id}/build`, { data: {} })).ok()).toBe(true);
     expect((await page.request.post(`/api/games/${id}/submit`, { data: {} })).ok()).toBe(true);
     await page.context().clearCookies();
-    expect((await page.request.post("/api/auth/login", { data: { email: "moderator@example.com", password: "moderator-password123" } })).ok()).toBe(true);
+    expect((await page.request.post("/api/auth/login", { data: { email: "moderator@example.com", password: "Moderator-password123!" } })).ok()).toBe(true);
     await page.goto("/moderation");
     const card = page.getByRole("article", { name: "Review layout", exact: true });
     await expect(card.getByTitle("Chơi thử trò chơi")).not.toBeVisible();

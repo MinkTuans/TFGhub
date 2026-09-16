@@ -5,7 +5,7 @@ for (const width of [390, 768, 1024, 1440]) {
   test(`Studio filters and creation layout fit ${width}px in both themes`, async ({ page }, testInfo) => {
     await page.setViewportSize({ width, height: 1000 });
     const suffix = randomUUID();
-    expect((await page.request.post("/api/auth/register", { data: { email: `studio-${suffix}@example.com`, password: "password123" } })).ok()).toBe(true);
+    expect((await page.request.post("/api/auth/register", { data: { email: `studio-${suffix}@example.com`, password: "Password123!" } })).ok()).toBe(true);
     for (const title of ["Zebra", "Alpha"]) {
       expect((await page.request.post("/api/games", { data: { title, slug: `${title.toLowerCase()}-${suffix}`, sourceType: "UPLOAD", description: "Forest adventure" } })).ok()).toBe(true);
     }

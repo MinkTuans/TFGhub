@@ -15,7 +15,7 @@ async function createProject(page: Page) {
   await page.request.post(api("/auth/register"), {
     data: {
       email: `studio-assets-${suffix}@example.test`,
-      password: "studio-password123",
+      password: "Studio-password123!",
     },
   });
   await page.goto("/studio/games/new");

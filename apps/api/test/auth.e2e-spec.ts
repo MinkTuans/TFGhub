@@ -16,7 +16,7 @@ describe('Authentication HTTP boundary', () => {
   let app: INestApplication;
   let users: Map<string, StoredUser>;
   const tokens = new JwtService({ secret: testSecret });
-  const credentials = { email: ' DEV@Example.COM ', password: 'password123' };
+  const credentials = { email: ' DEV@Example.COM ', password: 'Abcdef1!' };
 
   beforeEach(async () => {
     vi.stubEnv('JWT_SECRET', testSecret);
@@ -100,10 +100,11 @@ describe('Authentication HTTP boundary', () => {
   });
 
   it.each([
-    { email: 'invalid', password: 'password123' },
+    ...['abcdefgh1!', 'ABCDEFGH1!', 'Abcdefghi!', 'Abcdefghi1', 'Abcdefghi1 '].map(password => ({ email: 'dev@example.com', password })),
+    { email: 'invalid', password: 'Abcdef1!' },
     { email: 'dev@example.com', password: 'short' },
     { email: 'dev@example.com', password: 'x'.repeat(129) },
-    { email: 42, password: 'password123' },
+    { email: 42, password: 'Abcdef1!' },
     {},
   ])(
     'rejects invalid credentials at both public endpoints: %j',
@@ -139,7 +140,7 @@ describe('Authentication HTTP boundary', () => {
     await register();
     const wrong = await request(app.getHttpServer())
       .post('/auth/login')
-      .send({ ...credentials, password: 'wrong-password' })
+      .send({ ...credentials, password: 'Wrongpass1!' })
       .expect(401);
     expect(wrong.body).toEqual(absent.body);
     expect(wrong.headers['set-cookie']).toBeUndefined();

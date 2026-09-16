@@ -307,7 +307,7 @@ async function setup(page: Page) {
   const registration = await page.request.post("/api/auth/register", {
     data: {
       email: `renderer-${suffix}@example.test`,
-      password: "renderer-password123",
+      password: "Renderer-password123!",
     },
   });
   expect(registration.status()).toBe(201);

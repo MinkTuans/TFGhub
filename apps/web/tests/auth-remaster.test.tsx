@@ -13,10 +13,10 @@ test.each([["login", LoginPage], ["register", RegisterPage]] as const)("account 
   expect(screen.getByRole("main")).toHaveClass(`auth-layout--${mode}`);
 });
 
-function fillRegistration(confirm = "password123") {
+function fillRegistration(confirm = "Testpass1!") {
   fireEvent.change(screen.getByLabelText("Tên hiển thị"), { target: { value: "Minh" } });
   fireEvent.change(screen.getByLabelText("Thư điện tử"), { target: { value: "minh@example.test" } });
-  fireEvent.change(screen.getByLabelText("Mật khẩu", { exact: true }), { target: { value: "password123" } });
+  fireEvent.change(screen.getByLabelText("Mật khẩu", { exact: true }), { target: { value: "Testpass1!" } });
   fireEvent.change(screen.getByLabelText("Xác nhận mật khẩu"), { target: { value: confirm } });
   fireEvent.submit(screen.getByRole("button", { name: "Tạo tài khoản" }).closest("form")!);
 }
@@ -48,7 +48,7 @@ test("registration sends only auth fields to auth and then saves the display nam
   await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/studio"));
   expect(fetch).toHaveBeenCalledTimes(2);
   expect(fetch.mock.calls[0][0]).toMatch(/\/auth\/register$/);
-  expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({ email: "minh@example.test", password: "password123" });
+  expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({ email: "minh@example.test", password: "Testpass1!" });
   expect(fetch.mock.calls[1][0]).toMatch(/\/developers\/me$/);
   expect(JSON.parse(fetch.mock.calls[1][1].body)).toEqual({ displayName: "Minh", bio: "" });
 });
@@ -69,4 +69,29 @@ test("a profile-save retry never repeats successful account creation", async () 
   await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/studio"));
   expect(fetch.mock.calls.filter(([url]) => url.endsWith("/auth/register"))).toHaveLength(1);
   expect(fetch.mock.calls.filter(([url]) => url.endsWith("/developers/me"))).toHaveLength(2);
+});
+
+for (const mode of ["register", "login"] as const) {
+  test(`${mode} explains and rejects weak passwords before requests`, () => {
+    const fetch = vi.fn(); vi.stubGlobal("fetch", fetch);
+    render(<AuthForm mode={mode} />);
+    fireEvent.change(screen.getByLabelText("Thư điện tử"), { target: { value: "minh@example.test" } });
+    const password = screen.getByLabelText("Mật khẩu", { exact: true });
+    expect(password).toHaveAttribute("minlength", "8");
+    expect(password).toHaveAccessibleDescription(/chữ thường.*chữ hoa.*số.*ký tự đặc biệt/);
+    fireEvent.change(password, { target: { value: "weakpassword123" } });
+    fireEvent.submit(password.closest("form")!);
+    expect(screen.getByRole("alert")).toHaveTextContent(/chữ thường.*chữ hoa.*số.*ký tự đặc biệt/);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+}
+
+test("login accepts an eight-character compliant password", async () => {
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("{}", { status: 200 })));
+  render(<AuthForm mode="login" />);
+  fireEvent.change(screen.getByLabelText("Thư điện tử"), { target: { value: "minh@example.test" } });
+  const password = screen.getByLabelText("Mật khẩu", { exact: true });
+  fireEvent.change(password, { target: { value: "Abcdef1!" } });
+  fireEvent.submit(password.closest("form")!);
+  await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/studio"));
 });

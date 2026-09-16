@@ -34,7 +34,7 @@ const users = new Map([
     {
       id: "moderator-1",
       email: "moderator@example.com",
-      passwordHash: await hash("moderator-password123", { type: argon2id }),
+      passwordHash: await hash("Moderator-password123!", { type: argon2id }),
       role: "MODERATOR",
     },
   ],

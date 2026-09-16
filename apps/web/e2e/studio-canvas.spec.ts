@@ -22,7 +22,7 @@ async function setup(
   const register = await page.request.post("/api/auth/register", {
     data: {
       email: `canvas-${randomUUID()}@example.test`,
-      password: "canvas-password123",
+      password: "Canvas-password123!",
     },
   });
   expect(register.status()).toBe(201);

@@ -43,7 +43,7 @@ test("slow catalog searches show progress before the next results", async ({ pag
 
 
 test("protected Studio shows loading while owner games are delayed", async ({ page, request }) => {
-  await page.request.post("/api/auth/register", { data: { email: `loading-${randomUUID()}@example.com`, password: "password123" } });
+  await page.request.post("/api/auth/register", { data: { email: `loading-${randomUUID()}@example.com`, password: "Password123!" } });
   await request.post("/__test/api-fault?mode=owner-delay");
   await page.goto("/studio", { waitUntil: "commit" });
   await expect(page.getByRole("status")).toContainText("Đang tải nội dung…");

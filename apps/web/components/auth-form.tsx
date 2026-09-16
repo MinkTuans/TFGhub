@@ -8,6 +8,8 @@ import { api } from "../lib/api-client";
 import { apiErrorMessage } from "../lib/api-error-message";
 import { PasswordField } from "./password-field";
 
+const passwordHint = "Mật khẩu cần có 8–128 ký tự, gồm chữ thường, chữ hoa, số và ký tự đặc biệt.";
+
 type RegistrationProfile = { displayName: string; bio: string };
 
 export function AuthForm({ mode }: { mode: "register" | "login" }) {
@@ -28,7 +30,7 @@ export function AuthForm({ mode }: { mode: "register" | "login" }) {
       const raw = Object.fromEntries(new FormData(event.currentTarget));
       const input = (mode === "register" ? RegisterInput : LoginInput).safeParse(raw);
       if (!input.success) {
-        setError("Nhập thư điện tử hợp lệ và mật khẩu từ 10–128 ký tự.");
+        setError(`Nhập thư điện tử hợp lệ. ${passwordHint}`);
         return;
       }
       credentials = input.data;
@@ -81,9 +83,9 @@ export function AuthForm({ mode }: { mode: "register" | "login" }) {
         <>
           {mode === "register" && <label>Tên hiển thị<input name="displayName" autoComplete="nickname" minLength={2} maxLength={50} disabled={pending} required /></label>}
           <label>Thư điện tử<input name="email" type="email" autoComplete="email" disabled={pending} required /></label>
-          <PasswordField name="password" label="Mật khẩu" autoComplete={mode === "register" ? "new-password" : "current-password"} disabled={pending} describedBy={mode === "register" ? hintId : undefined} />
+          <PasswordField name="password" label="Mật khẩu" autoComplete={mode === "register" ? "new-password" : "current-password"} disabled={pending} describedBy={hintId} />
+          <p className="hint" id={hintId}>{passwordHint}</p>
           {mode === "register" && <>
-            <p className="hint" id={hintId}>Sử dụng từ 10–128 ký tự.</p>
             <PasswordField name="confirmPassword" label="Xác nhận mật khẩu" autoComplete="new-password" disabled={pending} />
           </>}
         </>

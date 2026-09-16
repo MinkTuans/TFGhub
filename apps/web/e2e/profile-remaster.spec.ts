@@ -8,7 +8,7 @@ for (const width of [390, 768, 1024, 1440]) {
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.setViewportSize({ width, height: 1000 });
     const suffix = randomUUID();
-    expect((await page.request.post("/api/auth/register", { data: { email: `profile-${suffix}@example.com`, password: "password123" } })).ok()).toBe(true);
+    expect((await page.request.post("/api/auth/register", { data: { email: `profile-${suffix}@example.com`, password: "Password123!" } })).ok()).toBe(true);
     expect((await page.request.put("/api/developers/me", { data: { displayName: "Nhà sáng tạo", bio: "Những ý tưởng nhỏ và thế giới mới." } })).ok()).toBe(true);
     const created = await page.request.post("/api/games", { data: { title: "Private creation", slug: `private-${suffix}`, sourceType: "UPLOAD", description: "My unpublished game" } });
     expect(created.ok()).toBe(true);

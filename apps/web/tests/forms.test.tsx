@@ -147,12 +147,12 @@ test("registration reports the API conflict and permits another attempt", async 
   );
   render(<AuthForm mode="register" />);
   fireEvent.change(screen.getByLabelText("Tên hiển thị"), { target: { value: "Minh" } });
-  fireEvent.change(screen.getByLabelText("Xác nhận mật khẩu"), { target: { value: "password123" } });
+  fireEvent.change(screen.getByLabelText("Xác nhận mật khẩu"), { target: { value: "Password123!" } });
   fireEvent.change(screen.getByLabelText("Thư điện tử"), {
     target: { value: "me@example.com" },
   });
   fireEvent.change(screen.getByLabelText("Mật khẩu"), {
-    target: { value: "password123" },
+    target: { value: "Password123!" },
   });
   fireEvent.submit(
     screen.getByRole("button", { name: "Tạo tài khoản" }).closest("form")!,
@@ -232,7 +232,7 @@ test.each([
     target: { value: "me@example.com" },
   });
   fireEvent.change(screen.getByLabelText("Mật khẩu"), {
-    target: { value: "password123" },
+    target: { value: "Password123!" },
   });
   fireEvent.submit(
     screen.getByRole("button", { name: "Đăng nhập" }).closest("form")!,

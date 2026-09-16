@@ -135,7 +135,7 @@ describe('contracts', () => {
   });
 
   it('normalizes registration email', () => {
-    expect(RegisterInput.parse({ email: ' DEV@EXAMPLE.COM ', password: 'password123' }).email)
+    expect(RegisterInput.parse({ email: ' DEV@EXAMPLE.COM ', password: 'Password123!' }).email)
       .toBe('dev@example.com');
   });
 

@@ -79,11 +79,11 @@ describeDatabase('mutation batches on PostgreSQL', () => {
     ];
     await owner
       .post('/auth/register')
-      .send({ email: emails[0], password: 'password123' })
+      .send({ email: emails[0], password: 'Password123!' })
       .expect(201);
     await other
       .post('/auth/register')
-      .send({ email: emails[1], password: 'password123' })
+      .send({ email: emails[1], password: 'Password123!' })
       .expect(201);
     ownerId = (
       await database.user.findUniqueOrThrow({ where: { email: emails[0] } })

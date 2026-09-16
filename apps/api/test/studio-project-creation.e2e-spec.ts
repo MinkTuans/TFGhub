@@ -37,7 +37,7 @@ describeDatabase('atomic Studio draft creation on PostgreSQL', () => {
     const email = `studio-${randomUUID()}@example.test`;
     await owner
       .post('/auth/register')
-      .send({ email, password: 'password123' })
+      .send({ email, password: 'Password123!' })
       .expect(201);
     ownerId = (await database.user.findUniqueOrThrow({ where: { email } })).id;
   });

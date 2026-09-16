@@ -110,7 +110,7 @@ Assets accept at most 10 MiB. Images are checked by content, metadata, dimension
 
 ### Accounts and profiles
 
-Registration/login JSON is `{email, password}`. Email is trimmed, lowercased, and validated; password length is 10–128 characters. Registration returns `201`, login `200`, and both return `{id,email,role}` with `Set-Cookie`. Duplicate registration returns `409`. Logout returns `204` without a body and clears the cookie.
+Registration/login JSON is `{email, password}`. Email is trimmed, lowercased, and validated; both endpoints require passwords of 8–128 characters containing a lowercase letter, an uppercase letter, a digit (0–9), and punctuation or a symbol. Whitespace alone is not a special character; passwords are never trimmed. Existing passwords that do not meet these requirements are rejected on login. Registration returns `201`, login `200`, and both return `{id,email,role}` with `Set-Cookie`. Duplicate registration returns `409`. Logout returns `204` without a body and clears the cookie.
 
 Profile replacement accepts `{displayName, bio?}` where display name is 2–50 trimmed characters and bio at most 500 characters. GET/PUT return `{displayName,bio}`; GET returns `404` when absent.
 
