@@ -28,7 +28,7 @@ body:has(.studio-shell)::before { display: none; }
 body > main:not(.studio-shell) :is(h1, h2), .site-footer__brand { font-family: var(--font-heading); letter-spacing: -.025em; }
 body > main:not(.studio-shell) h1 { font-weight: 700; }
 .site-header { background: #0a143b85; border-bottom-color: #65719428; backdrop-filter: blur(14px); }
-[data-theme="light"] .site-header { background: #fffdf4df; border-bottom-color: #9fbdb780; }
+[data-theme="light"] .site-header { background: #fffdf485; border-bottom-color: #9fbdb780; }
 .site-header__inner { min-height: 5.5rem; }
 .site-header .brand { display: flex; align-items: center; gap: .7rem; }
 .brand-wordmark { display: flex; flex-direction: column; font: 700 1.75rem var(--font-heading); letter-spacing: .03em; color: var(--text); }
