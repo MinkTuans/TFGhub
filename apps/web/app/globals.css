@@ -567,3 +567,15 @@ footer { padding: 2.5rem 0; border-top: 1px solid var(--border); font-size: 0.87
 .workspace-sections { display: flex; gap: .75rem; flex-wrap: wrap; padding: 1rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); }
 .workspace-sections a { padding: .65rem .85rem; border-radius: var(--radius-sm); }
 .workspace :is(h2[id], #game-editor) { scroll-margin-top: 6rem; }
+
+/* Review queue: preserve the displayed submission while clarifying decisions. */
+.moderation-count { font-weight: 700; margin: 2rem 0 1rem; }
+.moderation-page .moderation-grid { grid-template-columns: 1fr; }
+.moderation-page .moderation-card { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr); gap: 1.5rem; }
+.moderation-card__info, .moderation-card__preview, .moderation-card__decision { min-width: 0; }
+.moderation-card__info h2 { overflow-wrap: anywhere; }
+.moderation-card__preview iframe { width: 100%; height: auto; min-height: 0; aspect-ratio: 16 / 9; border: 1px solid var(--border); border-radius: var(--radius-md); background: #fff; }
+.moderation-card__decision { grid-column: 1 / -1; border-top: 1px solid var(--border); padding-top: 1.5rem; }
+.moderation-card__decision .actions { margin-top: 1rem; }
+@media (max-width: 768px) { .moderation-page .moderation-card { grid-template-columns: 1fr; } }
+.moderation-card h3 + .hint { margin: .5rem 0 1rem; }

@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-for (const width of [390, 768, 1440]) {
+for (const width of [390, 768, 1024, 1440]) {
   test(`catalog search and game information at ${width}px`, async ({ page }, testInfo) => {
     const errors: string[] = [];
     page.on("pageerror", (error) => errors.push(error.message));

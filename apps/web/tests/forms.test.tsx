@@ -905,3 +905,15 @@ test("display settings reject invalid dimensions and retain values after an API 
   expect(width).toHaveValue(4);
   expect(screen.getByRole("button", { name: "Lưu hiển thị" })).toBeEnabled();
 });
+
+test("moderation explains a missing preview and updates pending count after approval", async () => {
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("{}")));
+  render(<ModerationQueue initialGames={[{ ...moderationGame("game-1", "Review me"), artifactReady: false }]} />);
+  expect(screen.getByText("1 game chờ duyệt")).toBeVisible();
+  expect(screen.getByText("Bản chơi thử chưa sẵn sàng.")).toBeVisible();
+  expect(screen.getByText("7/9/2026, 09:00 UTC")).toHaveAttribute("datetime", "2026-09-07T09:00:00.000Z");
+  fireEvent.click(screen.getByRole("button", { name: "Duyệt" }));
+  await screen.findByText("Đã duyệt game.");
+  expect(screen.getByText("0 game chờ duyệt")).toBeVisible();
+  expect(screen.getByRole("heading", { name: "Đã xử lý hết hàng đợi" })).toBeVisible();
+});

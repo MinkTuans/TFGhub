@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
 
 test.afterEach(async ({ request }) => {
@@ -38,4 +39,14 @@ test("slow catalog searches show progress before the next results", async ({ pag
   await page.getByRole("button", { name: "Tìm kiếm", exact: true }).click();
   await expect(page.getByRole("button", { name: "Tìm kiếm", exact: true })).toBeEnabled();
   await expect(page.getByRole("status")).toHaveCount(0);
+});
+
+
+test("protected Studio shows loading while owner games are delayed", async ({ page, request }) => {
+  await page.request.post("/api/auth/register", { data: { email: `loading-${randomUUID()}@example.com`, password: "password123" } });
+  await request.post("/__test/api-fault?mode=owner-delay");
+  await page.goto("/studio", { waitUntil: "commit" });
+  await expect(page.getByRole("status")).toContainText("Đang tải nội dung…");
+  await expect(page.getByRole("heading", { name: "Studio của bạn" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Ý tưởng đầu tiên đang chờ bạn" })).toBeVisible();
 });

@@ -298,7 +298,7 @@ app.use((request, response, next) => {
     response.status(503).json({ message: "test-only upstream failure" });
     return;
   }
-  if (apiFault === "discover-delay" && request.path === "/discover") {
+  if ((apiFault === "discover-delay" && request.path === "/discover") || (apiFault === "owner-delay" && request.path === "/games/mine")) {
     setTimeout(next, 2000);
     return;
   }
@@ -325,7 +325,7 @@ const gateway = createServer((request, response) => {
   const url = new URL(request.url, "http://localhost:3100");
   if (request.method === "POST" && url.pathname === "/__test/api-fault") {
     const fault = url.searchParams.get("mode");
-    if (!["off", "session", "game", "discover-delay"].includes(fault)) {
+    if (!["off", "session", "game", "discover-delay", "owner-delay"].includes(fault)) {
       response.writeHead(400).end();
       return;
     }

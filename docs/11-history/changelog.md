@@ -2,6 +2,10 @@
 
 This release-oriented summary records major architecture/product milestones. It is not a deployment ledger; a development commit does not prove production rollout.
 
+## 2026-09-16 — Moderation presentation and broad UI audit (development only)
+
+Review queue now shows actual pending count, readable UTC submission dates, separate preview/decision areas and an explicit empty state. Review concurrency payloads and authorization remain unchanged. Scoped preview sizing avoids inherited oversized frames on mobile. Full frontend unit473/473 and production browser58/58 passed; final sizing regression4/4 passed after rebuild. Full lint retains one existing warning. Real ENGINE/assets integration remains open in the [plan](../superpowers/plans/2026-09-16-ui-remaster.md). No deployment.
+
 ## 2026-09-16 — Creator dashboard and management presentation (development only)
 
 Studio now searches and filters real owner games, sorts by update/name and distinguishes empty results from an empty account. Card data excludes full project payloads across the client boundary. Creation guidance preserves the single-click blank ENGINE flow; legacy management adds section navigation. Verified46 focused unit tests,9 production-browser checks across four widths and both themes, changed-file lint and production build. No deployment; moderation and final audit remain in the [plan](../superpowers/plans/2026-09-16-ui-remaster.md).

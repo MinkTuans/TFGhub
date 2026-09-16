@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
 
-for (const width of [390, 768, 1440]) {
+for (const width of [390, 768, 1024, 1440]) {
   test(`account forms fit ${width}px and support password visibility`, async ({ page }, testInfo) => {
     await page.setViewportSize({ width, height: 1000 });
     for (const mode of ["login", "register"]) {

@@ -2,6 +2,7 @@
 
 import { useState, useSyncExternalStore } from "react";
 import { api, resolvePublicApiBaseUrl } from "../lib/api-client";
+import { EmptyState } from "./empty-state";
 import { apiErrorMessage } from "../lib/api-error-message";
 
 export type ModerationGame = {
@@ -16,6 +17,11 @@ export type ModerationGame = {
   submittedAt: string;
   creator: { id: string; displayName: string | null };
 };
+
+function submittedDate(value: string) {
+  const date = new Date(value);
+  return `${date.toLocaleDateString("vi-VN", { timeZone: "UTC" })}, ${date.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "UTC" })} UTC`;
+}
 
 const subscribeToNothing = () => () => {};
 
@@ -70,10 +76,11 @@ export function ModerationQueue({
       data-hydrated={hydrated}
       data-testid="moderation-queue"
     >
+      <p className="moderation-count">{games.length} game chờ duyệt</p>
       {message && <p role="status">{message}</p>}
       {error && <p role="alert">{error}</p>}
       {games.length === 0 ? (
-        <p>Không có game nào đang chờ duyệt.</p>
+        <EmptyState title="Đã xử lý hết hàng đợi" description="Không có game nào đang chờ duyệt." />
       ) : (
         <div className="moderation-grid">
           {games.map((game) => {
@@ -85,6 +92,8 @@ export function ModerationQueue({
                 aria-label={game.title}
                 key={game.id}
               >
+                <div className="moderation-card__info">
+                <span className="badge" data-state="PENDING">Chờ duyệt</span>
                 <h2>{game.title}</h2>
                 <p>Tác giả: {game.creator.displayName ?? "Chưa có tên"}</p>
                 <p>
@@ -100,19 +109,28 @@ export function ModerationQueue({
                 </p>
                 <p>
                   Ngày gửi:{" "}
-                  <time dateTime={game.submittedAt}>{game.submittedAt}</time>
+                  <time dateTime={game.submittedAt}>{submittedDate(game.submittedAt)}</time>
                 </p>
                 <p className="description">{game.description}</p>
-                {game.artifactReady && game.artifactVersion > 0 && (
+                <p className="hint">Bản gửi: {game.artifactVersion}</p>
+                </div>
+                <div className="moderation-card__preview">
+                <h3>Chơi thử & kiểm tra</h3>
+                {game.artifactReady && game.artifactVersion > 0 ? (
                   <iframe
                     title="Chơi thử game"
                     src={`${resolvePublicApiBaseUrl()}/games/${encodeURIComponent(game.id)}/preview/?v=${game.artifactVersion}`}
                     sandbox="allow-scripts allow-pointer-lock"
                   />
-                )}
+                ) : <p className="hint">Bản chơi thử chưa sẵn sàng.</p>}
+                </div>
+                <div className="moderation-card__decision">
+                <h3>Quyết định kiểm duyệt</h3>
+                <p className="hint">Chơi thử và kiểm tra nội dung. Nếu từ chối, ghi rõ điều tác giả cần sửa.</p>
                 <label>
                   Lý do từ chối
                   <textarea
+                    disabled={busy}
                     value={note}
                     maxLength={500}
                     onChange={(event) =>
@@ -139,6 +157,7 @@ export function ModerationQueue({
                   >
                     {busy ? "Đang duyệt…" : "Từ chối"}
                   </button>
+                </div>
                 </div>
               </article>
             );
