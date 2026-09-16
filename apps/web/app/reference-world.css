@@ -11,20 +11,24 @@
   --shadow-md: 0 14px 40px #03081d50; --shadow-lg: 0 28px 80px #03081d80;
 }
 [data-theme="light"] {
-  --page: #e8e8f3; --surface: #f8f6ffed; --surface-raised: #e0e5f4; --text: #1d2946;
-  --muted: #455571; --border: #aab5d0; --control-border: #60708f;
-  --primary: #614c8d; --primary-hover: #443365; --on-primary: #ffffff;
-  --secondary: #614c8d; --secondary-hover: #443365; --focus: #614c8d;
-  --badge: #dce1f1; --skeleton-base: #cdd4e9; --skeleton-highlight: #f8f6ff;
+  --page: #f4f5ed; --surface: #fffdf6f5; --surface-raised: #e6f0ed; --text: #153347;
+  --muted: #42596b; --border: #aec4c4; --control-border: #647e85;
+  --primary: #175f70; --primary-hover: #104653; --on-primary: #ffffff;
+  --secondary: #17677a; --secondary-hover: #104653; --focus: #17677a;
+  --badge: #dcebe6; --skeleton-base: #d7e6df; --skeleton-highlight: #fffdf6;
+  --shadow-md: 0 14px 40px #315b6920; --shadow-lg: 0 28px 80px #315b6928;
 }
 body { background: var(--page); position: relative; isolation: isolate; }
 body::before { content: ""; position: absolute; z-index: -1; inset: 0 0 auto; height: 940px; pointer-events: none; background: linear-gradient(180deg, #080f281a 15%, #080f2820 55%, var(--page) 100%), url('/art/tfg-twilight-world.png') center top / cover no-repeat; }
-[data-theme="light"] body::before { opacity: .3; }
+[data-theme="light"] body::before {
+  opacity: 1;
+  background-image: linear-gradient(180deg, transparent 55%, var(--page) 100%), linear-gradient(90deg, #fff9eac9, #fff9ea40 45%, transparent 72%), url('/art/tfg-daylight-world.png');
+}
 body:has(.studio-shell)::before { display: none; }
 body > main:not(.studio-shell) :is(h1, h2), .site-footer__brand { font-family: var(--font-heading); letter-spacing: -.025em; }
 body > main:not(.studio-shell) h1 { font-weight: 700; }
 .site-header { background: #0a143b85; border-bottom-color: #65719428; backdrop-filter: blur(14px); }
-[data-theme="light"] .site-header { background: #eef0fabf; }
+[data-theme="light"] .site-header { background: #fffdf4df; border-bottom-color: #9fbdb780; }
 .site-header__inner { min-height: 5.5rem; }
 .site-header .brand { display: flex; align-items: center; gap: .7rem; }
 .brand-wordmark { display: flex; flex-direction: column; font: 700 1.75rem var(--font-heading); letter-spacing: .03em; color: var(--text); }
@@ -51,7 +55,7 @@ body > main:not(.studio-shell) h1 { font-weight: 700; }
 .home-hero .button { padding: .9rem 1.6rem; }
 .home-hero .button-ghost { border-color: transparent; background: transparent; }
 .home-community { padding: 2rem; margin-inline: 0; background: linear-gradient(160deg, #102443db, #101a38c9); border: 1px solid #52628855; border-radius: 1rem; backdrop-filter: blur(12px); }
-[data-theme="light"] .home-community { background: var(--surface); }
+[data-theme="light"] .home-community { background: var(--surface); border-color: var(--border); box-shadow: var(--shadow-md); }
 .catalog-grid { gap: 1.2rem; }
 .game-card { background: linear-gradient(145deg, var(--surface-raised), var(--surface)); border: 1px solid var(--border); border-radius: .8rem; padding: .5rem; box-shadow: 0 8px 24px #03081d30; }
 .game-card__artwork, .game-card .game-cover { border-radius: .45rem; overflow: hidden; }
@@ -93,7 +97,7 @@ body > main:not(.studio-shell) h1 { font-weight: 700; }
 .auth-form > button { margin-top: .75rem; }
 .site-footer { background: #08142cdb; }
 footer { background: linear-gradient(180deg, #0b1b37db, #070f24); border-top: 1px solid #4b587944; margin-top: 3rem; }
-[data-theme="light"] footer { background: var(--surface); }
+[data-theme="light"] footer { background: linear-gradient(180deg, #e7efe6, #dcebe6); border-color: var(--border); }
 .site-footer__inner { padding-block: 1rem; }
 .mobile-dock { display: none; }
 .game-details { background: var(--surface); border: 1px solid var(--border); border-radius: .85rem; padding: 2rem; }
@@ -145,5 +149,24 @@ footer { background: linear-gradient(180deg, #0b1b37db, #070f24); border-top: 1p
   .game-player:not(:fullscreen), .game-page__unavailable {
     height: min(75dvh, calc(100dvh - 11rem - env(safe-area-inset-bottom)));
     min-height: 0;
+  }
+}
+
+/* Daylight surfaces echo the harbor's ivory stone and clear marine colors. */
+[data-theme="light"] .home-hero__copy h1 { text-shadow: none; }
+[data-theme="light"] .home-hero__lede { color: var(--text); }
+[data-theme="light"] .game-card { box-shadow: 0 8px 24px #315b6918; }
+[data-theme="light"] .game-cover__fallback { color: #153347; background: radial-gradient(ellipse at 75% 12%, #fff9d9, transparent 45%), linear-gradient(155deg, hsl(var(--game-cover-hue) 35% 86%), #b8dcd7); }
+[data-theme="light"] .game-cover__fallback::after { background: linear-gradient(160deg, #749ba340, #507b8940); }
+[data-theme="light"] .game-cover__fallback strong { text-shadow: none; }
+[data-theme="light"] .game-page__layout { background: #e6f0edd9; }
+[data-theme="light"] .game-showcase__banner::after { background: linear-gradient(90deg, #fffdf6f5, #fffdf6bb 60%, #fffdf626); }
+[data-theme="light"] .game-showcase__caption { color: var(--text); }
+[data-theme="light"] .mobile-dock { background: #fffdf6f5; border-color: var(--border); }
+[data-theme="light"] .mobile-dock a { color: var(--muted); }
+[data-theme="light"] .mobile-dock a[aria-current="page"] { color: var(--primary); }
+@media (max-width: 768px) {
+  [data-theme="light"] body::before {
+    background-image: linear-gradient(180deg, #fff9eac9, #fff9ea70 38%, transparent 65%, var(--page) 100%), url('/art/tfg-daylight-world.png');
   }
 }
