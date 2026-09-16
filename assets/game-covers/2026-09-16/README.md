@@ -89,3 +89,11 @@ Asset: `snake.webp`
 Prompt: Neon Snake arcade on dark luminous grid, turquoise segmented snake with pink crystals; premium playful 3D cover, 16:9, no words/logos/buttons, quiet lower-right.
 
 Original: `/home/codexproxy/.codex/generated_images/01a0a9e5-bbba-7b72-be46-43e6e8110fdb/exec-2dfe3058-2020-4ca9-9ecb-d20b0d928cdb.png`
+
+## Chess (added during rollout)
+
+New draft game discovered by deployment preflight. Cover added without publishing or changing game content.
+
+Prompt: polished landscape chess game artwork, ivory knight and obsidian king across a chessboard, teal and amber cinematic lighting, stylized 3D art, no text or UI.
+
+Original: /home/codexproxy/.codex/generated_images/01a0a9e5-bbba-7b72-be46-43e6e8110fdb/exec-42f4b136-5037-4651-98de-2e9456b4f2a7.png

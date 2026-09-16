@@ -108,5 +108,16 @@
     "height": 720,
     "bytes": 182074,
     "sha256": "85f3ca130b2f9ce436cee7cffc1aa2b066e59067bd20a8fd6704595b8a195a44"
+  },
+  {
+    "gameId": "cmu4btmj10002pj01k6w2sbm0",
+    "slug": "game-chua-co-ten-95e0226b-4487-4db7-9f43-99409e89764d",
+    "title": "Chess",
+    "visibility": "DRAFT",
+    "file": "chess.webp",
+    "width": 1280,
+    "height": 720,
+    "bytes": 119738,
+    "sha256": "136b8c5e86abe4a79f23467dc8ec685de4e8fac6c907318785eb646361d1e18f"
   }
 ]
