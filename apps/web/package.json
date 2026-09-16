@@ -17,7 +17,9 @@
     "@indieforge/contracts": "workspace:^",
     "next": "16.3.4",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "react-markdown": "10",
+    "remark-gfm": "4"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",

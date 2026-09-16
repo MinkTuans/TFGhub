@@ -65,6 +65,8 @@ async function request<T>(
 }
 
 export const api = {
+  delete: <T = void>(path: string, body: unknown, options?: Options) =>
+    request<T>("DELETE", path, body, options),
   get: <T>(path: string, options?: Options) =>
     request<T>("GET", path, undefined, options),
   post: <T>(path: string, body: unknown, options?: Options) =>

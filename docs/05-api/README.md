@@ -170,3 +170,16 @@ Artifact capabilities expire after five minutes and are scoped to a game, artifa
 Nest validation and domain services return conventional HTTP statuses: `400` invalid domain input, `401` missing/invalid session, `403` origin/ownership/role denial, `404` unavailable resource, `409` revision or state conflict, `413` size limit, and `415` unsupported media type. Use the actual controller/service tests for exact response payloads.
 
 Related: [workflows](../04-workflows/authoring-publishing-and-assets.md), [database](../06-database/schema-and-migrations.md), and [security rules](../08-rules/coding-and-security-rules.md).
+
+## Administrator documentation library
+
+`/admin/library` requires authenticated ADMIN on every endpoint (database role is
+re-read); browser mutations also require the existing trusted-origin policy.
+GET `categories` lists categories/counts; POST creates; PATCH/DELETE
+`categories/:id` update/remove. GET `documents` supports `query` (title/content),
+`categoryId`, exact `sourcePath`, `offset` (0–100000), `limit` (1–100, default50),
+returning `{items,total}` summaries. GET `documents/:id` includes Markdown content.
+POST creates; PATCH/DELETE `documents/:id` update/remove. Mutation objects are
+strict; update/delete require current positive integer `version`. Stale versions
+and nonempty category deletion return409; unknown IDs404; invalid fields400.
+`sourcePath` is server-owned import provenance. GET responses are private/no-store.

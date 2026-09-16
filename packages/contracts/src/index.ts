@@ -70,3 +70,8 @@ export type {
   ReviewRevisionInput as ReviewRevisionInputType,
   StoryProjectInput as StoryProjectInputType,
 } from './games.js';
+export {
+  AdminCategoryInput, AdminCategoryUpdateInput, AdminDocumentInput,
+  AdminDocumentUpdateInput, AdminDeleteInput, AdminDocumentsQuery,
+} from './admin-library.js';
+export type { AdminCategory, AdminDocumentSummary, AdminDocument, AdminDocumentList } from './admin-library.js';

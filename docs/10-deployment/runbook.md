@@ -535,3 +535,25 @@ secret-management process.
 Changing `JWT_SECRET` and recreating the API invalidates existing sessions; users must sign in again. Coordinate this with the maintenance window. Changing `POSTGRES_PASSWORD` in `.env.production` alone does not rotate an existing database role: the PostgreSQL image initializes credentials only on an empty data volume. Stop API/web, change the role password inside PostgreSQL using a secure administrative session, update the protected environment file to the same new hexadecimal value, and recreate the API/migration services before health checks. Avoid passwords in command arguments or shell history. Changing the origin also requires API recreation; switching from HTTP to HTTPS requires secure cookies and a fresh login.
 
 One host and one database provide no automatic failover, rolling deployment guarantee, or point-in-time recovery. Host loss, disk exhaustion, restarts, and migrations can interrupt service. Define recovery objectives around tested off-host backups, monitor uptime/disk/certificate renewal, and plan replication and additional hosts separately if those limits are unacceptable.
+
+## Administrator documentation library
+
+The ADMIN-only `/admin/library` stores categories/documents in PostgreSQL. Apply
+`20260916120000_admin_library` and explicitly import the repository documentation
+once after migrations, using the new API image and existing production Compose
+function:
+
+```bash
+compose run --rm --no-deps --entrypoint node migrate scripts/seed-admin-library.mjs
+```
+
+The transaction imports regular Markdown files under approved `docs/` topics,
+records original paths as read-only provenance, and writes the durable
+`AdminLibraryState` marker `project-docs-v1`. It does not run on API startup.
+Repeat invocations report `seeded:false`: edits and deletions made on web are
+preserved, and newly deployed source files do not overwrite library records.
+The library is an editable operational copy; source docs remain versioned in
+Git. Admin may create and update entries on web as the project evolves.
+Database backups include all library records. No artifact-volume change is
+required. Keep API/web rollback image tags before starting builds. A compatible
+application rollback can leave these additive tables in place.

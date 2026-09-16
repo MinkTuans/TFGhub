@@ -268,3 +268,32 @@ model GameRelease {
 
   @@unique([gameId, id])
 }
+
+model AdminLibraryState {
+  id        String   @id
+  createdAt DateTime @default(now())
+}
+
+model AdminCategory {
+  id          String          @id @default(cuid())
+  name        String          @db.VarChar(100)
+  description String          @default("") @db.VarChar(500)
+  version     Int             @default(1)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  documents   AdminDocument[]
+}
+
+model AdminDocument {
+  id         String        @id @default(cuid())
+  categoryId String
+  title      String        @db.VarChar(200)
+  content    String        @default("")
+  sourcePath String?       @unique @db.VarChar(500)
+  version    Int           @default(1)
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+  category   AdminCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  @@index([categoryId])
+}

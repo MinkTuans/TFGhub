@@ -13,3 +13,13 @@
 | Deployment | Compose, Caddy, migrations, backup/restore | `/health` is liveness only |
 
 Not implemented: complete ENGINE build/release/runtime, production asset-GC scheduling, malware scanning, analytics, donations, or a generative-AI integration. Database tables and historical plans alone do not make a feature delivered.
+
+## Administrator information and documents
+
+ADMIN accounts have a separate “Quản trị website” entry leading to `/admin/library`.
+They can create, read, edit and delete document categories and Markdown documents,
+search title/content, read formatted tables/code, and follow imported document
+links. Empty categories may be deleted; documents must first be moved or removed.
+Concurrent stale saves/deletes are rejected with a version conflict. Guest, USER
+and MODERATOR sessions cannot access these records. Library edits persist in
+PostgreSQL and do not change executable source files or application configuration.

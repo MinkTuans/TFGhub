@@ -64,3 +64,12 @@ Do not infer the production schema from `schema.prisma` alone.
 ## Change rules
 
 Add a new migration for every schema change. Never edit an applied historical migration. Verify Prisma validation, an empty-database migration, upgrade behavior where relevant, and database integration tests. Dedicated integration suites skip unless `ENGINE_CORE_TEST_DATABASE_URL` or `ENGINE_GAME_SOURCE_TEST_DATABASE_URL` is configured.
+
+## Administrator library
+
+`20260916120000_admin_library` adds `AdminCategory`, `AdminDocument` and
+`AdminLibraryState`. Documents use a RESTRICT category FK, nullable unique
+source provenance and integer optimistic-lock versions. `AdminLibraryState`
+records the one-time import marker so source redeployments never overwrite
+admin edits or resurrect deletions. The seed holds a transaction-scoped advisory
+lock and commits categories, documents and marker atomically.

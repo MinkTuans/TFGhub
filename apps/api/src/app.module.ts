@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { AdminLibraryModule } from './admin-library/admin-library.module.js';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 import { HealthController } from './health/health.controller.js';
@@ -11,6 +12,7 @@ import { GameAssetsModule } from './game-assets/game-assets.module.js';
 @Module({
   imports: [
     AuthModule,
+    AdminLibraryModule,
     DevelopersModule,
     GamesModule,
     EngineProjectsModule,
