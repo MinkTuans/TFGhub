@@ -1,6 +1,6 @@
 # Game card overlap and cover artwork — 2026-09-16
 
-Status: validated; deployment pending.
+Status: COMPLETE — deployed and live-verified 2026-09-16 16:52 UTC.
 
 The user's phone screenshot showed RS/NC fallback initials overlapping the lower-right “Xem trò chơi” action. Both occupied the same corner; the visual theme raised initials above the action. The action now occupies normal flow below artwork. Initials are smaller and centered; redundant branding is hidden on compact and narrow discovery thumbnails.
 
@@ -17,3 +17,13 @@ Validation:
 Rollout uses the existing owner-authorized image-upload API in an isolated API process while public services are stopped. Baseline checks cover all game content fields; only coverVersion/contentType/updatedAt may change. No source, publication, accounts, scores or play activity are modified. Successful cover uploads are individually valid and remain valid if web rollback is needed. Original public containers restart if the image-upload step fails; retries accept only matching version-1 bytes.
 
 Rollout preflight discovered a newly created twelfth game, Chess (private draft), and aborted before any upload. Original API/web restarted healthy. The original eleven rows were unchanged; captured the additional row and generated a twelfth cover. Manifest now maps every ID explicitly; owned authenticated reads verify private cover bytes without publishing the draft. First backup: 20260916T164255-967626. Web build passed: sha256:988abf8174ea0448797d2e0e1721a96724b94ff7afcbf1b6b14bf333fdc6db11 (code a2f7498). Chess is uploaded through the API storage volume, so adding its source asset does not require rebuilding web.
+
+Completion:
+- Added 12 covers through the existing API: 11 public games and private Chess draft. Every owned response matched its manifest SHA-256; all non-cover game fields matched the captured baseline.
+- A second preflight failed before uploads because manifest.json was not readable by the container user. Corrected its file mode to 0644; original services recovered normally. Final rollout succeeded.
+- Consistent final backup: backups/20260916T165010-975987.database.dump and .artifacts.tar.gz, with .sha256 manifest.
+- Live API unchanged: sha256:421efea2a785de16e2add441a0c2327d3836ec58e21b96d7cf6b361d1a24ed32.
+- Live web: sha256:988abf8174ea0448797d2e0e1721a96724b94ff7afcbf1b6b14bf333fdc6db11. API/web/database healthy.
+- Live checks passed: all 11 public cover hashes, versions, immutable caching; 18 pages (home/discover/detail at 320/390/1440 × light/dark), all covers loaded, zero fallback initials, CTA below cover, no horizontal overflow or page errors. GET-only browser routing recorded zero mutation requests. Private Chess bytes verified via owner-authenticated read during isolated upload, without publishing it.
+- Reviewed live mobile screenshot. Original test API/Next previews stopped; transient owner credentials were in-memory only.
+- Code a2f7498; Chess asset/provenance 6a24e1d. Report marks completion so stale wakeups must not redeploy or re-upload.
