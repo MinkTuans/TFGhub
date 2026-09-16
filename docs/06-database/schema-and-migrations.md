@@ -19,7 +19,7 @@ Release  ──0..1── origin Release (rollback lineage)
 
 ## Core models
 
-- `User`: identity, password hash, role, owned games, authored revisions/builds/releases.
+- `User`: identity, password hash, role, active state (`isActive`), administrator edit version (`adminVersion`), owned games, authored revisions/builds/releases.
 - `DeveloperProfile`: one-to-one public creator identity.
 - `Game`: product metadata, source type, legacy `projectData`, artifact/cover/review state, and optional current release pointer.
 - `EngineProject`: one-to-one ENGINE aggregate for a game and its head revision number.
@@ -73,3 +73,5 @@ source provenance and integer optimistic-lock versions. `AdminLibraryState`
 records the one-time import marker so source redeployments never overwrite
 admin edits or resurrect deletions. The seed holds a transaction-scoped advisory
 lock and commits categories, documents and marker atomically.
+
+Migration `20260916140000_admin_management` adds `User.isActive` (default true) and positive `adminVersion` (default1), preserving existing accounts and games. Administrator user changes serialize with a PostgreSQL advisory lock and enforce version checks; deletion locks/checks the target and all related content before acting.

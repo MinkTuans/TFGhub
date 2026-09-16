@@ -75,3 +75,5 @@ export {
   AdminDocumentUpdateInput, AdminDeleteInput, AdminDocumentsQuery,
 } from './admin-library.js';
 export type { AdminCategory, AdminDocumentSummary, AdminDocument, AdminDocumentList } from './admin-library.js';
+
+export * from "./admin-management.js";

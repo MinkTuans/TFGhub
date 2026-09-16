@@ -1,3 +1,4 @@
+import { AdminNavigation } from "../../../components/admin-management/admin-navigation";
 import { redirect } from "next/navigation";
 import type { AdminCategory, AdminDocument, AdminDocumentList } from "@indieforge/contracts";
 import { AdminLibrary } from "../../../components/admin-library/admin-library";
@@ -15,5 +16,5 @@ export default async function AdminLibraryPage({ searchParams }: { searchParams?
     const matched = await privateGet<AdminDocumentList>(`/admin/library/documents?sourcePath=${encodeURIComponent(sourcePath)}&limit=1`);
     if (matched.items[0]) document = await privateGet<AdminDocument>(`/admin/library/documents/${encodeURIComponent(matched.items[0].id)}`);
   }
-  return <main><AdminLibrary initialCategories={categories} initialDocuments={documents} initialDocument={document} /></main>;
+  return <main><AdminNavigation /><AdminLibrary initialCategories={categories} initialDocuments={documents} initialDocument={document} /></main>;
 }

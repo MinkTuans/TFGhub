@@ -12,13 +12,15 @@ test.each([null, "USER", "MODERATOR"] as const)("role %s cannot SSR-load protect
   await expect(Page({})).rejects.toThrow("redirect:/");
   expect(privateGet).not.toHaveBeenCalled();
 });
-test("ADMIN loads library and admin root redirects to library", async () => {
+test("ADMIN loads library and management landing", async () => {
   vi.mocked(optionalSession).mockResolvedValue({ id: "a", email: "a@example.test", role: "ADMIN" });
   vi.mocked(privateGet).mockImplementation(async (path) => path.endsWith("categories") ? [] : { items: [], total: 0 });
   render(await Page({}));
   expect(privateGet).toHaveBeenCalledWith("/admin/library/documents?offset=0&limit=6");
   expect(screen.getByRole("heading", { name: "Thư viện website" })).toBeVisible();
-  await expect(AdminPage()).rejects.toThrow("redirect:/admin/library");
+  render(await AdminPage());
+  expect(screen.getByRole("heading", { name: "Quản trị website" })).toBeVisible();
+  expect(screen.getByRole("link", { name: /Người dùng Quản lý/ })).toHaveAttribute("href", "/admin/users");
 });
 test.each(["USER", "MODERATOR", "ADMIN"] as const)("navigation exposes admin link only to ADMIN (%s)", (role) => {
   render(<SiteNavigation session={{ id: "u", email: "u@example.test", role }} />);

@@ -1,3 +1,4 @@
+import { AdminNavigation } from "../../components/admin-management/admin-navigation";
 import { redirect } from "next/navigation";
 import {
   ModerationQueue,
@@ -12,6 +13,7 @@ export default async function ModerationPage() {
 
   return (
     <main className="moderation-page">
+      {session.role === "ADMIN" && <AdminNavigation />}
       <header className="page-heading">
         <p className="eyebrow">Không gian kiểm duyệt</p>
         <h1>Hàng đợi kiểm duyệt</h1>

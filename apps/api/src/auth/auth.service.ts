@@ -9,7 +9,10 @@ import type { UserRole } from '@indieforge/database';
 import { argon2id, hash, verify } from 'argon2';
 
 export type AuthenticatedUser = { id: string; email: string; role: UserRole };
-export type StoredUser = AuthenticatedUser & { passwordHash: string };
+export type StoredUser = AuthenticatedUser & {
+  passwordHash: string;
+  isActive?: boolean;
+};
 type Credentials = { email: string; password: string };
 
 export abstract class AuthUsersRepository {
@@ -78,6 +81,7 @@ export class AuthService {
     const user = await this.users.findByEmail(input.email.trim().toLowerCase());
     if (
       !user ||
+      user.isActive === false ||
       !(await this.hasher.verify(user.passwordHash, input.password))
     ) {
       throw new UnauthorizedException('Invalid email or password');

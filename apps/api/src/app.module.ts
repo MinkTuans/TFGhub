@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { AdminManagementModule } from './admin-management/admin-management.module.js';
 import { AdminLibraryModule } from './admin-library/admin-library.module.js';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
@@ -13,6 +14,7 @@ import { GameAssetsModule } from './game-assets/game-assets.module.js';
   imports: [
     AuthModule,
     AdminLibraryModule,
+    AdminManagementModule,
     DevelopersModule,
     GamesModule,
     EngineProjectsModule,

@@ -90,6 +90,21 @@ describe('AuthService', () => {
     });
   });
 
+  it('rejects inactive accounts without issuing a token', async () => {
+    const { service, users, tokens } = fixture();
+    users.findByEmail.mockResolvedValue({
+      id: 'user-1',
+      email: 'dev@example.com',
+      passwordHash: 'hashed',
+      role: 'USER',
+      isActive: false,
+    });
+    await expect(
+      service.login({ email: 'dev@example.com', password: 'password123' }),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+    expect(tokens.signAsync).not.toHaveBeenCalled();
+  });
+
   it.each(['missing user', 'wrong password'])(
     'rejects %s without issuing a token',
     async (reason) => {

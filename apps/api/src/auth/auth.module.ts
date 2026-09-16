@@ -37,13 +37,13 @@ import { RolesGuard } from './roles.guard.js';
         create: (data) => database.user.create({ data }),
         findByEmail: (email) => database.user.findUnique({ where: { email } }),
         findById: (id) =>
-          database.user.findUnique({
-            where: { id },
+          database.user.findFirst({
+            where: { id, isActive: true },
             select: { id: true, email: true, role: true },
           }),
       }),
     },
   ],
-  exports: [AuthService, JwtAuthGuard, RolesGuard, JwtModule],
+  exports: [AuthService, JwtAuthGuard, RolesGuard, JwtModule, PasswordHasher],
 })
 export class AuthModule {}

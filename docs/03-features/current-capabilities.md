@@ -16,7 +16,13 @@ Not implemented: complete ENGINE build/release/runtime, production asset-GC sche
 
 ## Administrator information and documents
 
-ADMIN accounts have a separate “Quản trị website” entry leading to `/admin/library`.
+ADMIN accounts have a separate “Quản trị website” entry leading to `/admin`, with users, games, moderation and document sections.
+
+`/admin/users` supports search, role/activity filters, creation, editing, password replacement, role assignment, account locking and deletion of accounts without owned games or retained content history. Inactive accounts cannot log in or reuse existing sessions. Self-demotion/locking/deletion and removing the last active administrator are blocked.
+
+`/admin/games` searches across all owners, filters status/owner, edits metadata, access and visibility, and hides or quarantines content. Deletion is blocked when build/release history must be retained. New games use Studio and review decisions use the existing moderation workflow. Public visibility still requires approved, ready, clear content. User/game lists have ten records per page, responsive editors and unsaved-change protection.
+
+`/admin/library` remains the information and document library.
 They can create, read, edit and delete document categories and Markdown documents,
 search title/content, read formatted tables/code, and follow imported document
 links. Empty categories may be deleted; documents must first be moved or removed.

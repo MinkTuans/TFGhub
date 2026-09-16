@@ -183,3 +183,10 @@ POST creates; PATCH/DELETE `documents/:id` update/remove. Mutation objects are
 strict; update/delete require current positive integer `version`. Stale versions
 and nonempty category deletion return409; unknown IDs404; invalid fields400.
 `sourcePath` is server-owned import provenance. GET responses are private/no-store.
+
+
+### Administrator user/game management
+
+All routes require a currently active ADMIN; guests receive 401 and other roles 403. GET responses are private/no-store. `/admin/users` supports GET `{items,total}` and POST; `/admin/users/:id` supports GET/PATCH/DELETE. Queries accept `query`, optional `role`/`active` (`true` or `false`), `offset` and `limit` (default10, maximum50). Creation accepts normalized email, compliant password, optional display name, role and active state. PATCH accepts changed fields plus positive `version`; DELETE requires `version`. User responses contain identity, role, active state, profile name, game count and version, never password hashes. Inactive users cannot log in or authenticate existing cookies. Self-demotion/disable/delete and removal of the last active ADMIN are rejected; accounts with owned games or historical references cannot be deleted.
+
+`/admin/games` GET lists games across all owners and review states; `/admin/games/:id` supports GET/PATCH/DELETE. Search matches title, slug or owner email; filters include ownerId, visibility, moderationState and reviewState with the same paging bounds. PATCH accepts title, description, accessMode, visibility and moderationState plus `updatedAt`; DELETE requires `updatedAt`. Metadata changes to pending/approved games reset review and visibility to DRAFT. Non-CLEAR moderation hides the game; clearing does not publish it. PUBLIC requires an approved ready artifact and CLEAR moderation. Games with build/release history or other retained references cannot be deleted; hide/quarantine instead. Immutable stored artifacts are retained. New game creation and approve/reject use the existing Studio/moderation flows, preserving their validation.

@@ -52,7 +52,7 @@ export function SiteNavigation({ session }: SiteNavigationProps) {
           <Link href="/studio" aria-current={current("/studio")}>Xưởng sáng tạo</Link>
           <Link href="/profile" aria-current={current("/profile")}>Hồ sơ</Link>
           {canModerate && <Link href="/moderation" aria-current={current("/moderation")}>Kiểm duyệt</Link>}
-          {session.role === "ADMIN" && <Link href="/admin/library" aria-current={current("/admin")}>Quản trị website</Link>}
+          {session.role === "ADMIN" && <Link href="/admin" aria-current={current("/admin")}>Quản trị website</Link>}
           <LogoutButton />
         </>
       ) : (

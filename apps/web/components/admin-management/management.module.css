@@ -1,0 +1,28 @@
+.page { max-width: 1200px; margin-inline: auto; padding: 1.5rem; min-width: 0; }
+.navigation { display: flex; flex-wrap: wrap; gap: .5rem; padding: 1rem 0; border-bottom: 1px solid var(--border); margin-bottom: 1.5rem; }
+.navigation a { padding: .65rem .85rem; border-radius: .5rem; font-size: .85rem; color: var(--muted); }
+.navigation a[aria-current], .navigation a:hover { background: var(--surface-raised); color: var(--text); }
+.cards { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 1rem; margin-top: 2rem; }
+.card, .panel { border: 1px solid var(--border); background: var(--surface); border-radius: .8rem; padding: 1.25rem; min-width: 0; overflow-wrap: anywhere; }
+.card h2 { font-size: 1.2rem; }
+.card p, .hint { color: var(--muted); font-size: .85rem; line-height: 1.7; }
+.heading, .actions, .pagination { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .7rem; margin-block: 1rem; }
+.heading h1 { margin: 0; }
+.filters { display: grid; grid-template-columns: repeat(auto-fit,minmax(160px,1fr)); gap: .75rem; align-items: end; margin: 1.5rem 0; }
+.field { display: grid; gap: .45rem; font-size: .85rem; }
+.field label { font-size: .85rem; }
+.filters input, .filters select, .editor input, .editor select, .editor textarea { width: 100%; min-width: 0; max-width: 100%; }
+.workspace { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 1.25rem; align-items: start; }
+.list { display: grid; gap: .65rem; }
+.row { border: 1px solid var(--border); border-radius: .65rem; padding: 1rem; overflow-wrap: anywhere; min-width: 0; }
+.row p { margin: .5rem 0; font-size: .8rem; color: var(--muted); }
+.editor { display: grid; gap: 1rem; }
+.editor fieldset { display: grid; gap: 1rem; padding: 0; margin: 0; border: 0; min-width: 0; }
+.editor .checkbox { display: flex; align-items: center; }
+.checkbox input { width: auto; }
+.editor textarea { min-height: 8rem; resize: vertical; }
+.error { color: var(--danger); border: 1px solid var(--border); border-radius: .5rem; padding: 1rem; margin: 1rem 0; }
+.notice { color: var(--success); }
+.page .danger { color: var(--danger); background: transparent; border: 1px solid var(--border); }
+.pagination { font-size: .8rem; }
+@media (max-width: 760px) { .page { padding: 1rem; } .workspace, .cards { grid-template-columns: minmax(0,1fr); } .navigation { gap: .25rem; } .navigation a { padding: .65rem .5rem; } }
