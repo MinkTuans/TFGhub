@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 const directory = await mkdtemp(join(tmpdir(), "indieforge-deploy-runbook-"));
-const document = await readFile("docs/deployment.md", "utf8");
+const document = await readFile("docs/10-deployment/runbook.md", "utf8");
 const block = (prefix) => {
   const value = [...document.matchAll(/```bash\n([\s\S]*?)```/g)]
     .map((match) => match[1])

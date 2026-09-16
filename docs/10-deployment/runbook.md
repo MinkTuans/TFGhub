@@ -154,7 +154,7 @@ Owner reads are `private, no-store`; public reads require a `PUBLIC`, `CLEAR`,
 type and `X-Content-Type-Options: nosniff`; only the current positive cover
 version is readable at the origin; previously fetched immutable responses may
 remain cached after a later change. Test a draft's owner preview, an anonymous denial, and a
-public cover after approval. See [API examples](api/foundation.md#game-covers).
+public cover after approval. See [API reference](../05-api/README.md#covers).
 
 The API writes covers atomically under
 `GAME_STORAGE_ROOT/covers/<game-id>/<version>/cover` with adjacent
@@ -177,7 +177,7 @@ pnpm --filter web e2e
 unset E2E_MODERATOR_EMAIL E2E_MODERATOR_PASSWORD
 ```
 
-Register the disposable account first, grant it `MODERATOR` with the operator-only function below, and use credentials created solely for this run. If either moderator variable is omitted, the external moderation journey is skipped; the local harness alone supplies its documented deterministic defaults. After verification, revoke the role (or delete the disposable account and its test data through an audited operator procedure) and unset both variables. Never reuse or commit production credentials. This creates real test records; the fixture-dependent public discovery test is skipped. See [browser setup](../apps/web/README.md#verify). The separate `pnpm test:deploy-smoke` creates and deletes a disposable Compose project and its volumes; run it on a validation host with free ports 8080 and 443, not alongside this production proxy.
+Register the disposable account first, grant it `MODERATOR` with the operator-only function below, and use credentials created solely for this run. If either moderator variable is omitted, the external moderation journey is skipped; the local harness alone supplies its documented deterministic defaults. After verification, revoke the role (or delete the disposable account and its test data through an audited operator procedure) and unset both variables. Never reuse or commit production credentials. This creates real test records; the fixture-dependent public discovery test is skipped. See [browser verification](../09-development/setup-and-testing.md#external-browser-verification). The separate `pnpm test:deploy-smoke` creates and deletes a disposable Compose project and its volumes; run it on a validation host with free ports 8080 and 443, not alongside this production proxy.
 
 ## Routine operations
 
@@ -260,8 +260,9 @@ If the function fails, it restarts only services that were running on entry;
 investigate the error and do not deploy from an unvalidated pair. Record the
 revision alongside both files in operations records. The database dump includes
 application data and Prisma migration history, while the artifact archive is a
-tar stream of the entire private `game_storage` named volume, including covers
-and hidden image metadata. Keep the owner-only `.sha256` manifest with both
+tar stream of the entire private `game_storage` named volume, including covers,
+project assets, generated thumbnails, and hidden image metadata. Keep the
+owner-only `.sha256` manifest with both
 archives and verify it before restore. Its paths are relative to the checkout;
 preserve the recorded filenames and run verification from the repository root.
 Neither archive includes cluster roles or `.env.production`. Keep encrypted
@@ -272,7 +273,8 @@ will not survive host loss.
 
 ## Restore with explicit confirmation
 
-A restore replaces database contents, game artifacts, and covers, discarding
+A restore replaces database contents, game artifacts, covers, project assets,
+and thumbnails, discarding
 changes since the chosen backup pair. First make a fresh backup using the
 previous section, identify its revision and the revision compatible with the
 pair to restore, and verify the target project. Do not run an upgrade or a
@@ -366,7 +368,7 @@ restore_database() {
   case "$target_database" in
     ''|postgres|template0|template1) printf 'Refusing maintenance/empty database target.\n' >&2; return 1 ;;
   esac
-  printf 'DROP/recreate database %s and replace game artifacts and covers in project indieforge? Type RESTORE: ' "$target_database"
+  printf 'DROP/recreate database %s and replace game artifacts, covers, and project assets in project indieforge? Type RESTORE: ' "$target_database"
   read -r confirmation
   test "$confirmation" = RESTORE || return 1
   compose stop api web migrate || return 1
@@ -519,8 +521,9 @@ For an incompatible migration, keep API/web stopped, make a fresh safety backup 
 ## Persistent state, rotation, and availability
 
 The `indieforge_postgres_data` volume holds PostgreSQL data.
-`indieforge_game_storage` holds immutable uploaded and compiled game artifacts
-plus versioned image covers and their metadata, and is mounted only into the
+`indieforge_game_storage` holds immutable uploaded and compiled game artifacts,
+versioned image covers and their metadata, and hash-addressed project assets
+with generated thumbnails. It is mounted only into the
 single API process. `indieforge_caddy_data` stores
 certificates and private keys; `indieforge_caddy_config` stores Caddy
 configuration state. Preserve all four across restarts and upgrades. Repeatedly

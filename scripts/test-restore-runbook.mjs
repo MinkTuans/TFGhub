@@ -34,7 +34,7 @@ const sql = (query) =>
     "-c",
     query,
   ]).trim();
-const document = await readFile("docs/deployment.md", "utf8");
+const document = await readFile("docs/10-deployment/runbook.md", "utf8");
 const restoreBlock = [...document.matchAll(/```bash\n([\s\S]*?)```/g)]
   .map((match) => match[1])
   .find((block) => block.startsWith("restore_database()"));

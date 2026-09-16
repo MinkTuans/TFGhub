@@ -17,7 +17,7 @@ JWT_SECRET=${jwtSecret}
 `;
 
 const environmentExample = await readFile('.env.production.example', 'utf8');
-const deploymentRunbook = await readFile('docs/deployment.md', 'utf8');
+const deploymentRunbook = await readFile('docs/10-deployment/runbook.md', 'utf8');
 const postgresPasswordDocumentation =
   environmentExample.match(/(?:^#.*\n)+POSTGRES_PASSWORD=/m)?.[0] ?? '';
 assert.match(postgresPasswordDocumentation, /URL-safe hexadecimal/i);
