@@ -44,6 +44,6 @@ Files: apps/web/app/admin/**, components/admin-library/**, relevant nav links, l
 
 - [x] Review API/UI against spec and security, fix confirmed defects.
 - [x] Disposable PostgreSQL real API sessions: USER/MODERATOR403, ADMIN full CRUD, stale409, category nonempty409, persistence and seed idempotence; browser CRUD plus Markdown safety and mobile/desktop screenshots.
-- [ ] Tag running API+web rollback images BEFORE build; production Docker build API+web; consistent backup via runbook.
-- [ ] Apply additive migrations, run seed explicitly once, deploy API+web, verify health and library authorization without altering live user roles.
-- [ ] Record release images/backup/tests in docs/11-history/reports/2026-09-16-admin-library.md. Commit code and evidence; do not repeat deploy from future scheduled wakeup once complete.
+- [x] Tag running API+web rollback images BEFORE build; production Docker build API+web; consistent backup via runbook.
+- [x] Apply additive migrations, run seed explicitly once, deploy API+web, verify health and library authorization without altering live user roles.
+- [x] Record release images/backup/tests in docs/11-history/reports/2026-09-16-admin-library.md. Commit code and evidence; do not repeat deploy from future scheduled wakeup once complete.
