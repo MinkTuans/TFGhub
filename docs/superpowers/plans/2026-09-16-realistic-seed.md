@@ -8,6 +8,6 @@ Design: deterministic seed IDs and reserved email namespace, natural DeveloperPr
 - [x] Root dataset: users, assignments, ratings/comments/activity, exports and invariants.
 - [x] Additive transactional seed uses existing compiler/artifact storage, advisory lock, refuse collisions, idempotent complete rerun, no overwriting real rows or published artifacts.
 - [x] Test disposable PG + repeat/concurrent seed + real public API/analytics + actual browser all10 mobile/desktop, independent code review.
-- [ ] Backup live; apply via current API container using reviewed seed files (no application image change needed); read-only live verification; report/export, commit and cleanup.
+- [x] Backup live; apply via current API container using reviewed seed files (no application image change needed); read-only live verification; report/export, commit and cleanup.
 
 Recovery: DB transaction rollback on insert failure; new immutable artifacts may be reused only when bytes match on retry. Existing namespace rows cause no-op only if the complete expected seed footprint exists; partial or unrelated collisions abort. Preserve later real interactions on rerun. No destructive cleanup of real records.

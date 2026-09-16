@@ -1,6 +1,6 @@
 # Vietnamese community seed — 2026-09-16
 
-Status: validated; live application pending.
+Status: COMPLETE — added to http://161.248.81.59 on 2026-09-16 at approximately 16:09 UTC.
 
 Dataset: 30 synthetic Vietnamese accounts, 10 different playable CODE games, 56 memberships (4–7 per game including creator), 280 detailed plays and scores, 46 distinct user/game ratings, 46 individually written comments. Natural names, varied registration/game/activity dates, no overlapping historical sessions per user, mixed 2–5-star ratings and uneven engagement. All accounts have at least one game; one participant plays five games. Every aggregate derives from detail rows.
 
@@ -17,3 +17,17 @@ Validation:
 - Independent review found a rerun completeness gap; fixed by validating immutable FK identities, cooldown footprint and original artifact bytes. Final review has no remaining blockers.
 
 No application rebuild is required: reviewed seed files use the current compiled API/database modules. Live target and artifact root are checked independently, and database/artifact backups precede insertion. Existing rows are never updated or deleted; complete reruns are read-only.
+
+## Live result
+
+- Code/data commit: `aeed741`.
+- Database and artifact backup: `backups/20260916T160754-933615`, validated with SHA-256 manifest.
+- Explicit target verified: compose project `deploy-ip-preview`, API container `deploy-ip-preview-api-1`, PostgreSQL host `postgres`, database `indieforge`, storage `/var/lib/indieforge/games`.
+- One successful transactional seed inserted 30 regular accounts/profiles, 10 games, 280 plays/scores, 46 ratings/comments/cooldowns. Existing rows were not updated/deleted.
+- An initial CLI launch could not read the copied source directory permissions and exited before DB writes. Corrected only the seed source directory/file read permissions; next invocation committed successfully. No extra seed or backup replay was needed.
+- Live read-only audit confirmed FK identities, account roles and distinct Argon2id hashes, exact installed game artifact bytes, detailed scores/playtime and public API aggregates.
+- GET-only live website checks passed for all 10 games at 390px and 1440px: comments and stats visible, no automatic game launch, no horizontal overflow/errors, no extra test activity written to production.
+- API/web remain healthy on their previous images (`421efea2…` / `d6b30f34…`). No application rebuild, schema migration or runtime logic change.
+- Temporary preview API/web/proxy and disposable PostgreSQL stopped; live audit script removed. Reviewed seed source remains available in the repository and running API container; data and artifacts persist independently of that container.
+
+The displayed counts may increase as actual visitors play or comment. Exported overview describes the initial synthetic dataset only, not all pre-existing users/games in the system.
