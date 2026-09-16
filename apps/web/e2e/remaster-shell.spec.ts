@@ -26,6 +26,7 @@ for (const width of [390, 768, 1024, 1440]) {
     if (width <= 768) await expect(nav).not.toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await page.goto("/");
+    await page.evaluate(() => document.documentElement.dataset.theme = "light");
     await page.screenshot({ path: testInfo.outputPath(`home-${width}-light.png`), fullPage: true });
     await page.evaluate(() => document.documentElement.dataset.theme = "dark");
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);

@@ -26,7 +26,14 @@ export default async function GamePage({
   const related = await relatedRequest;
   return (
     <main className="game-page">
-      <div className="game-page__layout">
+      <header className="game-showcase">
+        <Link className="game-showcase__back" href="/discover">← Trở về khám phá</Link>
+        <div className="game-showcase__banner">
+          <GameCover game={game} priority />
+          <div className="game-showcase__caption"><span className="badge">Game độc lập · Trình duyệt</span><p className="game-showcase__title">{game.title}</p><p>Bởi {game.developer.displayName}</p><a href="#play-game" className="button">Chơi game <span aria-hidden="true">→</span></a></div>
+        </div>
+      </header>
+      <div className="game-page__layout" id="play-game">
         <aside className="game-page__ads" aria-label="Quảng cáo">
           <AdSlot slot="gameLeftTop" label="Quảng cáo phía trên" />
           <AdSlot slot="gameLeftBottom" label="Quảng cáo phía dưới" />

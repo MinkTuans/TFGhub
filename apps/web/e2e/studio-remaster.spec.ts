@@ -27,6 +27,7 @@ for (const width of [390, 768, 1024, 1440]) {
     await page.getByRole("navigation", { name: "Các phần quản lý game" }).getByRole("link", { name: "Hiển thị", exact: true }).click();
     await expect(page).toHaveURL(/#display-heading$/);
     await expect(page.getByRole("heading", { name: "Cài đặt hiển thị" })).toBeInViewport();
+    await page.screenshot({ path: testInfo.outputPath(`manage-${width}.png`), fullPage: true });
     await page.goto("/studio/games/new");
     await expect(page.getByRole("button", { name: "Tạo bản nháp", exact: true })).toBeEnabled();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);

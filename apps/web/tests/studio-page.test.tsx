@@ -88,3 +88,12 @@ test("Studio sends only card metadata across the interactive list boundary", asy
   expect(list.props.games[0]).not.toHaveProperty("projectData");
   expect(list.props.games[0]).toMatchObject({ id: "one", reviewState: "DRAFT" });
 });
+
+
+test("Studio navigation links creators to their game list and profile", async () => {
+  vi.mocked(privateGet).mockResolvedValue([]);
+  render(await StudioPage());
+  const nav = screen.getByRole("navigation", { name: "Không gian sáng tạo" });
+  expect(within(nav).getByRole("link", { name: "Game của bạn" })).toHaveAttribute("href", "#games-heading");
+  expect(within(nav).getByRole("link", { name: "Hồ sơ của bạn" })).toHaveAttribute("href", "/profile");
+});

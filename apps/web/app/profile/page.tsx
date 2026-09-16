@@ -44,12 +44,12 @@ export default async function ProfilePage() {
               <Link href="/studio/games/new">Tạo game đầu tiên</Link>
             </EmptyState>
           ) : (
-            <div className="grid">
+            <div className="profile-game-list">
               {games.map((game) => (
-                <Link className="game-card" href={`/studio/games/${encodeURIComponent(game.id)}`} key={game.id} aria-label={game.title}>
+                <Link className="profile-game-row" href={`/studio/games/${encodeURIComponent(game.id)}`} key={game.id} aria-label={game.title}>
                   <article>
-                    <GameCover game={game} ownerGameId={game.id} />
-                    <div className="game-card__body"><h3 className="game-card__title">{game.title}</h3><p className="description">{game.description}</p><p className="game-card__developer">Chỉnh sửa game →</p></div>
+                    <GameCover game={game} ownerGameId={game.id} size="compact" />
+                    <div className="game-card__body"><h3 className="game-card__title">{game.title}</h3><p className="description">{game.description}</p><p className="game-card__developer">Mở trong Studio →</p></div>
                   </article>
                 </Link>
               ))}

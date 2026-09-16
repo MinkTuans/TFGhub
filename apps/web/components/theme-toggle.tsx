@@ -2,11 +2,12 @@
 
 import { useSyncExternalStore } from "react";
 
+// Keep the legacy "system" storage value for the TFG default night theme.
 type ThemePreference = "system" | "light" | "dark";
 
 const preferences: ThemePreference[] = ["system", "light", "dark"];
 const labels: Record<ThemePreference, string> = {
-  system: "theo hệ thống",
+  system: "mặc định TFG",
   light: "sáng",
   dark: "tối",
 };

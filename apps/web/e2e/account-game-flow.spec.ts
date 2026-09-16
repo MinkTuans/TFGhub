@@ -135,12 +135,12 @@ test("same-origin gateway preserves cookies, query strings, origin checks and ar
   expect(await artifact.text()).toContain("<h1>Tiny Quest</h1>");
 });
 
-test("theme preference persists across reload and overrides the system until reset", async ({ page }) => {
+test("theme preference persists across reload and resets to TFG night independent of OS", async ({ page }) => {
   await page.emulateMedia({ colorScheme: "dark" });
   await page.goto("/");
   const root = page.locator("html");
   await expect(root).toHaveCSS("color-scheme", "dark");
-  await page.getByRole("button", { name: "Giao diện: theo hệ thống", exact: true }).click();
+  await page.getByRole("button", { name: "Giao diện: mặc định TFG", exact: true }).click();
   await expect(root).toHaveAttribute("data-theme", "light");
   await expect(root).toHaveCSS("color-scheme", "light");
   await page.reload();
@@ -156,11 +156,11 @@ test("theme preference persists across reload and overrides the system until res
   expect(await page.evaluate(() => localStorage.getItem("tfg-theme"))).toBe("dark");
   await page.getByRole("button", { name: "Giao diện: tối", exact: true }).click();
   await expect(root).not.toHaveAttribute("data-theme");
-  await expect(root).toHaveCSS("color-scheme", "light");
+  await expect(root).toHaveCSS("color-scheme", "dark");
   await page.emulateMedia({ colorScheme: "dark" });
   await expect(root).toHaveCSS("color-scheme", "dark");
   await page.reload();
-  await expect(page.getByRole("button", { name: "Giao diện: theo hệ thống", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Giao diện: mặc định TFG", exact: true })).toBeVisible();
   await expect(root).not.toHaveAttribute("data-theme");
   await expect(root).toHaveCSS("color-scheme", "dark");
   expect(await page.evaluate(() => localStorage.getItem("tfg-theme"))).toBe("system");
@@ -185,8 +185,10 @@ for (const theme of ["light", "dark"] as const) {
         await page.setViewportSize(viewport);
         await page.goto("/games/tiny-quest");
         await expect(page.locator("html")).toHaveCSS("color-scheme", theme);
+        await page.getByRole("link", { name: "Chơi game", exact: true }).click();
         const player = page.getByRole("region", { name: "Chơi Tiny Quest", exact: true });
-        await expect(player).toBeVisible();
+        await expect(player).toBeInViewport();
+        await expect.poll(async () => (await player.boundingBox())!.y).toBeLessThan(110);
         const box = await player.boundingBox();
         expect(box).not.toBeNull();
         expect(box!.y).toBeGreaterThanOrEqual(0);
@@ -346,7 +348,7 @@ test("register, save a profile, create a private draft, and sign back in", async
   await expect(page).toHaveURL("/studio");
   await expect(page.getByRole("heading", { name: title, exact: true })).toBeVisible();
   await expect(page.locator('[data-state="DRAFT"]')).toHaveText("Bản nháp");
-  await page.getByRole("link", { name: "Khám phá", exact: true }).click();
+  await page.getByRole("navigation", { name: "Điều hướng chính", exact: true }).getByRole("link", { name: "Khám phá", exact: true }).click();
   await page.getByLabel("Tìm kiếm game").fill(title);
   await page.getByRole("button", { name: "Tìm kiếm", exact: true }).click();
   await expect(page.getByRole("heading", { name: title, exact: true })).toHaveCount(0);
@@ -430,7 +432,7 @@ test("an HTML5 upload can be retried, previewed, and submitted for review", asyn
   await expect(page).toHaveURL("/studio");
   await createLegacyDraft(page, title, `html5-upload-${suffix}`, "UPLOAD");
 
-  await page.getByRole("link", { name: title }).click();
+  await page.getByRole("link", { name: title, exact: true }).click();
   await expect(page).toHaveURL(/\/studio\/games\//);
   const archive = page.getByLabel("Tệp ZIP HTML5");
   await archive.setInputFiles({ name: "broken.zip", mimeType: "application/zip", buffer: Buffer.from("not a zip") });
@@ -486,7 +488,7 @@ test("moderation requires a rejection note and publishes the approved artifact a
   await expect(page).toHaveURL("/");
 
   await createLegacyDraft(page, title, slug, "CODE");
-  await page.getByRole("link", { name: title }).click();
+  await page.getByRole("link", { name: title, exact: true }).click();
   await expect(page).toHaveURL(/\/studio\/games\/[^/]+$/);
   const gameId = new URL(page.url()).pathname.split("/").at(-1)!;
   await expect(page.getByTestId("game-cover-fallback")).toBeVisible();
@@ -542,6 +544,7 @@ test("moderation requires a rejection note and publishes the approved artifact a
     "true",
   );
   const queued = page.getByRole("article", { name: title });
+  await queued.getByText("Kiểm tra bản gửi", { exact: true }).click();
   await expect(queued.getByTitle("Chơi thử game")).toHaveAttribute(
     "sandbox",
     "allow-scripts allow-pointer-lock",
@@ -564,7 +567,7 @@ test("moderation requires a rejection note and publishes the approved artifact a
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Mật khẩu", { exact: true }).fill("password123");
   await page.getByRole("button", { name: "Đăng nhập" }).click();
-  await page.getByRole("link", { name: title }).click();
+  await page.getByRole("link", { name: title, exact: true }).click();
   await expect(page.getByRole("main").getByRole("alert")).toHaveText(
     "Please add instructions.",
   );
@@ -576,6 +579,7 @@ test("moderation requires a rejection note and publishes the approved artifact a
   await page.getByLabel("Mật khẩu", { exact: true }).fill(moderatorPassword);
   await page.getByRole("button", { name: "Đăng nhập" }).click();
   await navigation.getByRole("link", { name: "Kiểm duyệt" }).click();
+  await page.getByRole("article", { name: title }).getByText("Kiểm tra bản gửi", { exact: true }).click();
   await page.getByRole("article", { name: title }).getByRole("button", { name: "Duyệt" }).click();
   await expect(page.getByRole("status")).toHaveText("Đã duyệt game.");
   await page.goto("/discover");
@@ -612,7 +616,7 @@ test("a code game saves source, rebuilds its sandboxed preview, and submits the 
   await expect(page).toHaveURL("/studio");
   await createLegacyDraft(page, title, `code-game-${suffix}`, "CODE");
 
-  await page.getByRole("link", { name: title }).click();
+  await page.getByRole("link", { name: title, exact: true }).click();
   await expect(page).toHaveURL(/\/studio\/games\//);
   await page.getByLabel("HTML").fill(`<h1>Compiled ${suffix}</h1>`);
   await page.getByLabel("CSS").fill("h1 { color: teal; }");
@@ -651,7 +655,7 @@ test("a story game builds a sandboxed branching preview that reaches the selecte
   await expect(page).toHaveURL("/studio");
   await createLegacyDraft(page, title, `story-game-${suffix}`, "STORY");
 
-  await page.getByRole("link", { name: title }).click();
+  await page.getByRole("link", { name: title, exact: true }).click();
   const opening = page.getByRole("group", { name: "Cảnh 1" });
   await opening.getByLabel("Người nói").fill(openingSpeaker);
   await opening.getByLabel("Lời thoại").fill("A door waits in the dark.");
@@ -691,7 +695,7 @@ test("a platformer game builds a collision-safe preview that reaches its goal by
   await expect(page).toHaveURL("/studio");
   await createLegacyDraft(page, title, `platformer-game-${suffix}`, "PLATFORMER");
 
-  await page.getByRole("link", { name: title }).click();
+  await page.getByRole("link", { name: title, exact: true }).click();
   await page.getByLabel("Vị trí X đích đến").fill("205");
   await page.getByLabel("Vị trí Y đích đến").fill("316");
   await page.getByRole("button", { name: "Thêm nền tảng" }).click();

@@ -18,6 +18,10 @@ for (const width of [390, 768, 1024, 1440]) {
     expect((await page.request.post("/api/auth/login", { data: { email: "moderator@example.com", password: "moderator-password123" } })).ok()).toBe(true);
     await page.goto("/moderation");
     const card = page.getByRole("article", { name: "Review layout", exact: true });
+    await expect(card.getByTitle("Chơi thử game")).not.toBeVisible();
+    await page.screenshot({ path: testInfo.outputPath(`queue-${width}.png`), fullPage: true });
+    await card.locator("summary").focus();
+    await page.keyboard.press("Enter");
     await expect(card.getByRole("heading", { name: "Quyết định kiểm duyệt" })).toBeVisible();
     await expect(card.locator("time")).toContainText("UTC");
     await expect(card.getByRole("button", { name: "Từ chối", exact: true })).toBeDisabled();

@@ -29,7 +29,7 @@ export function StudioGameList({ games }: { games: StudioCardGame[] }) {
     </div>
     <p className="hint" role="status">{filtered.length} / {games.length} game</p>
     {filtered.length ? <div className="grid studio-games-grid">{filtered.map((game) => <article className="card studio-card" key={game.id}>
-      <GameCover game={game} ownerGameId={game.id} />
+      <GameCover game={game} ownerGameId={game.id} size="compact" />
       <div className="studio-card__body">
         <h3><Link href={`/studio/games/${encodeURIComponent(game.id)}`}>{game.title}</Link></h3>
         <div className="studio-card__states">
@@ -39,6 +39,7 @@ export function StudioGameList({ games }: { games: StudioCardGame[] }) {
         <p className="description">{game.description || "Thêm mô tả để giới thiệu game của bạn."}</p>
         <p className="hint">Cập nhật <time dateTime={game.updatedAt}>{new Date(game.updatedAt).toLocaleDateString("vi-VN", { timeZone: "UTC" })}</time></p>
       </div>
+      <Link className="studio-card__open" href={`/studio/games/${encodeURIComponent(game.id)}`} aria-label={`Mở ${game.title}`}><span aria-hidden="true">→</span></Link>
     </article>)}</div> : <EmptyState title="Không có game phù hợp" description="Thử tên khác hoặc xóa bộ lọc để xem lại game của bạn."><button className="button-secondary" onClick={() => { setQuery(""); setReview(""); }}>Xóa bộ lọc</button></EmptyState>}
   </>;
 }

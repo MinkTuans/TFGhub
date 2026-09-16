@@ -57,20 +57,7 @@ export default async function Home() {
             <Link className="button button-ghost" href="/register">Tạo tài khoản</Link>
           </div>
         </div>
-        <aside className="home-hero__studio" aria-labelledby="home-studio-title">
-          <div className="home-hero__studio-heading">
-            <FeatureIcon name="code" />
-            <span className="eyebrow">Không gian sáng tạo của bạn</span>
-          </div>
-          <h2 id="home-studio-title">Một ý tưởng nhỏ.<br />Rất nhiều cách bắt đầu.</h2>
-          <p>Tạo bản nháp, thử cách chơi và chia sẻ khi bạn đã sẵn sàng.</p>
-          <ol className="home-hero__notes">
-            <li><span aria-hidden="true">01</span> Viết code hoặc kể một câu chuyện</li>
-            <li><span aria-hidden="true">02</span> Thử nghiệm ngay trên trình duyệt</li>
-            <li><span aria-hidden="true">03</span> Gửi game để được duyệt công khai</li>
-          </ol>
-          <Link className="button button-ghost" href="/studio">Mở Studio</Link>
-        </aside>
+
       </section>
 
       <section className="home-community" aria-labelledby="recent-games-title">
@@ -125,6 +112,22 @@ export default async function Home() {
         </ol>
       </section>
 
+      <section className="home-creator-invite">
+        <aside className="home-hero__studio" aria-labelledby="home-studio-title">
+          <div className="home-hero__studio-heading">
+            <FeatureIcon name="code" />
+            <span className="eyebrow">Không gian sáng tạo của bạn</span>
+          </div>
+          <h2 id="home-studio-title">Một ý tưởng nhỏ.<br />Rất nhiều cách bắt đầu.</h2>
+          <p>Tạo bản nháp, thử cách chơi và chia sẻ khi bạn đã sẵn sàng.</p>
+          <ol className="home-hero__notes">
+            <li><span aria-hidden="true">01</span> Viết code hoặc kể một câu chuyện</li>
+            <li><span aria-hidden="true">02</span> Thử nghiệm ngay trên trình duyệt</li>
+            <li><span aria-hidden="true">03</span> Gửi game để được duyệt công khai</li>
+          </ol>
+          <Link className="button button-ghost" href="/studio">Mở Studio</Link>
+        </aside>
+      </section>
     </main>
   );
 }

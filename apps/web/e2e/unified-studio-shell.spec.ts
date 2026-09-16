@@ -257,6 +257,8 @@ test("mobile presents metadata-only editing with readable controls and persists 
 }, testInfo) => {
   await page.setViewportSize({ width: 375, height: 812 });
   const { suffix } = await createProject(page);
+  await expect(page.getByRole("navigation", { name: "Điều hướng nhanh" })).toBeHidden();
+  expect(await page.evaluate(() => getComputedStyle(document.body, "::before").display)).toBe("none");
   await expect(
     page.getByRole("region", { name: "Studio trên thiết bị di động" }),
   ).toBeVisible();

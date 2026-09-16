@@ -6,7 +6,10 @@ import { SiteNavigation } from "../components/site-navigation";
 import { TfgLogo } from "../components/tfg-logo";
 import { ThemeToggle } from "../components/theme-toggle";
 import { optionalSession } from "../lib/session";
+import { MobileNavigation } from "../components/mobile-navigation";
 import "./globals.css";
+import "./reference-world.css";
+import "./creator-reference.css";
 
 export const metadata: Metadata = {
   title: "TFG — Nền tảng trò chơi độc lập",
@@ -43,7 +46,7 @@ export default async function RootLayout({
         <header className="site-header">
           <div className="site-header__inner container">
             <Link aria-label="TFG — Trang chủ" className="brand" href="/">
-              <TfgLogo compact />
+              <TfgLogo compact /><span className="brand-wordmark">TFG<span>small games · big worlds</span></span>
             </Link>
             <div className="site-header__actions">
               <SiteNavigation session={session} />
@@ -53,6 +56,7 @@ export default async function RootLayout({
         </header>
         {children}
         <SiteFooter session={session} />
+        <MobileNavigation authenticated={!!session} />
       </body>
     </html>
   );

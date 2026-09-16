@@ -276,6 +276,7 @@ test("moderation translates a stale review revision and retains the review card"
   render(
     <ModerationQueue initialGames={[moderationGame("game-1", "Review me")]} />,
   );
+  fireEvent.click(screen.getByText("Kiểm tra bản gửi"));
   fireEvent.click(screen.getByRole("button", { name: "Duyệt" }));
   expect(await screen.findByRole("alert")).toHaveTextContent(
     "Game không còn chờ duyệt. Hãy tải lại danh sách.",
@@ -309,6 +310,8 @@ test("moderation keeps every active review disabled when two cards are actioned"
 
   const first = screen.getByRole("article", { name: "First review" });
   const second = screen.getByRole("article", { name: "Second review" });
+  fireEvent.click(within(first).getByText("Kiểm tra bản gửi"));
+  fireEvent.click(within(second).getByText("Kiểm tra bản gửi"));
   fireEvent.click(within(first).getByRole("button", { name: "Duyệt" }));
   fireEvent.click(within(second).getByRole("button", { name: "Duyệt" }));
 
@@ -331,6 +334,7 @@ test("moderation binds actions to the displayed submission and renders its conte
   const card = screen.getByRole("article", { name: "Review me" });
   expect(within(card).getByText("Nguồn: Trình soạn mã")).toBeVisible();
   expect(within(card).getByText(/Ngày gửi:/)).toBeVisible();
+  fireEvent.click(within(card).getByText("Kiểm tra bản gửi"));
   fireEvent.click(within(card).getByRole("button", { name: "Duyệt" }));
 
   await screen.findByText("Đã duyệt game.");
@@ -910,10 +914,28 @@ test("moderation explains a missing preview and updates pending count after appr
   vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("{}")));
   render(<ModerationQueue initialGames={[{ ...moderationGame("game-1", "Review me"), artifactReady: false }]} />);
   expect(screen.getByText("1 game chờ duyệt")).toBeVisible();
-  expect(screen.getByText("Bản chơi thử chưa sẵn sàng.")).toBeVisible();
+  expect(screen.getByText("Bản chơi thử chưa sẵn sàng.")).not.toBeVisible();
   expect(screen.getByText("7/9/2026, 09:00 UTC")).toHaveAttribute("datetime", "2026-09-07T09:00:00.000Z");
+  fireEvent.click(screen.getByText("Kiểm tra bản gửi"));
   fireEvent.click(screen.getByRole("button", { name: "Duyệt" }));
   await screen.findByText("Đã duyệt game.");
   expect(screen.getByText("0 game chờ duyệt")).toBeVisible();
   expect(screen.getByRole("heading", { name: "Đã xử lý hết hàng đợi" })).toBeVisible();
+});
+
+
+test("moderation opens a compact submission for review without losing its preview or rejection note", () => {
+  render(<ModerationQueue initialGames={[moderationGame("game-1", "Review me")]} />);
+  const preview = screen.getByTitle("Chơi thử game");
+  expect(preview).not.toBeVisible();
+  const disclosure = screen.getByText("Kiểm tra bản gửi");
+  fireEvent.click(disclosure);
+  expect(preview).toBeVisible();
+  fireEvent.change(screen.getByLabelText("Lý do từ chối"), { target: { value: "Please fix the opening." } });
+  fireEvent.click(disclosure);
+  expect(preview).not.toBeVisible();
+  fireEvent.click(disclosure);
+  expect(screen.getByTitle("Chơi thử game")).toBe(preview);
+  expect(screen.getByLabelText("Lý do từ chối")).toHaveValue("Please fix the opening.");
+  expect(preview).toHaveAttribute("sandbox", "allow-scripts allow-pointer-lock");
 });

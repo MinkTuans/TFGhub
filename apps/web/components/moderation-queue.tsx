@@ -88,12 +88,12 @@ export function ModerationQueue({
             const note = notes[game.id] ?? "";
             return (
               <article
-                className="panel moderation-card"
+                className="panel moderation-card moderation-row"
                 aria-label={game.title}
                 key={game.id}
               >
                 <div className="moderation-card__info">
-                <span className="badge" data-state="PENDING">Chờ duyệt</span>
+
                 <h2>{game.title}</h2>
                 <p>Tác giả: {game.creator.displayName ?? "Chưa có tên"}</p>
                 <p>
@@ -111,9 +111,13 @@ export function ModerationQueue({
                   Ngày gửi:{" "}
                   <time dateTime={game.submittedAt}>{submittedDate(game.submittedAt)}</time>
                 </p>
+                <span className="badge" data-state="PENDING">Chờ duyệt</span>
+                </div>
+                <details className="moderation-review">
+                <summary>Kiểm tra bản gửi</summary>
+                <div className="moderation-review__content">
                 <p className="description">{game.description}</p>
                 <p className="hint">Bản gửi: {game.artifactVersion}</p>
-                </div>
                 <div className="moderation-card__preview">
                 <h3>Chơi thử & kiểm tra</h3>
                 {game.artifactReady && game.artifactVersion > 0 ? (
@@ -159,6 +163,8 @@ export function ModerationQueue({
                   </button>
                 </div>
                 </div>
+                </div>
+                </details>
               </article>
             );
           })}

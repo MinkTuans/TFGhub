@@ -1,10 +1,17 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 import { AuthForm } from "../components/auth-form";
+import LoginPage from "../app/login/page";
+import RegisterPage from "../app/register/page";
 
 const router = vi.hoisted(() => ({ replace: vi.fn(), refresh: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => router }));
 afterEach(() => { vi.unstubAllGlobals(); vi.clearAllMocks(); });
+
+test.each([["login", LoginPage], ["register", RegisterPage]] as const)("account page selects its explicit layout variant (%s)", (mode, Page) => {
+  render(<Page />);
+  expect(screen.getByRole("main")).toHaveClass(`auth-layout--${mode}`);
+});
 
 function fillRegistration(confirm = "password123") {
   fireEvent.change(screen.getByLabelText("Tên hiển thị"), { target: { value: "Minh" } });

@@ -140,7 +140,7 @@ test("shows moderation only to moderators and administrators", () => {
 
 test("cycles theme preference and updates the accessible button label", () => {
   render(<ThemeToggle />);
-  const button = screen.getByRole("button", { name: "Giao diện: theo hệ thống" });
+  const button = screen.getByRole("button", { name: "Giao diện: mặc định TFG" });
 
   fireEvent.click(button);
   expect(document.documentElement).toHaveAttribute("data-theme", "light");
@@ -155,7 +155,7 @@ test("cycles theme preference and updates the accessible button label", () => {
   fireEvent.click(screen.getByRole("button", { name: "Giao diện: tối" }));
   expect(document.documentElement).not.toHaveAttribute("data-theme");
   expect(localStorage.getItem("tfg-theme")).toBe("system");
-  expect(screen.getByRole("button", { name: "Giao diện: theo hệ thống" })).toBeVisible();
+  expect(screen.getByRole("button", { name: "Giao diện: mặc định TFG" })).toBeVisible();
 });
 
 test("cycles from the theme selected by the pre-paint bootstrap", () => {
@@ -166,7 +166,7 @@ test("cycles from the theme selected by the pre-paint bootstrap", () => {
 
   expect(document.documentElement).not.toHaveAttribute("data-theme");
   expect(localStorage.getItem("tfg-theme")).toBe("system");
-  expect(screen.getByRole("button", { name: "Giao diện: theo hệ thống" })).toBeVisible();
+  expect(screen.getByRole("button", { name: "Giao diện: mặc định TFG" })).toBeVisible();
 });
 
 test("announces the theme selected by the pre-paint bootstrap", async () => {
@@ -182,7 +182,7 @@ test("changes the theme when browser storage is blocked", () => {
   });
   render(<ThemeToggle />);
 
-  fireEvent.click(screen.getByRole("button", { name: "Giao diện: theo hệ thống" }));
+  fireEvent.click(screen.getByRole("button", { name: "Giao diện: mặc định TFG" }));
 
   expect(document.documentElement).toHaveAttribute("data-theme", "light");
   expect(screen.queryByRole("alert")).not.toBeInTheDocument();
