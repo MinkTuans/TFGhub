@@ -479,7 +479,7 @@ function CanvasSession({
               !layer.locked &&
               (role !== "UI" || layer.type === "UI"),
           )?.id;
-      if (!layerId) throw new Error("Không có lớp phù hợp để nhận asset.");
+      if (!layerId) throw new Error("Không có lớp phù hợp để nhận tài nguyên.");
       const result = createAssetDrop({
         document: state.document,
         sceneId: scene.id,
@@ -517,19 +517,19 @@ function CanvasSession({
   const deleteTarget =
     deleting && scene.objects.find((object) => object.id === deleting);
   return (
-    <section className="studio-overview" aria-label="Tổng quan Scene">
+    <section className="studio-overview" aria-label="Tổng quan Cảnh">
       <div className="studio-overview__heading">
         <h2 className="studio-kicker">{scene.name}</h2>
         <output aria-live="polite">
           {selectedObject
             ? `Đã chọn: ${selectedObject.name}`
-            : "Chọn đối tượng trên Scene"}
+            : "Chọn đối tượng trên Cảnh"}
         </output>
       </div>
       <div
         className="studio-canvas-tools"
         role="toolbar"
-        aria-label="Công cụ Canvas"
+        aria-label="Công cụ Khung vẽ"
       >
         <button
           type="button"
@@ -591,14 +591,14 @@ function CanvasSession({
         </button>
         <button
           type="button"
-          aria-label="Vừa Scene"
+          aria-label="Vừa Cảnh"
           onClick={() => {
             cancel();
             fit();
             draw.current();
           }}
         >
-          Vừa Scene
+          Vừa Cảnh
         </button>
       </div>
       <div className="studio-canvas-stage" data-tool={tool}>
@@ -606,7 +606,7 @@ function CanvasSession({
           ref={canvas}
           role="img"
           tabIndex={0}
-          aria-label={`Scene: ${scene.name}`}
+          aria-label={`Cảnh: ${scene.name}`}
           aria-describedby={descriptionId}
           data-selected-object-id={selectionId ?? undefined}
           onDragOver={(event) => {
@@ -645,7 +645,7 @@ function CanvasSession({
               cancel();
           }}
         >
-          Trình duyệt cần hỗ trợ Canvas2D để hiển thị Scene.
+          Trình duyệt cần hỗ trợ Canvas2D để hiển thị Cảnh.
         </canvas>
         {resizable && selected && (
           <button
@@ -723,7 +723,7 @@ function CanvasSession({
           tác
         </p>
         {scene.objects.length === 0 && (
-          <p className="studio-muted">Scene này chưa có đối tượng.</p>
+          <p className="studio-muted">Cảnh này chưa có đối tượng.</p>
         )}
       </div>
       {deleteTarget && (

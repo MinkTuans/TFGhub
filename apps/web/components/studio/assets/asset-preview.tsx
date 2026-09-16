@@ -1,5 +1,7 @@
 "use client";
 
+import { studioLabel } from "../studio-labels";
+
 import type { GameAssetSummary } from "@indieforge/contracts";
 import Image from "next/image";
 import { resolveApiBaseUrl } from "../../../lib/api-client";
@@ -37,7 +39,7 @@ export function AssetPreview({ asset }: { asset: GameAssetSummary }) {
     );
   return (
     <span className="studio-asset-placeholder" aria-hidden="true">
-      {asset.kind}
+      {studioLabel(asset.kind)}
     </span>
   );
 }

@@ -23,7 +23,7 @@ export default async function DiscoverPage({
     error =
       failure instanceof ApiError && failure.status === 400
         ? "Từ khóa tìm kiếm không hợp lệ. Hãy thử lại."
-        : "Không thể tải game lúc này. Vui lòng thử lại.";
+        : "Không thể tải trò chơi lúc này. Vui lòng thử lại.";
   }
   const next = new URLSearchParams();
   if (query) next.set("query", query);
@@ -31,9 +31,9 @@ export default async function DiscoverPage({
   return (
     <main className="discover-page">
       <p className="eyebrow">Từ cộng đồng TFG</p>
-      <h1>Khám phá game</h1>
+      <h1>Khám phá trò chơi</h1>
       <p className="discover-page__lede">
-        Những game nhỏ, ý tưởng mới và những người tạo ra chúng.
+        Những trò chơi nhỏ, ý tưởng mới và những người tạo ra chúng.
       </p>
       <DiscoverSearch key={query} query={query} />
       {error && (
@@ -48,14 +48,14 @@ export default async function DiscoverPage({
         <section className="catalog-results" aria-label="Kết quả khám phá">
           <div className="catalog-results__heading">
             <div>
-              <h2>{query ? `Kết quả cho “${query}”` : "Game mới nhất"}</h2>
-              <p>{data.games.length} game trong trang này</p>
+              <h2>{query ? `Kết quả cho “${query}”` : "Trò chơi mới nhất"}</h2>
+              <p>{data.games.length} trò chơi trong trang này</p>
             </div>
             <span className="badge">Chơi trên trình duyệt</span>
           </div>
           {data.games.length === 0 ? (
-            <EmptyState title="Chưa có game phù hợp." description="Thử một từ khóa khác, hoặc xem tất cả game đang có trên TFG.">
-              <Link href="/discover">Xem tất cả game</Link>
+            <EmptyState title="Chưa có trò chơi phù hợp." description="Thử một từ khóa khác, hoặc xem tất cả trò chơi đang có trên TFG.">
+              <Link href="/discover">Xem tất cả trò chơi</Link>
             </EmptyState>
           ) : (
             <div className="grid catalog-grid">
@@ -65,7 +65,7 @@ export default async function DiscoverPage({
         </section>
       )}
       {data?.nextCursor && (
-        <nav className="catalog-pagination" aria-label="Phân trang game">
+        <nav className="catalog-pagination" aria-label="Phân trang trò chơi">
           <Link className="button button-ghost" href={`/discover?${next}`}>Trang tiếp theo</Link>
         </nav>
       )}

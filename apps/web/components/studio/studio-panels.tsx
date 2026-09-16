@@ -42,10 +42,10 @@ export function StudioInspector({
   return (
     <aside className="studio-inspector">
       <div className="studio-panel-heading">
-        {open && <h2>Thông tin Scene</h2>}
+        {open && <h2>Thông tin Cảnh</h2>}
         <StudioButton
-          tooltip={open ? "Thu gọn thông tin Scene" : "Mở thông tin Scene"}
-          aria-label={open ? "Thu gọn thông tin Scene" : "Mở thông tin Scene"}
+          tooltip={open ? "Thu gọn thông tin Cảnh" : "Mở thông tin Cảnh"}
+          aria-label={open ? "Thu gọn thông tin Cảnh" : "Mở thông tin Cảnh"}
           aria-expanded={open}
           aria-controls="studio-scene-info"
           onClick={onToggle}
@@ -54,7 +54,7 @@ export function StudioInspector({
         </StudioButton>
       </div>
       {open && (
-        <section id="studio-scene-info" aria-label="Thông tin Scene">
+        <section id="studio-scene-info" aria-label="Thông tin Cảnh">
           <PropertyInspector scene={scene} />
           <dl className="studio-properties">
             <div>
@@ -112,7 +112,7 @@ export function StudioSettings({
     <section
       className="studio-settings studio-desktop"
       id="studio-settings"
-      aria-label="Cài đặt Studio"
+      aria-label="Cài đặt Xưởng sáng tạo"
       onKeyDown={(event) => {
         if (event.key === "Escape") {
           event.stopPropagation();
@@ -121,7 +121,7 @@ export function StudioSettings({
       }}
     >
       <div className="studio-panel-heading">
-        <h2>Cài đặt Studio</h2>
+        <h2>Cài đặt Xưởng sáng tạo</h2>
         <button type="button" onClick={onClose}>
           Đóng cài đặt
         </button>
@@ -135,7 +135,7 @@ export function StudioSettings({
               checked={sidebarOpen}
               onChange={onSidebarToggle}
             />
-            Hiện danh sách Scene
+            Hiện danh sách Cảnh
           </label>
           <label>
             <input
@@ -143,7 +143,7 @@ export function StudioSettings({
               checked={inspectorOpen}
               onChange={onInspectorToggle}
             />
-            Hiện thông tin Scene
+            Hiện thông tin Cảnh
           </label>
         </fieldset>
         <dl className="studio-properties">
@@ -155,7 +155,7 @@ export function StudioSettings({
             </dd>
           </div>
           <div>
-            <dt>Đồ họa pixel</dt>
+            <dt>Đồ họa điểm ảnh</dt>
             <dd>{document.settings.pixelArt ? "Bật" : "Tắt"}</dd>
           </div>
         </dl>

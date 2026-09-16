@@ -10,7 +10,7 @@ export function RelatedGames({ games, currentSlug }: {
 
   return (
     <aside className="related-games" aria-labelledby="related-games-heading">
-      <h2 id="related-games-heading">Game liên quan</h2>
+      <h2 id="related-games-heading">Trò chơi liên quan</h2>
       <div className="related-games__list">
         {related.map((game) => <GameCard key={game.slug} game={game} compact headingLevel={3} />)}
       </div>

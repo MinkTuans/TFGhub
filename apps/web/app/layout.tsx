@@ -39,6 +39,8 @@ export default async function RootLayout({
   return (
     <html lang="vi" suppressHydrationWarning>
       <head>
+        <link rel="preload" href="/fonts/be-vietnam-pro-regular.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
+        <link rel="preload" href="/fonts/lora-variable.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
         <script dangerouslySetInnerHTML={{ __html: themeBootstrap }} />
       </head>
       <body>
@@ -46,7 +48,7 @@ export default async function RootLayout({
         <header className="site-header">
           <div className="site-header__inner container">
             <Link aria-label="TFG — Trang chủ" className="brand" href="/">
-              <TfgLogo compact /><span className="brand-wordmark">TFG<span>small games · big worlds</span></span>
+              <TfgLogo compact /><span className="brand-wordmark">TFG<span>trò chơi nhỏ · thế giới lớn</span></span>
             </Link>
             <div className="site-header__actions">
               <SiteNavigation session={session} />

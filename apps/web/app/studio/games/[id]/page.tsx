@@ -31,10 +31,10 @@ export default async function GameWorkspacePage({
     ) {
       return (
         <main>
-          <Link href="/studio">Về Studio</Link>
+          <Link href="/studio">Về Xưởng sáng tạo</Link>
           <h1>{game.title}</h1>
           <p role="alert">
-            Chưa thể mở dự án trong phiên bản Studio này. Dữ liệu dự án được giữ
+            Chưa thể mở dự án trong phiên bản Xưởng sáng tạo này. Dữ liệu dự án được giữ
             nguyên.
           </p>
         </main>
@@ -59,7 +59,7 @@ export default async function GameWorkspacePage({
   return (
     <main className="workspace-page">
       <header className="page-heading">
-        <Link href="/studio">← Về Studio</Link>
+        <Link href="/studio">← Về Xưởng sáng tạo</Link>
         <h1>{game.title}</h1>
       </header>
       <GameWorkspace initialGame={game} />

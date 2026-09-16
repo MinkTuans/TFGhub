@@ -10,7 +10,7 @@ function uploadErrorMessage(status: number): string {
     case 400:
       return "Ảnh bìa không hợp lệ. Chọn một ảnh JPG, PNG hoặc WebP.";
     case 403:
-      return "Bạn không có quyền thay đổi ảnh bìa game này.";
+      return "Bạn không có quyền thay đổi ảnh bìa trò chơi này.";
     case 413:
       return "Ảnh bìa quá lớn. Chọn ảnh không quá 5 MiB.";
     case 503:
@@ -67,7 +67,7 @@ export function CoverUploader({
       <GameCover game={game} ownerGameId={game.id} />
       <form method="post" onSubmit={upload} className="form-stack">
         <label>
-          Ảnh bìa game
+          Ảnh bìa trò chơi
           <input
             name="cover"
             type="file"

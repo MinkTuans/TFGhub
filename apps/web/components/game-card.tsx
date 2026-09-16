@@ -21,7 +21,7 @@ export function GameCard({
       <article>
         <div className="game-card__artwork">
           <GameCover game={game} size={compact ? "compact" : "card"} />
-          {!compact && <span className="game-card__action" aria-hidden="true">Xem game →</span>}
+          {!compact && <span className="game-card__action" aria-hidden="true">Xem trò chơi →</span>}
         </div>
         <div className="game-card__body">
           <Heading className="game-card__title">{game.title}</Heading>

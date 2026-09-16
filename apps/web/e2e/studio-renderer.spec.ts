@@ -313,7 +313,7 @@ async function setup(page: Page) {
   expect(registration.status()).toBe(201);
   await page.goto("/studio/games/new");
   await page.getByRole("button", { name: "Tạo bản nháp" }).click();
-  await expect(page.getByRole("main", { name: "Game Studio" })).toBeVisible();
+  await expect(page.getByRole("main", { name: "Xưởng sáng tạo trò chơi" })).toBeVisible();
   await expect(
     page.getByRole("status", { name: "Trạng thái dự án" }),
   ).toHaveText("Đã lưu");
@@ -463,7 +463,7 @@ async function setup(page: Page) {
   ).json();
   expect(saved.project).toEqual(EngineProjectV2.parse(project));
   await page.reload();
-  const canvas = page.getByRole("img", { name: "Scene: Canonical Canvas" });
+  const canvas = page.getByRole("img", { name: "Cảnh: Canonical Canvas" });
   await expect(canvas).toBeVisible();
   return { gameId, canvas, project: saved.project as EngineProjectV2Type };
 }

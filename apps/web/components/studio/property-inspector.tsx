@@ -1,5 +1,6 @@
 "use client";
 
+import { studioLabel } from "./studio-labels";
 import { useState } from "react";
 import {
   v2ComponentRegistry,
@@ -92,7 +93,7 @@ function ObjectInspector({
       aria-label="Thuộc tính đối tượng"
     >
       <h2>{object.name}</h2>
-      <p className="studio-muted">{object.objectType}</p>
+      <p className="studio-muted">{studioLabel(object.objectType)}</p>
       <fieldset disabled={!editable}>
         <legend>Đối tượng</legend>
         <form
@@ -222,13 +223,13 @@ function ObjectInspector({
           <button type="submit">Lưu đối tượng</button>
         </form>
         <label>
-          Thêm component
+          Thêm thành phần
           <select
             value={types.includes(adding) ? adding : types[0]}
             onChange={(event) => setAdding(event.target.value as typeof adding)}
           >
             {types.map((type) => (
-              <option key={type}>{type}</option>
+              <option key={type} value={type}>{studioLabel(type)}</option>
             ))}
           </select>
         </label>
@@ -244,7 +245,7 @@ function ObjectInspector({
             )
           }
         >
-          Thêm component
+          Thêm thành phần
         </button>
         <button type="button" onClick={() => setDeleting(true)}>
           Xóa đối tượng

@@ -20,7 +20,7 @@ export function CreateEngineGame() {
     try {
       const { game } = await api.post<CreateEngineGameResponse>(
         "/games/engine-projects",
-        {},
+        { title: "Trò chơi chưa có tên" },
       );
       router.replace("/studio/games/" + game.id);
     } catch (error) {

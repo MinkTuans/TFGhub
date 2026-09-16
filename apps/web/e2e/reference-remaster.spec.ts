@@ -32,7 +32,7 @@ for (const viewport of [{ width: 390, height: 667 }, { width: 667, height: 390 }
   test(`Play anchor keeps controls and game above the dock at ${viewport.width}x${viewport.height}`, async ({ page }) => {
     await page.setViewportSize(viewport);
     await page.goto("/games/tiny-quest");
-    await page.getByRole("link", { name: "Chơi game", exact: true }).click();
+    await page.getByRole("link", { name: "Chơi ngay", exact: true }).click();
     const player = page.getByRole("region", { name: "Chơi Tiny Quest", exact: true });
     await expect.poll(async () => (await player.boundingBox())!.y).toBeLessThan(110);
     const box = await player.boundingBox();

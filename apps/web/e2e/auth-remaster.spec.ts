@@ -32,7 +32,7 @@ test("a failed profile save after registration retries only that save", async ({
   });
   await page.goto("/register");
   await page.getByLabel("Tên hiển thị").fill("Recovery creator");
-  await page.getByLabel("Email").fill(`recovery-${randomUUID()}@example.com`);
+  await page.getByLabel("Thư điện tử").fill(`recovery-${randomUUID()}@example.com`);
   await page.getByLabel("Mật khẩu", { exact: true }).fill("password123");
   await page.getByLabel("Xác nhận mật khẩu").fill("does-not-match");
   await page.getByRole("button", { name: "Tạo tài khoản", exact: true }).click();
@@ -48,7 +48,7 @@ test("a failed profile save after registration retries only that save", async ({
   expect(profileWrites).toBe(2);
   await page.goto("/profile");
   await expect(page.getByLabel("Tên hiển thị")).toHaveValue("Recovery creator");
-  await expect(page.getByRole("heading", { name: "Chưa có game nào" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Chưa có trò chơi nào" })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: testInfo.outputPath("profile-390.png"), fullPage: true });
 });

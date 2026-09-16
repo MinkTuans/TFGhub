@@ -185,7 +185,7 @@ for (const theme of ["light", "dark"] as const) {
         await page.setViewportSize(viewport);
         await page.goto("/games/tiny-quest");
         await expect(page.locator("html")).toHaveCSS("color-scheme", theme);
-        await page.getByRole("link", { name: "Chơi game", exact: true }).click();
+        await page.getByRole("link", { name: "Chơi ngay", exact: true }).click();
         const player = page.getByRole("region", { name: "Chơi Tiny Quest", exact: true });
         await expect(player).toBeInViewport();
         await expect.poll(async () => (await player.boundingBox())!.y).toBeLessThan(110);
@@ -205,7 +205,7 @@ for (const theme of ["light", "dark"] as const) {
         expect(frameBox!.width / frameBox!.height).toBeCloseTo(16 / 9, 2);
         expect(frameBox!.y + frameBox!.height).toBeLessThanOrEqual(box!.y + box!.height);
         expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(viewport.width);
-        const related = page.getByRole("complementary", { name: "Game liên quan" });
+        const related = page.getByRole("complementary", { name: "Trò chơi liên quan" });
         await expect(related).toBeVisible();
         await expect(related.getByRole("link", { name: "Chơi Moon Garden", exact: true })).toBeVisible();
         await expect(related.locator('a[href="/games/tiny-quest"]')).toHaveCount(0);
@@ -278,7 +278,7 @@ for (const route of ["register", "login"] as const) {
         await page.getByLabel("Tên hiển thị").fill("Native creator");
         await page.getByLabel("Xác nhận mật khẩu").fill("native-password123");
       }
-      await page.getByLabel("Email").fill("native-submit@example.com");
+      await page.getByLabel("Thư điện tử").fill("native-submit@example.com");
       await page.getByLabel("Mật khẩu", { exact: true }).fill("native-password123");
       const [request] = await Promise.all([
         page.waitForRequest((request) => request.isNavigationRequest()),
@@ -308,7 +308,7 @@ test("register, save a profile, create a private draft, and sign back in", async
   await page.goto("/register");
   await page.getByLabel("Tên hiển thị").fill("New creator");
   await page.getByLabel("Xác nhận mật khẩu").fill("password123");
-  await page.getByLabel("Email").fill(email);
+  await page.getByLabel("Thư điện tử").fill(email);
   await page.getByLabel("Mật khẩu", { exact: true }).fill("password123");
   await page.getByRole("button", { name: "Tạo tài khoản" }).click();
   await expect(page).toHaveURL("/studio");
@@ -349,10 +349,10 @@ test("register, save a profile, create a private draft, and sign back in", async
   await expect(page.getByRole("heading", { name: title, exact: true })).toBeVisible();
   await expect(page.locator('[data-state="DRAFT"]')).toHaveText("Bản nháp");
   await page.getByRole("navigation", { name: "Điều hướng chính", exact: true }).getByRole("link", { name: "Khám phá", exact: true }).click();
-  await page.getByLabel("Tìm kiếm game").fill(title);
+  await page.getByLabel("Tìm kiếm trò chơi").fill(title);
   await page.getByRole("button", { name: "Tìm kiếm", exact: true }).click();
   await expect(page.getByRole("heading", { name: title, exact: true })).toHaveCount(0);
-  await expect(page.getByText("Chưa có game phù hợp.")).toBeVisible();
+  await expect(page.getByText("Chưa có trò chơi phù hợp.")).toBeVisible();
   const hidden = await page.goto(`/games/first-game-${suffix}`);
   expect(hidden?.status()).toBe(404);
   await navigation.getByRole("button", { name: "Đăng xuất" }).click();
@@ -381,11 +381,11 @@ test("register, save a profile, create a private draft, and sign back in", async
   await expect(page).toHaveURL("/login");
   await page.goto("/studio");
   await expect(page).toHaveURL("/login");
-  await page.getByLabel("Email").fill(email);
+  await page.getByLabel("Thư điện tử").fill(email);
   await page.getByLabel("Mật khẩu", { exact: true }).fill("wrong-password");
   await page.getByRole("button", { name: "Đăng nhập" }).click();
   await expect(page.getByRole("main").getByRole("alert")).toHaveText(
-    "Email hoặc mật khẩu không đúng.",
+    "Thư điện tử hoặc mật khẩu không đúng.",
   );
   await page.getByLabel("Mật khẩu", { exact: true }).fill("password123");
   await page.getByRole("button", { name: "Đăng nhập" }).click();
@@ -412,7 +412,7 @@ test("public discovery and metadata render without browser JavaScript", async ({
       page.getByRole("heading", { name: "Tiny Quest", exact: true }),
     ).toBeVisible();
     const details = page.getByRole("article").filter({
-      has: page.getByRole("heading", { name: "Về game này", exact: true }),
+      has: page.getByRole("heading", { name: "Về trò chơi này", exact: true }),
     });
     await expect(details.getByText("Bởi Minh", { exact: true })).toBeVisible();
   });
@@ -426,7 +426,7 @@ test("an HTML5 upload can be retried, previewed, and submitted for review", asyn
   await page.goto("/register");
   await page.getByLabel("Tên hiển thị").fill("New creator");
   await page.getByLabel("Xác nhận mật khẩu").fill("password123");
-  await page.getByLabel("Email").fill(`upload-${suffix}@example.com`);
+  await page.getByLabel("Thư điện tử").fill(`upload-${suffix}@example.com`);
   await page.getByLabel("Mật khẩu", { exact: true }).fill("password123");
   await page.getByRole("button", { name: "Tạo tài khoản" }).click();
   await expect(page).toHaveURL("/studio");
@@ -436,9 +436,9 @@ test("an HTML5 upload can be retried, previewed, and submitted for review", asyn
   await expect(page).toHaveURL(/\/studio\/games\//);
   const archive = page.getByLabel("Tệp ZIP HTML5");
   await archive.setInputFiles({ name: "broken.zip", mimeType: "application/zip", buffer: Buffer.from("not a zip") });
-  await page.getByRole("button", { name: "Tải game lên" }).click();
-  await expect(page.getByRole("main").getByRole("alert")).toHaveText("Không thể tải game lên. Vui lòng thử lại.");
-  await expect(page.getByRole("button", { name: "Tải game lên" })).toBeEnabled();
+  await page.getByRole("button", { name: "Tải trò chơi lên" }).click();
+  await expect(page.getByRole("main").getByRole("alert")).toHaveText("Không thể tải trò chơi lên. Vui lòng thử lại.");
+  await expect(page.getByRole("button", { name: "Tải trò chơi lên" })).toBeEnabled();
   await archive.setInputFiles({
     name: "game.zip",
     mimeType: "application/zip",
@@ -447,8 +447,8 @@ test("an HTML5 upload can be retried, previewed, and submitted for review", asyn
       "base64",
     ),
   });
-  await page.getByRole("button", { name: "Tải game lên" }).click();
-  const preview = page.getByTitle("Chơi thử game");
+  await page.getByRole("button", { name: "Tải trò chơi lên" }).click();
+  const preview = page.getByTitle("Chơi thử trò chơi");
   await expect(preview).toHaveAttribute(
     "sandbox",
     "allow-scripts allow-pointer-lock",
@@ -476,7 +476,7 @@ test("moderation requires a rejection note and publishes the approved artifact a
   await page.goto("/register");
   await page.getByLabel("Tên hiển thị").fill("New creator");
   await page.getByLabel("Xác nhận mật khẩu").fill("password123");
-  await page.getByLabel("Email").fill(email);
+  await page.getByLabel("Thư điện tử").fill(email);
   await page.getByLabel("Mật khẩu", { exact: true }).fill("password123");
   await page.getByRole("button", { name: "Tạo tài khoản" }).click();
   await expect(page).toHaveURL("/studio");
@@ -492,7 +492,7 @@ test("moderation requires a rejection note and publishes the approved artifact a
   await expect(page).toHaveURL(/\/studio\/games\/[^/]+$/);
   const gameId = new URL(page.url()).pathname.split("/").at(-1)!;
   await expect(page.getByTestId("game-cover-fallback")).toBeVisible();
-  await page.getByLabel("Ảnh bìa game").setInputFiles({
+  await page.getByLabel("Ảnh bìa trò chơi").setInputFiles({
     name: "tiny.png", mimeType: "image/png", buffer: tinyPng,
   });
   const [upload] = await Promise.all([
@@ -526,7 +526,7 @@ test("moderation requires a rejection note and publishes the approved artifact a
   await page.getByRole("button", { name: "Lưu mã nguồn" }).click();
   await page.getByRole("button", { name: "Tạo bản chơi thử" }).click();
   await expect(
-    page.getByTitle("Chơi thử game").contentFrame().getByRole("heading", {
+    page.getByTitle("Chơi thử trò chơi").contentFrame().getByRole("heading", {
       name: title,
     }),
   ).toBeVisible();
@@ -534,7 +534,7 @@ test("moderation requires a rejection note and publishes the approved artifact a
   await expect(page.getByRole("status")).toHaveText("Chờ duyệt");
   await switchAccount();
 
-  await page.getByLabel("Email").fill(moderatorEmail);
+  await page.getByLabel("Thư điện tử").fill(moderatorEmail);
   await page.getByLabel("Mật khẩu", { exact: true }).fill(moderatorPassword);
   await page.getByRole("button", { name: "Đăng nhập" }).click();
   await expect(navigation.getByRole("link", { name: "Kiểm duyệt" })).toBeVisible();
@@ -545,12 +545,12 @@ test("moderation requires a rejection note and publishes the approved artifact a
   );
   const queued = page.getByRole("article", { name: title });
   await queued.getByText("Kiểm tra bản gửi", { exact: true }).click();
-  await expect(queued.getByTitle("Chơi thử game")).toHaveAttribute(
+  await expect(queued.getByTitle("Chơi thử trò chơi")).toHaveAttribute(
     "sandbox",
     "allow-scripts allow-pointer-lock",
   );
   await expect(
-    queued.getByTitle("Chơi thử game").contentFrame().getByRole("heading", {
+    queued.getByTitle("Chơi thử trò chơi").contentFrame().getByRole("heading", {
       name: title,
     }),
   ).toBeVisible();
@@ -560,11 +560,11 @@ test("moderation requires a rejection note and publishes the approved artifact a
   await queued.getByLabel("Lý do từ chối").press("Tab");
   await expect(reject).toBeEnabled();
   await reject.click();
-  await expect(page.getByRole("status")).toHaveText("Đã từ chối game.");
+  await expect(page.getByRole("status")).toHaveText("Đã từ chối trò chơi.");
   await expect(queued).toHaveCount(0);
   await switchAccount();
 
-  await page.getByLabel("Email").fill(email);
+  await page.getByLabel("Thư điện tử").fill(email);
   await page.getByLabel("Mật khẩu", { exact: true }).fill("password123");
   await page.getByRole("button", { name: "Đăng nhập" }).click();
   await page.getByRole("link", { name: title, exact: true }).click();
@@ -575,13 +575,13 @@ test("moderation requires a rejection note and publishes the approved artifact a
   await expect(page.getByRole("status")).toHaveText("Chờ duyệt");
   await switchAccount();
 
-  await page.getByLabel("Email").fill(moderatorEmail);
+  await page.getByLabel("Thư điện tử").fill(moderatorEmail);
   await page.getByLabel("Mật khẩu", { exact: true }).fill(moderatorPassword);
   await page.getByRole("button", { name: "Đăng nhập" }).click();
   await navigation.getByRole("link", { name: "Kiểm duyệt" }).click();
   await page.getByRole("article", { name: title }).getByText("Kiểm tra bản gửi", { exact: true }).click();
   await page.getByRole("article", { name: title }).getByRole("button", { name: "Duyệt" }).click();
-  await expect(page.getByRole("status")).toHaveText("Đã duyệt game.");
+  await expect(page.getByRole("status")).toHaveText("Đã duyệt trò chơi.");
   await page.goto("/discover");
   await expect(page.getByRole("heading", { name: title, exact: true })).toBeVisible();
   const publicCover = page.getByRole("img", { name: `Ảnh bìa ${title}`, exact: true });
@@ -610,7 +610,7 @@ test("a code game saves source, rebuilds its sandboxed preview, and submits the 
   await page.goto("/register");
   await page.getByLabel("Tên hiển thị").fill("New creator");
   await page.getByLabel("Xác nhận mật khẩu").fill("password123");
-  await page.getByLabel("Email").fill(`code-${suffix}@example.com`);
+  await page.getByLabel("Thư điện tử").fill(`code-${suffix}@example.com`);
   await page.getByLabel("Mật khẩu", { exact: true }).fill("password123");
   await page.getByRole("button", { name: "Tạo tài khoản" }).click();
   await expect(page).toHaveURL("/studio");
@@ -624,7 +624,7 @@ test("a code game saves source, rebuilds its sandboxed preview, and submits the 
   await page.getByRole("button", { name: "Lưu mã nguồn" }).click();
   await expect(page.getByRole("button", { name: "Gửi duyệt" })).toBeDisabled();
   await page.getByRole("button", { name: "Tạo bản chơi thử" }).click();
-  const preview = page.getByTitle("Chơi thử game");
+  const preview = page.getByTitle("Chơi thử trò chơi");
   await expect(preview).toHaveAttribute(
     "sandbox",
     "allow-scripts allow-pointer-lock",
@@ -649,7 +649,7 @@ test("a story game builds a sandboxed branching preview that reaches the selecte
   await page.goto("/register");
   await page.getByLabel("Tên hiển thị").fill("New creator");
   await page.getByLabel("Xác nhận mật khẩu").fill("password123");
-  await page.getByLabel("Email").fill(`story-${suffix}@example.com`);
+  await page.getByLabel("Thư điện tử").fill(`story-${suffix}@example.com`);
   await page.getByLabel("Mật khẩu", { exact: true }).fill("password123");
   await page.getByRole("button", { name: "Tạo tài khoản" }).click();
   await expect(page).toHaveURL("/studio");
@@ -670,7 +670,7 @@ test("a story game builds a sandboxed branching preview that reaches the selecte
   await page.getByRole("button", { name: "Lưu cốt truyện" }).click();
   await page.getByRole("button", { name: "Tạo bản chơi thử" }).click();
 
-  const preview = page.getByTitle("Chơi thử game");
+  const preview = page.getByTitle("Chơi thử trò chơi");
   await expect(preview).toHaveAttribute(
     "sandbox",
     "allow-scripts allow-pointer-lock",
@@ -689,7 +689,7 @@ test("a platformer game builds a collision-safe preview that reaches its goal by
   await page.goto("/register");
   await page.getByLabel("Tên hiển thị").fill("New creator");
   await page.getByLabel("Xác nhận mật khẩu").fill("password123");
-  await page.getByLabel("Email").fill(`platformer-${suffix}@example.com`);
+  await page.getByLabel("Thư điện tử").fill(`platformer-${suffix}@example.com`);
   await page.getByLabel("Mật khẩu", { exact: true }).fill("password123");
   await page.getByRole("button", { name: "Tạo tài khoản" }).click();
   await expect(page).toHaveURL("/studio");
@@ -704,10 +704,10 @@ test("a platformer game builds a collision-safe preview that reaches its goal by
   await elevated.getByLabel("Y").fill("340");
   await elevated.getByLabel("Chiều rộng").fill("240");
   await elevated.getByLabel("Chiều cao").fill("20");
-  await page.getByRole("button", { name: "Lưu game đi cảnh" }).click();
+  await page.getByRole("button", { name: "Lưu trò chơi đi cảnh" }).click();
   await page.getByRole("button", { name: "Tạo bản chơi thử" }).click();
 
-  const preview = page.getByTitle("Chơi thử game");
+  const preview = page.getByTitle("Chơi thử trò chơi");
   await expect(preview).toHaveAttribute(
     "sandbox",
     "allow-scripts allow-pointer-lock",

@@ -145,7 +145,7 @@ test("keeps the SSR player available when related discovery fails", async () => 
   });
   render(await GamePage({ params: Promise.resolve({ slug: "tiny-quest" }) }));
   expect(screen.getByTitle("Chơi Tiny Quest")).toBeVisible();
-  expect(screen.queryByRole("heading", { name: "Game liên quan" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("heading", { name: "Trò chơi liên quan" })).not.toBeInTheDocument();
 });
 
 test("does not embed an unavailable artifact", async () => {
@@ -167,7 +167,7 @@ test("propagates primary game failures", async () => {
 test("adds product information from the public summary without inventing release history", async () => {
   vi.mocked(api.get).mockImplementation(async (path) => path.startsWith("/discover") ? { games: [], nextCursor: null } : game);
   render(await GamePage({ params: Promise.resolve({ slug: game.slug }) }));
-  expect(screen.getByRole("heading", { name: "Thông tin game" })).toBeVisible();
+  expect(screen.getByRole("heading", { name: "Thông tin trò chơi" })).toBeVisible();
   expect(screen.getByText("Trình duyệt")).toBeVisible();
   expect(screen.getByText("Bản dựng #1")).toBeVisible();
   expect(screen.getByText("07/09/2026")).toHaveAttribute("dateTime", game.createdAt);

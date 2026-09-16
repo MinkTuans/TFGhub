@@ -15,7 +15,7 @@ test.each([["login", LoginPage], ["register", RegisterPage]] as const)("account 
 
 function fillRegistration(confirm = "password123") {
   fireEvent.change(screen.getByLabelText("Tên hiển thị"), { target: { value: "Minh" } });
-  fireEvent.change(screen.getByLabelText("Email"), { target: { value: "minh@example.test" } });
+  fireEvent.change(screen.getByLabelText("Thư điện tử"), { target: { value: "minh@example.test" } });
   fireEvent.change(screen.getByLabelText("Mật khẩu", { exact: true }), { target: { value: "password123" } });
   fireEvent.change(screen.getByLabelText("Xác nhận mật khẩu"), { target: { value: confirm } });
   fireEvent.submit(screen.getByRole("button", { name: "Tạo tài khoản" }).closest("form")!);

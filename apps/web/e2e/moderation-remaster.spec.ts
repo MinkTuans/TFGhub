@@ -18,18 +18,18 @@ for (const width of [390, 768, 1024, 1440]) {
     expect((await page.request.post("/api/auth/login", { data: { email: "moderator@example.com", password: "moderator-password123" } })).ok()).toBe(true);
     await page.goto("/moderation");
     const card = page.getByRole("article", { name: "Review layout", exact: true });
-    await expect(card.getByTitle("Chơi thử game")).not.toBeVisible();
+    await expect(card.getByTitle("Chơi thử trò chơi")).not.toBeVisible();
     await page.screenshot({ path: testInfo.outputPath(`queue-${width}.png`), fullPage: true });
     await card.locator("summary").focus();
     await page.keyboard.press("Enter");
     await expect(card.getByRole("heading", { name: "Quyết định kiểm duyệt" })).toBeVisible();
     await expect(card.locator("time")).toContainText("UTC");
     await expect(card.getByRole("button", { name: "Từ chối", exact: true })).toBeDisabled();
-    await expect(card.getByTitle("Chơi thử game").contentFrame().getByRole("heading", { name: "Ready to play" })).toBeVisible();
+    await expect(card.getByTitle("Chơi thử trò chơi").contentFrame().getByRole("heading", { name: "Ready to play" })).toBeVisible();
     const decisionHeading = await card.getByRole("heading", { name: "Quyết định kiểm duyệt" }).boundingBox();
     const decisionHint = await card.getByText("Chơi thử và kiểm tra nội dung. Nếu từ chối, ghi rõ điều tác giả cần sửa.").boundingBox();
     expect(decisionHint!.y - decisionHeading!.y - decisionHeading!.height).toBeGreaterThanOrEqual(8);
-    const previewBox = await card.getByTitle("Chơi thử game").boundingBox();
+    const previewBox = await card.getByTitle("Chơi thử trò chơi").boundingBox();
     expect(previewBox).not.toBeNull();
     expect(previewBox!.width / previewBox!.height).toBeCloseTo(16 / 9, 1);
     for (const theme of ["light", "dark"]) {
@@ -40,7 +40,7 @@ for (const width of [390, 768, 1024, 1440]) {
     await card.getByLabel("Lý do từ chối").fill("Bổ sung hướng dẫn chơi.");
     await card.getByRole("button", { name: "Từ chối", exact: true }).click();
     await expect(card).toHaveCount(0);
-    await expect(page.getByText("Đã từ chối game.", { exact: true })).toBeVisible();
+    await expect(page.getByText("Đã từ chối trò chơi.", { exact: true })).toBeVisible();
     expect(errors).toEqual([]);
   });
 }

@@ -28,7 +28,7 @@ export function AuthForm({ mode }: { mode: "register" | "login" }) {
       const raw = Object.fromEntries(new FormData(event.currentTarget));
       const input = (mode === "register" ? RegisterInput : LoginInput).safeParse(raw);
       if (!input.success) {
-        setError("Nhập email hợp lệ và mật khẩu từ 10–128 ký tự.");
+        setError("Nhập thư điện tử hợp lệ và mật khẩu từ 10–128 ký tự.");
         return;
       }
       credentials = input.data;
@@ -80,7 +80,7 @@ export function AuthForm({ mode }: { mode: "register" | "login" }) {
       ) : (
         <>
           {mode === "register" && <label>Tên hiển thị<input name="displayName" autoComplete="nickname" minLength={2} maxLength={50} disabled={pending} required /></label>}
-          <label>Email<input name="email" type="email" autoComplete="email" disabled={pending} required /></label>
+          <label>Thư điện tử<input name="email" type="email" autoComplete="email" disabled={pending} required /></label>
           <PasswordField name="password" label="Mật khẩu" autoComplete={mode === "register" ? "new-password" : "current-password"} disabled={pending} describedBy={mode === "register" ? hintId : undefined} />
           {mode === "register" && <>
             <p className="hint" id={hintId}>Sử dụng từ 10–128 ký tự.</p>

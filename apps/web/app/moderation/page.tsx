@@ -16,7 +16,7 @@ export default async function ModerationPage() {
         <p className="eyebrow">Không gian kiểm duyệt</p>
         <h1>Hàng đợi kiểm duyệt</h1>
       </header>
-      <p>Kiểm tra các game được gửi trước khi xuất hiện trong Khám phá.</p>
+      <p>Kiểm tra các trò chơi được gửi trước khi xuất hiện trong Khám phá.</p>
       <ModerationQueue initialGames={games} />
     </main>
   );

@@ -26,7 +26,7 @@ export default async function ProfilePage() {
           <h1>{profile?.displayName || "Thông tin cá nhân"}</h1>
           <p className="description">{profile?.bio || "Thêm vài dòng giới thiệu để người chơi biết về bạn."}</p>
         </div>
-        <dl className="profile-header__stat"><dt>Game trong Studio</dt><dd>{games.length}</dd></dl>
+        <dl className="profile-header__stat"><dt>Trò chơi trong Xưởng sáng tạo</dt><dd>{games.length}</dd></dl>
       </header>
       <div className="profile-layout">
         <section className="profile-editor" aria-labelledby="profile-edit-title">
@@ -36,12 +36,12 @@ export default async function ProfilePage() {
         </section>
         <section className="profile-games" aria-labelledby="profile-games-title">
           <div className="section-heading">
-            <h2 id="profile-games-title">Game của bạn</h2>
-            <Link href="/studio">Quản lý trong Studio</Link>
+            <h2 id="profile-games-title">Trò chơi của bạn</h2>
+            <Link href="/studio">Quản lý trong Xưởng sáng tạo</Link>
           </div>
           {games.length === 0 ? (
-            <EmptyState title="Chưa có game nào" description="Bắt đầu một bản nháp để đưa ý tưởng đầu tiên của bạn vào Studio.">
-              <Link href="/studio/games/new">Tạo game đầu tiên</Link>
+            <EmptyState title="Chưa có trò chơi nào" description="Bắt đầu một bản nháp để đưa ý tưởng đầu tiên của bạn vào Xưởng sáng tạo.">
+              <Link href="/studio/games/new">Tạo trò chơi đầu tiên</Link>
             </EmptyState>
           ) : (
             <div className="profile-game-list">
@@ -49,7 +49,7 @@ export default async function ProfilePage() {
                 <Link className="profile-game-row" href={`/studio/games/${encodeURIComponent(game.id)}`} key={game.id} aria-label={game.title}>
                   <article>
                     <GameCover game={game} ownerGameId={game.id} size="compact" />
-                    <div className="game-card__body"><h3 className="game-card__title">{game.title}</h3><p className="description">{game.description}</p><p className="game-card__developer">Mở trong Studio →</p></div>
+                    <div className="game-card__body"><h3 className="game-card__title">{game.title}</h3><p className="description">{game.description}</p><p className="game-card__developer">Mở trong Xưởng sáng tạo →</p></div>
                   </article>
                 </Link>
               ))}

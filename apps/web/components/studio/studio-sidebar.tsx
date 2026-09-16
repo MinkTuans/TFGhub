@@ -20,16 +20,16 @@ export function StudioSidebar({
   assetManager?: ReactNode;
 }) {
   return (
-    <aside className="studio-sidebar" aria-label="Điều hướng Scene">
+    <aside className="studio-sidebar" aria-label="Điều hướng Cảnh">
       <div className="studio-panel-heading">
         {open && (
           <h2>
-            Scene <span className="studio-count">{scenes.length}</span>
+            Cảnh <span className="studio-count">{scenes.length}</span>
           </h2>
         )}
         <StudioButton
-          tooltip={open ? "Thu gọn danh sách Scene" : "Mở danh sách Scene"}
-          aria-label={open ? "Thu gọn danh sách Scene" : "Mở danh sách Scene"}
+          tooltip={open ? "Thu gọn danh sách Cảnh" : "Mở danh sách Cảnh"}
+          aria-label={open ? "Thu gọn danh sách Cảnh" : "Mở danh sách Cảnh"}
           aria-expanded={open}
           aria-controls="studio-scene-list"
           onClick={onToggle}

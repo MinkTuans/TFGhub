@@ -17,7 +17,7 @@ export function GameForm() {
     );
     if (!input.success) {
       setError(
-        "Kiểm tra tên game, đường dẫn, mô tả, quyền truy cập và kích thước hiển thị.",
+        "Kiểm tra tên trò chơi, đường dẫn, mô tả, quyền truy cập và kích thước hiển thị.",
       );
       return;
     }
@@ -42,7 +42,7 @@ export function GameForm() {
   return (
     <form onSubmit={submit} className="form-stack panel">
       <label>
-        Tên game
+        Tên trò chơi
         <input name="title" maxLength={80} required />
       </label>
       <label>
@@ -55,7 +55,7 @@ export function GameForm() {
         />
       </label>
       <p className="hint" id="slug-help">
-        Dùng chữ thường, số và dấu gạch nối, ví dụ tiny-quest.
+        Dùng chữ thường, số và dấu gạch nối, ví dụ cuoc-phieu-luu.
       </p>
       <label>
         Mô tả
@@ -69,7 +69,7 @@ export function GameForm() {
         </select>
       </label>
       <label>
-        Cách tạo game
+        Cách tạo trò chơi
         <select name="sourceType" defaultValue="UPLOAD">
           <option value="UPLOAD">Tải tệp ZIP HTML5</option>
           <option value="CODE">Lập trình</option>

@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./vietnamese-fonts.css";
 
 :root,
 [data-theme="light"] {
@@ -112,7 +113,7 @@ body {
   flex-direction: column;
   background: var(--page);
   color: var(--text);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-body);
 }
 
 /* Presence-based scoping also restores site chrome after client navigation. */
@@ -395,7 +396,7 @@ input[type="color"] { min-height: 3rem; padding: 0.25rem; }
 .workspace-editor { display: grid; align-items: start; gap: 1.5rem; }
 .editor-panel .form-stack { max-width: none; }
 .editor-actions { display: flex; flex-wrap: wrap; gap: 0.75rem; padding-top: 1rem; border-top: 1px solid var(--border); }
-.editor-panel textarea { font-family: ui-monospace, monospace; font-size: 0.9375rem; line-height: 1.5; }
+.editor-panel textarea { font-family: 'TFG Mono', monospace; font-size: 0.9375rem; line-height: 1.5; }
 .submission-panel { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1.25rem; }
 .submission-panel h2 { margin-bottom: 1rem; }
 .studio-card { padding: 0; overflow: hidden; }

@@ -12,27 +12,27 @@ const creationMethods: Array<{
 }> = [
   {
     icon: "archive",
-    title: "ZIP HTML5",
-    description: "Đưa game HTML5 có sẵn của bạn lên TFG.",
+    title: "Tệp nén HTML5",
+    description: "Đưa trò chơi HTML5 có sẵn của bạn lên TFG.",
   },
   {
     icon: "code",
-    title: "Code",
-    description: "Viết một game nhỏ trực tiếp trong trình duyệt.",
+    title: "Lập trình",
+    description: "Viết một trò chơi nhỏ trực tiếp trong trình duyệt.",
   },
   {
     icon: "story",
-    title: "Truyện & quiz",
+    title: "Truyện và câu đố",
     description: "Kể câu chuyện tương tác với lựa chọn của người chơi.",
   },
   {
     icon: "platformer",
-    title: "Platformer",
+    title: "Vượt chướng ngại vật",
     description: "Dựng màn chơi bằng công cụ kéo thả đơn giản.",
   },
 ];
 
-const publishingSteps = ["1. Tạo game", "2. Xem trước", "3. Gửi duyệt"];
+const publishingSteps = ["1. Tạo trò chơi", "2. Xem trước", "3. Gửi duyệt"];
 
 export default async function Home() {
   let recentGames: DiscoverGamesResponse["games"] | undefined;
@@ -46,14 +46,14 @@ export default async function Home() {
     <main className="home-page">
       <section className="home-hero" aria-labelledby="home-title">
         <div className="home-hero__copy">
-          <p className="eyebrow" lang="en">A HOME FOR SMALL GAMES</p>
-          <h1 id="home-title" lang="en">Every great game starts with a small idea.</h1>
+          <p className="eyebrow">NƠI ƯƠM MẦM NHỮNG TRÒ CHƠI</p>
+          <h1 id="home-title">Mỗi trò chơi lớn đều bắt đầu từ một ý tưởng nhỏ.</h1>
           <p className="home-hero__lede">
-            Khám phá những game độc lập, gặp gỡ ý tưởng mới và biến câu chuyện của bạn
+            Khám phá những trò chơi độc lập, gặp gỡ ý tưởng mới và biến câu chuyện của bạn
             thành một trò chơi. Một không gian chung cho người chơi và người sáng tạo.
           </p>
           <div className="actions">
-            <Link className="button" href="/discover">Khám phá game</Link>
+            <Link className="button" href="/discover">Khám phá trò chơi</Link>
             <Link className="button button-ghost" href="/register">Tạo tài khoản</Link>
           </div>
         </div>
@@ -64,18 +64,18 @@ export default async function Home() {
         <div className="section-heading">
           <div>
             <p className="eyebrow">Được tạo bởi cộng đồng độc lập</p>
-            <h2 id="recent-games-title">Game mới trên TFG</h2>
+            <h2 id="recent-games-title">Trò chơi mới trên TFG</h2>
           </div>
-          <Link href="/discover">Xem tất cả game</Link>
+          <Link href="/discover">Xem tất cả trò chơi</Link>
         </div>
         {recentGames === undefined ? (
           <div role="alert">
-            <p>Không thể tải game lúc này. Bạn vẫn có thể khám phá các công cụ sáng tạo bên dưới.</p>
+            <p>Không thể tải trò chơi lúc này. Bạn vẫn có thể khám phá các công cụ sáng tạo bên dưới.</p>
             <Link href="/">Thử tải lại</Link>
           </div>
         ) : recentGames.length === 0 ? (
-          <EmptyState title="Chưa có game công khai" description="Những ý tưởng đầu tiên đang chờ được chia sẻ. Bắt đầu với một bản nháp trong Studio của bạn.">
-            <Link href="/studio/games/new">Tạo game đầu tiên</Link>
+          <EmptyState title="Chưa có trò chơi công khai" description="Những ý tưởng đầu tiên đang chờ được chia sẻ. Bắt đầu với một bản nháp trong Xưởng sáng tạo của bạn.">
+            <Link href="/studio/games/new">Tạo trò chơi đầu tiên</Link>
           </EmptyState>
         ) : (
           <div className="grid catalog-grid">
@@ -88,7 +88,7 @@ export default async function Home() {
         <div className="section-heading">
           <div>
             <p className="eyebrow">Bắt đầu theo cách của bạn</p>
-            <h2 id="creation-methods-title">Tạo game theo cách của bạn</h2>
+            <h2 id="creation-methods-title">Tạo trò chơi theo cách của bạn</h2>
           </div>
         </div>
         <div className="feature-grid">
@@ -104,7 +104,7 @@ export default async function Home() {
 
       <section className="publishing-process" aria-labelledby="publishing-steps-title">
         <p className="eyebrow">Quy trình đơn giản</p>
-        <h2 id="publishing-steps-title">Từ ý tưởng đến game công khai</h2>
+        <h2 id="publishing-steps-title">Từ ý tưởng đến trò chơi công khai</h2>
         <ol>
           {publishingSteps.map((step) => (
             <li key={step}>{step}</li>
@@ -121,11 +121,11 @@ export default async function Home() {
           <h2 id="home-studio-title">Một ý tưởng nhỏ.<br />Rất nhiều cách bắt đầu.</h2>
           <p>Tạo bản nháp, thử cách chơi và chia sẻ khi bạn đã sẵn sàng.</p>
           <ol className="home-hero__notes">
-            <li><span aria-hidden="true">01</span> Viết code hoặc kể một câu chuyện</li>
+            <li><span aria-hidden="true">01</span> Viết mã hoặc kể một câu chuyện</li>
             <li><span aria-hidden="true">02</span> Thử nghiệm ngay trên trình duyệt</li>
-            <li><span aria-hidden="true">03</span> Gửi game để được duyệt công khai</li>
+            <li><span aria-hidden="true">03</span> Gửi trò chơi để được duyệt công khai</li>
           </ol>
-          <Link className="button button-ghost" href="/studio">Mở Studio</Link>
+          <Link className="button button-ghost" href="/studio">Mở Xưởng sáng tạo</Link>
         </aside>
       </section>
     </main>

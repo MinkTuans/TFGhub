@@ -190,7 +190,7 @@ test("changes the theme when browser storage is blocked", () => {
 
 test("mobile navigation closes with Escape and returns focus to the trigger", () => {
   render(<SiteNavigation session={null} />);
-  const toggle = screen.getByRole("button", { name: "Mở menu điều hướng" });
+  const toggle = screen.getByRole("button", { name: "Mở trình đơn điều hướng" });
   fireEvent.click(toggle);
   expect(toggle).toHaveAttribute("aria-expanded", "true");
   const discover = screen.getByRole("link", { name: "Khám phá" });
@@ -202,7 +202,7 @@ test("mobile navigation closes with Escape and returns focus to the trigger", ()
 
 test("mobile navigation closes after choosing a route", () => {
   render(<SiteNavigation session={null} />);
-  const toggle = screen.getByRole("button", { name: "Mở menu điều hướng" });
+  const toggle = screen.getByRole("button", { name: "Mở trình đơn điều hướng" });
   fireEvent.click(toggle);
   fireEvent.click(screen.getByRole("link", { name: "Khám phá" }));
   expect(toggle).toHaveAttribute("aria-expanded", "false");
@@ -210,11 +210,11 @@ test("mobile navigation closes after choosing a route", () => {
 
 test("does not reopen the mobile menu when returning through browser history", () => {
   const { rerender } = render(<SiteNavigation session={null} />);
-  fireEvent.click(screen.getByRole("button", { name: "Mở menu điều hướng" }));
+  fireEvent.click(screen.getByRole("button", { name: "Mở trình đơn điều hướng" }));
   route.pathname = "/discover";
   rerender(<SiteNavigation session={null} />);
-  expect(screen.getByRole("button", { name: "Mở menu điều hướng" })).toHaveAttribute("aria-expanded", "false");
+  expect(screen.getByRole("button", { name: "Mở trình đơn điều hướng" })).toHaveAttribute("aria-expanded", "false");
   route.pathname = "/";
   rerender(<SiteNavigation session={null} />);
-  expect(screen.getByRole("button", { name: "Mở menu điều hướng" })).toHaveAttribute("aria-expanded", "false");
+  expect(screen.getByRole("button", { name: "Mở trình đơn điều hướng" })).toHaveAttribute("aria-expanded", "false");
 });

@@ -1,3 +1,4 @@
+import { studioComponentDefaults } from "./studio-component-defaults";
 import {
   ApplyMutationBatchInput,
   v2ComponentRegistry,
@@ -56,7 +57,7 @@ export function createObjectCommand(
     Math.max(-1, ...layerObjects.map((object) => object.renderOrder)) + 1;
   const components = compositions[options.objectType].map((type) => {
     const definition = v2ComponentRegistry[type];
-    const properties = definition.defaults() as Record<string, unknown>;
+    const properties = studioComponentDefaults(type);
     if (type === "Transform") {
       if (options.objectType === "TILEMAP") properties.pivot = { x: 0, y: 0 };
       Object.assign(properties, options.transform);
@@ -160,7 +161,7 @@ export function addComponentCommand(
   sceneId: string,
   objectId: string,
   type: ComponentType,
-  properties: unknown = v2ComponentRegistry[type].defaults(),
+  properties: unknown = studioComponentDefaults(type),
   newId: () => string = createStudioId,
 ): StudioMutation {
   return command({

@@ -19,15 +19,15 @@ export function StudioGameList({ games }: { games: StudioCardGame[] }) {
     `${game.title} ${game.description}`.toLocaleLowerCase("vi").includes(term))
     .sort((a, b) => sort === "title" ? a.title.localeCompare(b.title, "vi") : b.updatedAt.localeCompare(a.updatedAt));
 
-  if (!games.length) return <EmptyState title="Ý tưởng đầu tiên đang chờ bạn" description="Bạn chưa có bản nháp. Bắt đầu với một ý tưởng và tên game."><Link href="/studio/games/new">Tạo game đầu tiên</Link></EmptyState>;
+  if (!games.length) return <EmptyState title="Ý tưởng đầu tiên đang chờ bạn" description="Bạn chưa có bản nháp. Bắt đầu với một ý tưởng và tên trò chơi."><Link href="/studio/games/new">Tạo trò chơi đầu tiên</Link></EmptyState>;
 
   return <>
     <div className="studio-filters">
-      <label>Tìm game của bạn<input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Tên hoặc mô tả game…" /></label>
+      <label>Tìm trò chơi của bạn<input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Tên hoặc mô tả trò chơi…" /></label>
       <label>Trạng thái duyệt<select value={review} onChange={(event) => setReview(event.target.value)}><option value="">Tất cả trạng thái</option>{Object.entries(reviewLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
       <label>Sắp xếp<select value={sort} onChange={(event) => setSort(event.target.value)}><option value="updated">Cập nhật gần nhất</option><option value="title">Tên A–Z</option></select></label>
     </div>
-    <p className="hint" role="status">{filtered.length} / {games.length} game</p>
+    <p className="hint" role="status">{filtered.length} / {games.length} trò chơi</p>
     {filtered.length ? <div className="grid studio-games-grid">{filtered.map((game) => <article className="card studio-card" key={game.id}>
       <GameCover game={game} ownerGameId={game.id} size="compact" />
       <div className="studio-card__body">
@@ -36,10 +36,10 @@ export function StudioGameList({ games }: { games: StudioCardGame[] }) {
           <span className="badge">{game.visibility === "DRAFT" ? "Riêng tư" : game.visibility === "PUBLIC" ? "Công khai" : "Không niêm yết"}</span>
           <span className="badge" data-state={game.reviewState}>{reviewLabels[game.reviewState]}</span>
         </div>
-        <p className="description">{game.description || "Thêm mô tả để giới thiệu game của bạn."}</p>
+        <p className="description">{game.description || "Thêm mô tả để giới thiệu trò chơi của bạn."}</p>
         <p className="hint">Cập nhật <time dateTime={game.updatedAt}>{new Date(game.updatedAt).toLocaleDateString("vi-VN", { timeZone: "UTC" })}</time></p>
       </div>
       <Link className="studio-card__open" href={`/studio/games/${encodeURIComponent(game.id)}`} aria-label={`Mở ${game.title}`}><span aria-hidden="true">→</span></Link>
-    </article>)}</div> : <EmptyState title="Không có game phù hợp" description="Thử tên khác hoặc xóa bộ lọc để xem lại game của bạn."><button className="button-secondary" onClick={() => { setQuery(""); setReview(""); }}>Xóa bộ lọc</button></EmptyState>}
+    </article>)}</div> : <EmptyState title="Không có trò chơi phù hợp" description="Thử tên khác hoặc xóa bộ lọc để xem lại trò chơi của bạn."><button className="button-secondary" onClick={() => { setQuery(""); setReview(""); }}>Xóa bộ lọc</button></EmptyState>}
   </>;
 }

@@ -3,10 +3,10 @@ import { ApiError } from "../lib/api-client";
 import { apiErrorMessage } from "../lib/api-error-message";
 
 test.each([
-  ["Email already registered", "Email này đã được đăng ký."],
-  ["Invalid email or password", "Email hoặc mật khẩu không đúng."],
-  ["Invalid registration input", "Kiểm tra email và mật khẩu đăng ký."],
-  ["Invalid login input", "Kiểm tra email và mật khẩu đăng nhập."],
+  ["Email already registered", "Thư điện tử này đã được đăng ký."],
+  ["Invalid email or password", "Thư điện tử hoặc mật khẩu không đúng."],
+  ["Invalid registration input", "Kiểm tra thư điện tử và mật khẩu đăng ký."],
+  ["Invalid login input", "Kiểm tra thư điện tử và mật khẩu đăng nhập."],
   ["Unauthorized", "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại."],
   ["Forbidden", "Bạn không có quyền thực hiện thao tác này."],
   [
@@ -21,21 +21,21 @@ test.each([
   ["Invalid developer profile input", "Kiểm tra tên hiển thị và giới thiệu."],
   [
     "Game slug already exists",
-    "Đường dẫn game đã tồn tại. Hãy chọn đường dẫn khác.",
+    "Đường dẫn trò chơi đã tồn tại. Hãy chọn đường dẫn khác.",
   ],
-  ["Invalid game input", "Kiểm tra thông tin và kích thước hiển thị của game."],
-  ["You do not own this game", "Bạn không có quyền chỉnh sửa game này."],
+  ["Invalid game input", "Kiểm tra thông tin và kích thước hiển thị của trò chơi."],
+  ["You do not own this game", "Bạn không có quyền chỉnh sửa trò chơi này."],
   [
     "Game changed; reload the workspace",
-    "Game đã thay đổi. Hãy tải lại không gian làm việc.",
+    "Trò chơi đã thay đổi. Hãy tải lại không gian làm việc.",
   ],
   [
     "Build or upload a game artifact before review",
-    "Tạo bản chơi thử hoặc tải game lên trước khi gửi duyệt.",
+    "Tạo bản chơi thử hoặc tải trò chơi lên trước khi gửi duyệt.",
   ],
   [
     "Game cannot be submitted",
-    "Chưa thể gửi game để duyệt. Hãy tải lại không gian làm việc.",
+    "Chưa thể gửi trò chơi để duyệt. Hãy tải lại không gian làm việc.",
   ],
   [
     "Invalid game project",
@@ -43,11 +43,11 @@ test.each([
   ],
   [
     "Project source type does not match the game",
-    "Loại dự án không khớp với cách tạo game.",
+    "Loại dự án không khớp với cách tạo trò chơi.",
   ],
   [
     "This game does not accept ZIP uploads",
-    "Game này không hỗ trợ tải tệp ZIP.",
+    "Trò chơi này không hỗ trợ tải tệp ZIP.",
   ],
   [
     "Artifact storage is unavailable",
@@ -57,20 +57,20 @@ test.each([
     "Artifact finalization is unavailable",
     "Chưa thể hoàn tất bản chơi thử. Vui lòng thử lại sau.",
   ],
-  ["You cannot preview this game", "Bạn không có quyền chơi thử game này."],
-  ["Game not found", "Không tìm thấy game."],
-  ["Game file not found", "Không tìm thấy tệp game."],
+  ["You cannot preview this game", "Bạn không có quyền chơi thử trò chơi này."],
+  ["Game not found", "Không tìm thấy trò chơi."],
+  ["Game file not found", "Không tìm thấy tệp trò chơi."],
   [
     "Game content capability is invalid or expired",
-    "Liên kết chơi game đã hết hạn hoặc không hợp lệ. Hãy tải lại trang.",
+    "Liên kết chơi trò chơi đã hết hạn hoặc không hợp lệ. Hãy tải lại trang.",
   ],
   [
     "Provide one .zip file in the game field",
-    "Chọn một tệp ZIP để tải game lên.",
+    "Chọn một tệp ZIP để tải trò chơi lên.",
   ],
   [
     "Invalid ZIP archive",
-    "Tệp ZIP không hợp lệ. Hãy kiểm tra và nén lại game.",
+    "Tệp ZIP không hợp lệ. Hãy kiểm tra và nén lại trò chơi.",
   ],
   [
     "ZIP requires a root index.html",
@@ -111,13 +111,13 @@ test.each([
     "Invalid review revision",
     "Phiên bản gửi duyệt không hợp lệ. Hãy tải lại danh sách.",
   ],
-  ["Invalid review input", "Kiểm tra phiên bản game và lý do từ chối."],
+  ["Invalid review input", "Kiểm tra phiên bản trò chơi và lý do từ chối."],
   [
     "Game is not pending review",
-    "Game không còn chờ duyệt. Hãy tải lại danh sách.",
+    "Trò chơi không còn chờ duyệt. Hãy tải lại danh sách.",
   ],
   ["Invalid discovery query", "Thông tin tìm kiếm không hợp lệ."],
-  ["Invalid cursor", "Danh sách game đã thay đổi. Hãy tải lại trang."],
+  ["Invalid cursor", "Danh sách trò chơi đã thay đổi. Hãy tải lại trang."],
 ])("translates known API error %s", (message, expected) => {
   expect(
     apiErrorMessage(

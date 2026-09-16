@@ -150,7 +150,7 @@ export function PlatformerGameEditor({
       className="panel editor-panel"
       aria-labelledby="platformer-editor-heading"
     >
-      <h2 id="platformer-editor-heading">Trình tạo game đi cảnh</h2>
+      <h2 id="platformer-editor-heading">Trình tạo trò chơi đi cảnh</h2>
       <div className="form-stack">
         <fieldset>
           <legend>Khung vẽ</legend>
@@ -387,7 +387,7 @@ export function PlatformerGameEditor({
             onClick={savePlatformer}
             type="button"
           >
-            {operation === "save" ? "Đang lưu…" : "Lưu game đi cảnh"}
+            {operation === "save" ? "Đang lưu…" : "Lưu trò chơi đi cảnh"}
           </button>
           <button
             disabled={operation !== null || !hasSavedProject || isDirty}

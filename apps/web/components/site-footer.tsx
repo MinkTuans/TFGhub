@@ -13,7 +13,7 @@ export function SiteFooter({ session }: { session: SessionUser | null }) {
         </div>
         <nav aria-label="Khám phá TFG">
           <h2>Khám phá</h2>
-          <Link href="/discover">Khám phá game</Link>
+          <Link href="/discover">Khám phá trò chơi</Link>
           <Link href="/">Trang chủ</Link>
         </nav>
         <nav aria-label="Dành cho người sáng tạo">

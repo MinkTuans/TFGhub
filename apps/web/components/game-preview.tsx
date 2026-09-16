@@ -13,7 +13,7 @@ export function GamePreview({
     <section className="panel editor-panel" aria-labelledby="preview-heading">
       <h2 id="preview-heading">Chơi thử</h2>
       <iframe
-        title="Chơi thử game"
+        title="Chơi thử trò chơi"
         src={`${resolvePublicApiBaseUrl()}/games/${encodeURIComponent(gameId)}/preview/?v=${revision}`}
         sandbox="allow-scripts allow-pointer-lock"
       />

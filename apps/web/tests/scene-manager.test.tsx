@@ -958,25 +958,25 @@ const button = (name: string) => screen.getByRole("button", { name });
 
 test("shell exposes scene creation, settings, rename, duplicate, order and entry controls through canonical history", async () => {
   const h = await shell();
-  fireEvent.click(button("Thêm Scene"));
+  fireEvent.click(button("Thêm Cảnh"));
   expect(h.studio.state.document.scenes).toHaveLength(3);
   const created = h.studio.state.document.scenes[2];
   expect(created.id).not.toBe(id(2));
-  fireEvent.change(screen.getByRole("textbox", { name: "Tên Scene" }), {
+  fireEvent.change(screen.getByRole("textbox", { name: "Tên Cảnh" }), {
     target: { value: "Island" },
   });
-  fireEvent.change(screen.getByRole("combobox", { name: "Loại Scene" }), {
+  fireEvent.change(screen.getByRole("combobox", { name: "Loại Cảnh" }), {
     target: { value: "MAP" },
   });
   fireEvent.change(
-    screen.getByRole("spinbutton", { name: "Chiều rộng Scene" }),
+    screen.getByRole("spinbutton", { name: "Chiều rộng Cảnh" }),
     { target: { value: "1200" } },
   );
   fireEvent.change(screen.getByRole("spinbutton", { name: "Trọng lực Y" }), {
     target: { value: "250" },
   });
   fireEvent.click(screen.getByRole("checkbox", { name: "Bật lưới" }));
-  fireEvent.click(button("Lưu Scene"));
+  fireEvent.click(button("Lưu Cảnh"));
   expect(h.studio.state.document.scenes[2]).toMatchObject({
     id: created.id,
     name: "Island",
@@ -984,15 +984,15 @@ test("shell exposes scene creation, settings, rename, duplicate, order and entry
     width: 1200,
     settings: { gravityY: 250, grid: { enabled: true } },
   });
-  fireEvent.click(button("Đặt làm Scene bắt đầu"));
+  fireEvent.click(button("Đặt làm Cảnh bắt đầu"));
   expect(h.studio.state.document.entrySceneId).toBe(created.id);
-  fireEvent.click(button("Đưa Scene lên"));
+  fireEvent.click(button("Đưa Cảnh lên"));
   expect(
     [...h.studio.state.document.scenes]
       .sort((a, b) => a.order - b.order)
       .map((x) => x.name),
   ).toEqual(["Opening", "Island", "Ending"]);
-  fireEvent.click(button("Nhân bản Scene"));
+  fireEvent.click(button("Nhân bản Cảnh"));
   expect(h.studio.state.document.scenes).toHaveLength(4);
   const copy = structuredClone(h.studio.state.document.scenes[3]);
   expect(copy.id).not.toBe(created.id);
@@ -1007,9 +1007,9 @@ test("scene deletion uses cancellable TFG confirmation, explicit entry replaceme
   const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
   const h = await shell();
   const before = structuredClone(h.studio.state.document);
-  button("Xóa Scene").focus();
-  fireEvent.click(button("Xóa Scene"));
-  let dialog = screen.getByRole("dialog", { name: "Xóa Scene" });
+  button("Xóa Cảnh").focus();
+  fireEvent.click(button("Xóa Cảnh"));
+  let dialog = screen.getByRole("dialog", { name: "Xóa Cảnh" });
   expect(h.studio.state.document).toEqual(before);
   expect(within(dialog).getByRole("button", { name: "Hủy" })).toHaveFocus();
   expect(
@@ -1017,17 +1017,17 @@ test("scene deletion uses cancellable TFG confirmation, explicit entry replaceme
   ).toBeDisabled();
   fireEvent.keyDown(dialog, { key: "Escape" });
   expect(screen.queryByRole("dialog")).toBeNull();
-  expect(button("Xóa Scene")).toHaveFocus();
-  fireEvent.click(button("Xóa Scene"));
-  dialog = screen.getByRole("dialog", { name: "Xóa Scene" });
+  expect(button("Xóa Cảnh")).toHaveFocus();
+  fireEvent.click(button("Xóa Cảnh"));
+  dialog = screen.getByRole("dialog", { name: "Xóa Cảnh" });
   fireEvent.change(
-    within(dialog).getByRole("combobox", { name: "Scene bắt đầu thay thế" }),
+    within(dialog).getByRole("combobox", { name: "Cảnh bắt đầu thay thế" }),
     { target: { value: id(3) } },
   );
   fireEvent.click(within(dialog).getByRole("button", { name: "Xác nhận xóa" }));
   expect(h.studio.state.document.scenes).toHaveLength(1);
   expect(h.studio.state.document.entrySceneId).toBe(id(3));
-  expect(button("Xóa Scene")).toBeDisabled();
+  expect(button("Xóa Cảnh")).toBeDisabled();
   fireEvent.click(button("Hoàn tác"));
   expect(h.studio.state.document).toEqual(before);
   expect(alert).not.toHaveBeenCalled();
@@ -1107,10 +1107,10 @@ test("referenced scene deletion reports a visible error and retains all canonica
     },
   ];
   const h = await shell(input);
-  fireEvent.click(button("Xóa Scene"));
-  const dialog = screen.getByRole("dialog", { name: "Xóa Scene" });
+  fireEvent.click(button("Xóa Cảnh"));
+  const dialog = screen.getByRole("dialog", { name: "Xóa Cảnh" });
   fireEvent.change(
-    within(dialog).getByRole("combobox", { name: "Scene bắt đầu thay thế" }),
+    within(dialog).getByRole("combobox", { name: "Cảnh bắt đầu thay thế" }),
     { target: { value: id(3) } },
   );
   fireEvent.click(within(dialog).getByRole("button", { name: "Xác nhận xóa" }));

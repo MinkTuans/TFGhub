@@ -124,13 +124,13 @@ test.each(["register", "login"] as const)(
     const fetch = vi.fn();
     vi.stubGlobal("fetch", fetch);
     render(<AuthForm mode={mode} />);
-    fireEvent.change(screen.getByLabelText("Email"), {
+    fireEvent.change(screen.getByLabelText("Thư điện tử"), {
       target: { value: "not-an-email" },
     });
     fireEvent.change(screen.getByLabelText("Mật khẩu"), {
       target: { value: "short" },
     });
-    fireEvent.submit(screen.getByLabelText("Email").closest("form")!);
+    fireEvent.submit(screen.getByLabelText("Thư điện tử").closest("form")!);
     expect(screen.getByRole("alert")).toBeVisible();
     expect(fetch).not.toHaveBeenCalled();
   },
@@ -148,7 +148,7 @@ test("registration reports the API conflict and permits another attempt", async 
   render(<AuthForm mode="register" />);
   fireEvent.change(screen.getByLabelText("Tên hiển thị"), { target: { value: "Minh" } });
   fireEvent.change(screen.getByLabelText("Xác nhận mật khẩu"), { target: { value: "password123" } });
-  fireEvent.change(screen.getByLabelText("Email"), {
+  fireEvent.change(screen.getByLabelText("Thư điện tử"), {
     target: { value: "me@example.com" },
   });
   fireEvent.change(screen.getByLabelText("Mật khẩu"), {
@@ -158,7 +158,7 @@ test("registration reports the API conflict and permits another attempt", async 
     screen.getByRole("button", { name: "Tạo tài khoản" }).closest("form")!,
   );
   expect(await screen.findByRole("alert")).toHaveTextContent(
-    "Email này đã được đăng ký.",
+    "Thư điện tử này đã được đăng ký.",
   );
   expect(screen.getByRole("button", { name: "Tạo tài khoản" })).toBeEnabled();
 });
@@ -173,7 +173,7 @@ test("draft creation keeps input visible after a duplicate slug rejection", asyn
     ),
   );
   render(<GameForm />);
-  fireEvent.change(screen.getByLabelText("Tên game"), {
+  fireEvent.change(screen.getByLabelText("Tên trò chơi"), {
     target: { value: "My game" },
   });
   fireEvent.change(screen.getByLabelText("Đường dẫn"), {
@@ -183,9 +183,9 @@ test("draft creation keeps input visible after a duplicate slug rejection", asyn
     screen.getByRole("button", { name: "Tạo bản nháp" }).closest("form")!,
   );
   expect(await screen.findByRole("alert")).toHaveTextContent(
-    "Đường dẫn game đã tồn tại. Hãy chọn đường dẫn khác.",
+    "Đường dẫn trò chơi đã tồn tại. Hãy chọn đường dẫn khác.",
   );
-  expect(screen.getByLabelText("Tên game")).toHaveValue("My game");
+  expect(screen.getByLabelText("Tên trò chơi")).toHaveValue("My game");
   expect(screen.getByRole("button", { name: "Tạo bản nháp" })).toBeEnabled();
 });
 
@@ -196,13 +196,13 @@ test("draft creation submits the selected source type", async () => {
   vi.stubGlobal("fetch", fetch);
   render(<GameForm />);
 
-  fireEvent.change(screen.getByLabelText("Tên game"), {
+  fireEvent.change(screen.getByLabelText("Tên trò chơi"), {
     target: { value: "Upload quest" },
   });
   fireEvent.change(screen.getByLabelText("Đường dẫn"), {
     target: { value: "upload-quest" },
   });
-  fireEvent.change(screen.getByLabelText("Cách tạo game"), {
+  fireEvent.change(screen.getByLabelText("Cách tạo trò chơi"), {
     target: { value: "UPLOAD" },
   });
   fireEvent.submit(
@@ -216,7 +216,7 @@ test("draft creation submits the selected source type", async () => {
 });
 
 test.each([
-  ["Invalid email or password", "Email hoặc mật khẩu không đúng."],
+  ["Invalid email or password", "Thư điện tử hoặc mật khẩu không đúng."],
   ["Unexpected backend detail", "Không thể đăng nhập. Vui lòng thử lại."],
 ])("login translates API error %s", async (message, expected) => {
   vi.stubGlobal(
@@ -228,7 +228,7 @@ test.each([
       ),
   );
   render(<AuthForm mode="login" />);
-  fireEvent.change(screen.getByLabelText("Email"), {
+  fireEvent.change(screen.getByLabelText("Thư điện tử"), {
     target: { value: "me@example.com" },
   });
   fireEvent.change(screen.getByLabelText("Mật khẩu"), {
@@ -279,7 +279,7 @@ test("moderation translates a stale review revision and retains the review card"
   fireEvent.click(screen.getByText("Kiểm tra bản gửi"));
   fireEvent.click(screen.getByRole("button", { name: "Duyệt" }));
   expect(await screen.findByRole("alert")).toHaveTextContent(
-    "Game không còn chờ duyệt. Hãy tải lại danh sách.",
+    "Trò chơi không còn chờ duyệt. Hãy tải lại danh sách.",
   );
   expect(screen.getByRole("article", { name: "Review me" })).toBeVisible();
   expect(screen.getByRole("button", { name: "Duyệt" })).toBeEnabled();
@@ -337,7 +337,7 @@ test("moderation binds actions to the displayed submission and renders its conte
   fireEvent.click(within(card).getByText("Kiểm tra bản gửi"));
   fireEvent.click(within(card).getByRole("button", { name: "Duyệt" }));
 
-  await screen.findByText("Đã duyệt game.");
+  await screen.findByText("Đã duyệt trò chơi.");
   expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({
     artifactVersion: 1,
     submittedAt: "2026-09-07T09:00:00.000Z",
@@ -451,7 +451,7 @@ test("platformer editor rejects geometry outside the canvas before saving", () =
   fireEvent.change(within(platform).getByLabelText("Chiều rộng"), {
     target: { value: "641" },
   });
-  fireEvent.click(screen.getByRole("button", { name: "Lưu game đi cảnh" }));
+  fireEvent.click(screen.getByRole("button", { name: "Lưu trò chơi đi cảnh" }));
 
   expect(screen.getByRole("alert")).toHaveTextContent(
     "Nền tảng phải nằm trong khung vẽ.",
@@ -477,7 +477,7 @@ test("platformer editor retains values after a failed save", async () => {
   fireEvent.change(screen.getByLabelText("Vị trí X nhân vật"), {
     target: { value: "42" },
   });
-  fireEvent.click(screen.getByRole("button", { name: "Lưu game đi cảnh" }));
+  fireEvent.click(screen.getByRole("button", { name: "Lưu trò chơi đi cảnh" }));
 
   expect(await screen.findByRole("alert")).toHaveTextContent(
     "Không thể lưu hoặc tạo bản chơi thử. Vui lòng thử lại.",
@@ -560,7 +560,7 @@ test("story build refreshes the sandboxed preview and enables submission", async
   expect(screen.getByRole("button", { name: "Gửi duyệt" })).toBeDisabled();
 
   fireEvent.click(screen.getByRole("button", { name: "Tạo bản chơi thử" }));
-  const preview = await screen.findByTitle("Chơi thử game");
+  const preview = await screen.findByTitle("Chơi thử trò chơi");
   expect(preview).toHaveAttribute(
     "src",
     "http://localhost:3001/games/game-1/preview/?v=2",
@@ -595,12 +595,12 @@ test("platformer build refreshes the sandboxed preview and enables submission", 
   vi.stubGlobal("fetch", fetch);
   render(<GameWorkspace initialGame={platformerGame()} />);
 
-  fireEvent.click(screen.getByRole("button", { name: "Lưu game đi cảnh" }));
+  fireEvent.click(screen.getByRole("button", { name: "Lưu trò chơi đi cảnh" }));
   await screen.findByRole("button", { name: "Tạo bản chơi thử" });
   expect(screen.getByRole("button", { name: "Gửi duyệt" })).toBeDisabled();
 
   fireEvent.click(screen.getByRole("button", { name: "Tạo bản chơi thử" }));
-  const preview = await screen.findByTitle("Chơi thử game");
+  const preview = await screen.findByTitle("Chơi thử trò chơi");
   expect(preview).toHaveAttribute(
     "src",
     "http://localhost:3001/games/game-1/preview/?v=2",
@@ -669,7 +669,7 @@ test("code build refreshes the sandboxed preview and enables submission of its c
   vi.stubGlobal("fetch", fetch);
   render(<GameWorkspace initialGame={codeGame()} />);
 
-  expect(screen.getByTitle("Chơi thử game")).toHaveAttribute(
+  expect(screen.getByTitle("Chơi thử trò chơi")).toHaveAttribute(
     "src",
     "http://localhost:3001/games/game-1/preview/?v=1",
   );
@@ -681,7 +681,7 @@ test("code build refreshes the sandboxed preview and enables submission of its c
   expect(screen.getByRole("button", { name: "Gửi duyệt" })).toBeDisabled();
 
   fireEvent.click(screen.getByRole("button", { name: "Tạo bản chơi thử" }));
-  const preview = await screen.findByTitle("Chơi thử game");
+  const preview = await screen.findByTitle("Chơi thử trò chơi");
   expect(preview).toHaveAttribute(
     "src",
     "http://localhost:3001/games/game-1/preview/?v=2",
@@ -731,7 +731,7 @@ test("creation sends explicit viewport dimensions and defaults to 16 by 9", asyn
   render(<GameForm />);
   expect(screen.getByLabelText("Chiều rộng hiển thị")).toHaveValue(16);
   expect(screen.getByLabelText("Chiều cao hiển thị")).toHaveValue(9);
-  fireEvent.change(screen.getByLabelText("Tên game"), {
+  fireEvent.change(screen.getByLabelText("Tên trò chơi"), {
     target: { value: "Game mới" },
   });
   fireEvent.change(screen.getByLabelText("Đường dẫn"), {
@@ -773,7 +773,7 @@ test.each([
   render(<GameWorkspace initialGame={codeGame()} />);
   const panel = screen.getByRole("region", { name: "Ảnh bìa và thông tin" });
   const file = new File(["cover"], "cover.png", { type: "image/png" });
-  const input = within(panel).getByLabelText("Ảnh bìa game");
+  const input = within(panel).getByLabelText("Ảnh bìa trò chơi");
   expect(input).toHaveAttribute("accept", ".jpg,.jpeg,.png,.webp");
   fireEvent.change(input, { target: { files: [file] } });
   // fireEvent sets files but cannot populate a native FileList for constraint validation.
@@ -797,7 +797,7 @@ test.each([
 test.each([
   [0, "Không thể tải ảnh bìa. Vui lòng thử lại."],
   [400, "Ảnh bìa không hợp lệ. Chọn một ảnh JPG, PNG hoặc WebP."],
-  [403, "Bạn không có quyền thay đổi ảnh bìa game này."],
+  [403, "Bạn không có quyền thay đổi ảnh bìa trò chơi này."],
   [413, "Ảnh bìa quá lớn. Chọn ảnh không quá 5 MiB."],
   [503, "Dịch vụ lưu ảnh bìa tạm thời không khả dụng. Vui lòng thử lại sau."],
   [500, "Không thể tải ảnh bìa. Vui lòng thử lại."],
@@ -826,7 +826,7 @@ test.each([
         })}
       />,
     );
-    fireEvent.change(screen.getByLabelText("Ảnh bìa game"), {
+    fireEvent.change(screen.getByLabelText("Ảnh bìa trò chơi"), {
       target: {
         files: [new File(["cover"], "new.png", { type: "image/png" })],
       },
@@ -913,20 +913,20 @@ test("display settings reject invalid dimensions and retain values after an API 
 test("moderation explains a missing preview and updates pending count after approval", async () => {
   vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("{}")));
   render(<ModerationQueue initialGames={[{ ...moderationGame("game-1", "Review me"), artifactReady: false }]} />);
-  expect(screen.getByText("1 game chờ duyệt")).toBeVisible();
+  expect(screen.getByText("1 trò chơi chờ duyệt")).toBeVisible();
   expect(screen.getByText("Bản chơi thử chưa sẵn sàng.")).not.toBeVisible();
   expect(screen.getByText("7/9/2026, 09:00 UTC")).toHaveAttribute("datetime", "2026-09-07T09:00:00.000Z");
   fireEvent.click(screen.getByText("Kiểm tra bản gửi"));
   fireEvent.click(screen.getByRole("button", { name: "Duyệt" }));
-  await screen.findByText("Đã duyệt game.");
-  expect(screen.getByText("0 game chờ duyệt")).toBeVisible();
+  await screen.findByText("Đã duyệt trò chơi.");
+  expect(screen.getByText("0 trò chơi chờ duyệt")).toBeVisible();
   expect(screen.getByRole("heading", { name: "Đã xử lý hết hàng đợi" })).toBeVisible();
 });
 
 
 test("moderation opens a compact submission for review without losing its preview or rejection note", () => {
   render(<ModerationQueue initialGames={[moderationGame("game-1", "Review me")]} />);
-  const preview = screen.getByTitle("Chơi thử game");
+  const preview = screen.getByTitle("Chơi thử trò chơi");
   expect(preview).not.toBeVisible();
   const disclosure = screen.getByText("Kiểm tra bản gửi");
   fireEvent.click(disclosure);
@@ -935,7 +935,7 @@ test("moderation opens a compact submission for review without losing its previe
   fireEvent.click(disclosure);
   expect(preview).not.toBeVisible();
   fireEvent.click(disclosure);
-  expect(screen.getByTitle("Chơi thử game")).toBe(preview);
+  expect(screen.getByTitle("Chơi thử trò chơi")).toBe(preview);
   expect(screen.getByLabelText("Lý do từ chối")).toHaveValue("Please fix the opening.");
   expect(preview).toHaveAttribute("sandbox", "allow-scripts allow-pointer-lock");
 });

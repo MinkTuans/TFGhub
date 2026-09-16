@@ -73,7 +73,7 @@ export function GameWorkspace({ initialGame }: { initialGame: GameSummary }) {
 
   return (
     <div className="workspace">
-      <nav className="workspace-sections" aria-label="Các phần quản lý game">
+      <nav className="workspace-sections" aria-label="Các phần quản lý trò chơi">
         <a href="#cover-heading">Thông tin & ảnh bìa</a>
         <a href="#display-heading">Hiển thị</a>
         <a href="#game-editor">Nội dung & chơi thử</a>
@@ -84,11 +84,11 @@ export function GameWorkspace({ initialGame }: { initialGame: GameSummary }) {
         aria-labelledby="cover-heading"
       >
         <div className="workspace-metadata">
-          <p className="eyebrow">Studio / Game của bạn</p>
+          <p className="eyebrow">Xưởng sáng tạo / Trò chơi của bạn</p>
           <h2 id="cover-heading">Ảnh bìa và thông tin</h2>
           <p className="description">
             {game.description ||
-              "Thêm ảnh bìa để người chơi nhận ra game của bạn."}
+              "Thêm ảnh bìa để người chơi nhận ra trò chơi của bạn."}
           </p>
           <p className="hint">Đường dẫn: {game.slug}</p>
           <p className="badge" role="status" data-state={game.reviewState}>
@@ -175,9 +175,9 @@ export function GameWorkspace({ initialGame }: { initialGame: GameSummary }) {
         aria-labelledby="submission-heading"
       >
         <div>
-          <h2 id="submission-heading">Xuất bản game</h2>
+          <h2 id="submission-heading">Xuất bản trò chơi</h2>
           <p className="hint">
-            Lưu và tạo bản chơi thử, sau đó gửi game để được kiểm duyệt.
+            Lưu và tạo bản chơi thử, sau đó gửi trò chơi để được kiểm duyệt.
           </p>
         </div>
         {error && <p role="alert">{error}</p>}

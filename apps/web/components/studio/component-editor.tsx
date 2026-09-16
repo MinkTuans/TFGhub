@@ -1,5 +1,7 @@
 "use client";
 
+import { studioComponentDefaults } from "./studio-component-defaults";
+import { studioLabel, studioFieldLabel } from "./studio-labels";
 import { useId, useState } from "react";
 import {
   v2ComponentRegistry,
@@ -22,6 +24,18 @@ function unwrap(schema: Schema): Schema {
   return schema;
 }
 export function studioValidationMessage(error: unknown) {
+  const message = (text: string) => {
+    if (text === "Current health cannot exceed maximum health")
+      return "Sức khỏe hiện tại không được vượt quá mức tối đa.";
+    if (text === "Collider must reference a COLLISION layer")
+      return "Vùng va chạm phải tham chiếu một lớp va chạm.";
+    if (text === "Scale must not be zero")
+      return "Tỉ lệ không được bằng 0.";
+    if (/referenc/i.test(text))
+      return "Tham chiếu không hợp lệ. Kiểm tra các đối tượng, lớp, tài nguyên và sự kiện liên quan.";
+    if (/[À-ỹ]/u.test(text)) return text;
+    return "Giá trị không hợp lệ. Kiểm tra kiểu dữ liệu, giới hạn và các tham chiếu.";
+  };
   if (
     error &&
     typeof error === "object" &&
@@ -31,11 +45,14 @@ export function studioValidationMessage(error: unknown) {
     return error.issues
       .map(
         (issue: { path: (string | number)[]; message: string }) =>
-          `${issue.path.join(".")}: ${issue.message}`,
+          `${studioFieldLabel(issue.path.join("."))}: ${message(issue.message)}`,
       )
       .join(" · ");
-  return error instanceof Error ? error.message : "Không thể áp dụng thay đổi.";
+  return error instanceof Error
+    ? message(error.message)
+    : "Không thể áp dụng thay đổi.";
 }
+
 function JsonField({
   label,
   value,
@@ -48,9 +65,9 @@ function JsonField({
   const [text, setText] = useState(() => JSON.stringify(value, null, 2));
   return (
     <label>
-      {label}
+      {studioFieldLabel(label)}
       <textarea
-        aria-label={label}
+        aria-label={studioFieldLabel(label)}
         value={text}
         spellCheck={false}
         onChange={(event) => {
@@ -107,9 +124,9 @@ function Fields({
     return (
       <>
         <label>
-          {discriminator}
+          {studioLabel(discriminator)}
           <select
-            aria-label={discriminator}
+            aria-label={studioLabel(discriminator)}
             value={String(current[discriminator])}
             onChange={(event) => {
               const option = options.find(
@@ -131,7 +148,7 @@ function Fields({
             {options.map((option) => {
               const value = option._def.shape()[discriminator]._def
                 .value as string;
-              return <option key={value}>{value}</option>;
+              return <option key={value} value={value}>{studioLabel(value)}</option>;
             })}
           </select>
         </label>
@@ -167,25 +184,25 @@ function Fields({
     return (
       <label>
         <input
-          aria-label={label}
+          aria-label={studioFieldLabel(label)}
           type="checkbox"
           checked={value === true}
           onChange={(event) => change(event.target.checked)}
         />
-        {label}
+        {studioFieldLabel(label)}
       </label>
     );
   if (kind === "ZodEnum")
     return (
       <label>
-        {label}
+        {studioFieldLabel(label)}
         <select
-          aria-label={label}
+          aria-label={studioFieldLabel(label)}
           value={String(value)}
           onChange={(event) => change(event.target.value)}
         >
           {(schema._def.values as string[]).map((value) => (
-            <option key={value}>{value}</option>
+            <option key={value} value={value}>{studioLabel(value)}</option>
           ))}
         </select>
       </label>
@@ -193,9 +210,9 @@ function Fields({
   if (kind === "ZodNumber")
     return (
       <label>
-        {label}
+        {studioFieldLabel(label)}
         <input
-          aria-label={label}
+          aria-label={studioFieldLabel(label)}
           type="number"
           step="any"
           value={
@@ -214,9 +231,9 @@ function Fields({
   if (kind === "ZodString")
     return (
       <label>
-        {label}
+        {studioFieldLabel(label)}
         <textarea
-          aria-label={label}
+          aria-label={studioFieldLabel(label)}
           value={typeof value === "string" ? value : ""}
           onChange={(event) => change(event.target.value)}
         />
@@ -294,12 +311,11 @@ function ComponentForm({
   return (
     <fieldset
       className="studio-component"
-      aria-label={component.type}
+      aria-label={studioLabel(component.type)}
       disabled={!editable}
     >
-      <legend>{component.type}</legend>
-      <small>Version {component.version}</small>
-      <code>{definition.runtimeHandlerKey}</code>
+      <legend>{studioLabel(component.type)}</legend>
+      <small>Phiên bản {component.version}</small>
       <form
         noValidate
         aria-describedby={error ? errorId : undefined}
@@ -320,20 +336,20 @@ function ComponentForm({
           </p>
         )}
         <div className="studio-actions">
-          <button type="submit">Lưu {component.type}</button>
+          <button type="submit">Lưu {studioLabel(component.type)}</button>
           <button
             type="button"
             onClick={() => {
-              setDraft(structuredClone(definition.defaults()));
+              setDraft(studioComponentDefaults(component.type));
               setReset((value) => value + 1);
               setError("");
             }}
           >
-            Mặc định {component.type}
+            Mặc định {studioLabel(component.type)}
           </button>
           {component.type !== "Transform" && (
             <button type="button" onClick={() => commit(true)}>
-              Gỡ {component.type}
+              Gỡ {studioLabel(component.type)}
             </button>
           )}
         </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { studioValidationMessage } from "./component-editor";
 import type { EngineProjectV2Type } from "@indieforge/contracts";
 import { useStudio } from "./studio-provider";
 import { useStudioSelection } from "./studio-selection";
@@ -178,14 +179,14 @@ function HierarchySession({ scene }: { scene: Scene }) {
       setError("");
     } catch (error) {
       setError(
-        error instanceof Error ? error.message : "Không thể thay đổi lớp.",
+        studioValidationMessage(error),
       );
     }
   }
   return (
-    <section className="studio-hierarchy" aria-label="Phân cấp Scene">
+    <section className="studio-hierarchy" aria-label="Phân cấp Cảnh">
       <h2>Đối tượng</h2>
-      <div role="tree" aria-label="Đối tượng Scene">
+      <div role="tree" aria-label="Đối tượng Cảnh">
         {rows.map((row) => (
           <div
             key={row.id}

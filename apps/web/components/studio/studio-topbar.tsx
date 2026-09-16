@@ -81,7 +81,7 @@ export function StudioTopbar({
     if (inFlight.current || !dirty) return;
     const parsed = UpdateGameInput.safeParse({ title });
     if (!parsed.success) {
-      setError("Tên game cần có 1–80 ký tự.");
+      setError("Tên trò chơi cần có 1–80 ký tự.");
       return;
     }
     inFlight.current = true;
@@ -124,15 +124,15 @@ export function StudioTopbar({
     <header className="studio-topbar">
       <div className="studio-topbar__identity">
         <Link className="studio-back" href="/studio">
-          <span aria-hidden="true">←</span> Về Studio
+          <span aria-hidden="true">←</span> Về Xưởng sáng tạo
         </Link>
         <h1 className="studio-wordmark">
-          <span>TFG</span> Studio
+          <span>TFG</span> Xưởng sáng tạo
         </h1>
         <span className="studio-badge">{publication}</span>
       </div>
       <form className="studio-title" onSubmit={saveTitle}>
-        <label htmlFor="studio-game-title">Tên game</label>
+        <label htmlFor="studio-game-title">Tên trò chơi</label>
         <div className="studio-title__field">
           <input
             id="studio-game-title"
@@ -156,7 +156,7 @@ export function StudioTopbar({
         <span
           id="studio-title-status"
           role="status"
-          aria-label="Trạng thái tên game"
+          aria-label="Trạng thái tên trò chơi"
           className="studio-save-status"
         >
           {saving ? "Đang lưu tên…" : dirty ? "Chưa lưu tên" : "Đã lưu tên"}
@@ -204,7 +204,7 @@ export function StudioTopbar({
           </StudioButton>
         </div>
         <label className="studio-scene-select">
-          Scene hiện tại
+          Cảnh hiện tại
           <select
             value={sceneId}
             onChange={(event) => onSceneChange(event.target.value)}
@@ -221,7 +221,7 @@ export function StudioTopbar({
         <StudioButton
           ref={settingsRef}
           tooltip="Bố cục các bảng và thông tin dự án"
-          aria-label="Cài đặt Studio"
+          aria-label="Cài đặt Xưởng sáng tạo"
           aria-expanded={settingsOpen}
           aria-controls="studio-settings"
           onClick={onSettingsToggle}

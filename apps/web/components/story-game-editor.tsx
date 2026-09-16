@@ -24,8 +24,8 @@ const defaultProject: StoryProject = {
   scenes: [
     {
       id: "start",
-      speaker: "Narrator",
-      dialogue: "Begin your story.",
+      speaker: "Người kể chuyện",
+      dialogue: "Hãy bắt đầu câu chuyện của bạn.",
       backgroundColor: "#ffffff",
       choices: [],
     },
@@ -115,7 +115,7 @@ export function StoryGameEditor({
         {
           key: addedKey("scene"),
           id: `scene-${number}`,
-          speaker: "Narrator",
+          speaker: "Người kể chuyện",
           dialogue: "",
           backgroundColor: "#ffffff",
           choices: [],
@@ -138,7 +138,7 @@ export function StoryGameEditor({
                 ...scene.choices,
                 {
                   key: addedKey("choice"),
-                  text: "Continue",
+                  text: "Tiếp tục",
                   targetSceneId: current[0]?.id ?? "",
                 },
               ],

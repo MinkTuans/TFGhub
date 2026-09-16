@@ -23,7 +23,7 @@ async function createProject(page: Page) {
   expect(register.status()).toBe(201);
   await page.goto("/studio/games/new");
   await page.getByRole("button", { name: "Tạo bản nháp" }).click();
-  await expect(page.getByRole("main", { name: "Game Studio" })).toBeVisible();
+  await expect(page.getByRole("main", { name: "Xưởng sáng tạo trò chơi" })).toBeVisible();
   await expect(
     page.getByRole("status", { name: "Trạng thái dự án" }),
   ).toHaveText("Đã lưu");
@@ -59,17 +59,17 @@ test("scene and layer edits autosave canonical revisions, survive reload, and un
       ).json()
     ).project;
   const before = await read();
-  await page.getByRole("button", { name: "Thêm Scene", exact: true }).click();
+  await page.getByRole("button", { name: "Thêm Cảnh", exact: true }).click();
   await page
-    .getByRole("textbox", { name: "Tên Scene", exact: true })
+    .getByRole("textbox", { name: "Tên Cảnh", exact: true })
     .fill("Island");
-  await page.getByRole("combobox", { name: "Loại Scene" }).selectOption("MAP");
-  await page.getByRole("spinbutton", { name: "Chiều rộng Scene" }).fill("1200");
+  await page.getByRole("combobox", { name: "Loại Cảnh" }).selectOption("MAP");
+  await page.getByRole("spinbutton", { name: "Chiều rộng Cảnh" }).fill("1200");
   await page.getByRole("spinbutton", { name: "Trọng lực Y" }).fill("250");
   await page.getByRole("checkbox", { name: "Bật lưới" }).check();
-  await page.getByRole("button", { name: "Lưu Scene", exact: true }).click();
-  await page.getByRole("button", { name: "Đặt làm Scene bắt đầu" }).click();
-  await page.getByRole("button", { name: "Đưa Scene lên" }).click();
+  await page.getByRole("button", { name: "Lưu Cảnh", exact: true }).click();
+  await page.getByRole("button", { name: "Đặt làm Cảnh bắt đầu" }).click();
+  await page.getByRole("button", { name: "Đưa Cảnh lên" }).click();
   await page.getByRole("button", { name: "Thêm lớp", exact: true }).click();
   const layer = page.getByRole("group", { name: "Lớp mới", exact: true });
   await layer.getByRole("textbox", { name: "Tên lớp" }).fill("HUD");
@@ -101,10 +101,10 @@ test("scene and layer edits autosave canonical revisions, survive reload, and un
   await expect(status).toHaveText("Đã lưu");
   expect(await read()).toEqual(saved);
   await expect(
-    page.getByRole("textbox", { name: "Tên Scene", exact: true }),
+    page.getByRole("textbox", { name: "Tên Cảnh", exact: true }),
   ).toHaveValue("Island");
   await page
-    .getByRole("button", { name: "Nhân bản Scene", exact: true })
+    .getByRole("button", { name: "Nhân bản Cảnh", exact: true })
     .click();
   await expect(status).toHaveText("Đã lưu");
   const duplicated = await read();
@@ -117,16 +117,16 @@ test("scene and layer edits autosave canonical revisions, survive reload, and un
   await expect(status).toHaveText("Đã lưu");
   expect(await read()).toEqual(duplicated);
   await page
-    .getByRole("combobox", { name: "Scene hiện tại" })
+    .getByRole("combobox", { name: "Cảnh hiện tại" })
     .selectOption(island.id);
-  await page.getByRole("button", { name: "Xóa Scene", exact: true }).click();
-  const dialog = page.getByRole("dialog", { name: "Xóa Scene", exact: true });
+  await page.getByRole("button", { name: "Xóa Cảnh", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Xóa Cảnh", exact: true });
   await expect(dialog.getByRole("button", { name: "Hủy" })).toBeFocused();
   await expect(
     dialog.getByRole("button", { name: "Xác nhận xóa" }),
   ).toBeDisabled();
   await dialog
-    .getByRole("combobox", { name: "Scene bắt đầu thay thế" })
+    .getByRole("combobox", { name: "Cảnh bắt đầu thay thế" })
     .selectOption(before.entrySceneId);
   await dialog.getByRole("button", { name: "Xác nhận xóa" }).click();
   await expect(dialog).toHaveCount(0);
@@ -145,7 +145,7 @@ test("desktop opens a full-width dark shell, reads the saved Scene, collapses pa
   page,
 }, testInfo) => {
   const { gameId, suffix } = await createProject(page);
-  const shell = page.getByRole("main", { name: "Game Studio" });
+  const shell = page.getByRole("main", { name: "Xưởng sáng tạo trò chơi" });
   await expect(page.locator(".site-header")).toBeHidden();
   await expect(page.locator("body > footer")).toBeHidden();
   expect(await shell.boundingBox()).toMatchObject({ x: 0, y: 0, width: 1440 });
@@ -181,11 +181,11 @@ test("desktop opens a full-width dark shell, reads the saved Scene, collapses pa
   expect(saved.status()).toBe(201);
   await page.reload();
   await page
-    .getByRole("combobox", { name: "Scene hiện tại" })
+    .getByRole("combobox", { name: "Cảnh hiện tại" })
     .selectOption(sceneId);
   await expect(
     page
-      .getByRole("region", { name: "Tổng quan Scene" })
+      .getByRole("region", { name: "Tổng quan Cảnh" })
       .getByRole("heading", { name: "Bến cảng" }),
   ).toBeVisible();
   await expect(page.getByRole("button", { name: "Bến cảng" })).toHaveAttribute(
@@ -198,11 +198,11 @@ test("desktop opens a full-width dark shell, reads the saved Scene, collapses pa
   expect(sceneRead.revision.revisionNumber).toBe(1);
   expect(sceneRead.project).toEqual(read.project);
 
-  const title = page.getByRole("textbox", { name: "Tên game" });
+  const title = page.getByRole("textbox", { name: "Tên trò chơi" });
   await title.fill(`Studio ${suffix}`);
   await page.getByRole("button", { name: "Lưu tên" }).click();
   await expect(
-    page.getByRole("status", { name: "Trạng thái tên game" }),
+    page.getByRole("status", { name: "Trạng thái tên trò chơi" }),
   ).toHaveText("Đã lưu tên");
   await page.reload();
   await expect(title).toHaveValue(`Studio ${suffix}`);
@@ -215,38 +215,38 @@ test("desktop opens a full-width dark shell, reads the saved Scene, collapses pa
     fullPage: true,
   });
 
-  const settings = page.getByRole("button", { name: "Cài đặt Studio" });
+  const settings = page.getByRole("button", { name: "Cài đặt Xưởng sáng tạo" });
   await settings.focus();
   await expect(page.getByRole("tooltip")).toContainText("Bố cục");
   await page.keyboard.press("Escape");
   await expect(page.getByRole("tooltip")).toHaveCount(0);
   await page.keyboard.press("Enter");
   await expect(
-    page.getByRole("region", { name: "Cài đặt Studio" }),
+    page.getByRole("region", { name: "Cài đặt Xưởng sáng tạo" }),
   ).toBeVisible();
-  await page.getByRole("checkbox", { name: "Hiện thông tin Scene" }).uncheck();
+  await page.getByRole("checkbox", { name: "Hiện thông tin Cảnh" }).uncheck();
   await expect(
-    page.getByRole("region", { name: "Thông tin Scene" }),
+    page.getByRole("region", { name: "Thông tin Cảnh" }),
   ).toHaveCount(0);
-  await page.getByRole("button", { name: "Mở thông tin Scene" }).click();
+  await page.getByRole("button", { name: "Mở thông tin Cảnh" }).click();
   await expect(
-    page.getByRole("region", { name: "Thông tin Scene" }),
+    page.getByRole("region", { name: "Thông tin Cảnh" }),
   ).toBeVisible();
-  await page.getByRole("checkbox", { name: "Hiện danh sách Scene" }).focus();
+  await page.getByRole("checkbox", { name: "Hiện danh sách Cảnh" }).focus();
   await page.keyboard.press("Escape");
   await expect(settings).toBeFocused();
   await expect(
-    page.getByRole("region", { name: "Cài đặt Studio" }),
+    page.getByRole("region", { name: "Cài đặt Xưởng sáng tạo" }),
   ).toHaveCount(0);
-  await page.getByRole("button", { name: "Thu gọn danh sách Scene" }).click();
+  await page.getByRole("button", { name: "Thu gọn danh sách Cảnh" }).click();
   await expect(
-    page.getByRole("navigation", { name: "Danh sách Scene" }),
+    page.getByRole("navigation", { name: "Danh sách Cảnh" }),
   ).toHaveCount(0);
-  await page.getByRole("button", { name: "Mở danh sách Scene" }).click();
+  await page.getByRole("button", { name: "Mở danh sách Cảnh" }).click();
   await expect(
-    page.getByRole("navigation", { name: "Danh sách Scene" }),
+    page.getByRole("navigation", { name: "Danh sách Cảnh" }),
   ).toBeVisible();
-  await page.getByRole("link", { name: "Về Studio" }).click();
+  await page.getByRole("link", { name: "Về Xưởng sáng tạo" }).click();
   await expect(page).toHaveURL("/studio");
   await expect(page.locator(".site-header")).toBeVisible();
   await expect(page.locator("body > footer")).toBeVisible();
@@ -260,20 +260,20 @@ test("mobile presents metadata-only editing with readable controls and persists 
   await expect(page.getByRole("navigation", { name: "Điều hướng nhanh" })).toBeHidden();
   expect(await page.evaluate(() => getComputedStyle(document.body, "::before").display)).toBe("none");
   await expect(
-    page.getByRole("region", { name: "Studio trên thiết bị di động" }),
+    page.getByRole("region", { name: "Xưởng sáng tạo trên thiết bị di động" }),
   ).toBeVisible();
   await expect(
-    page.getByRole("combobox", { name: "Scene hiện tại" }),
+    page.getByRole("combobox", { name: "Cảnh hiện tại" }),
   ).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Hoàn tác" })).toHaveCount(0);
   await expect(
-    page.getByRole("button", { name: "Cài đặt Studio" }),
+    page.getByRole("button", { name: "Cài đặt Xưởng sáng tạo" }),
   ).toHaveCount(0);
-  const title = page.getByRole("textbox", { name: "Tên game" });
+  const title = page.getByRole("textbox", { name: "Tên trò chơi" });
   await title.fill(`Mobile ${suffix}`);
   await page.getByRole("button", { name: "Lưu tên" }).click();
   await expect(
-    page.getByRole("status", { name: "Trạng thái tên game" }),
+    page.getByRole("status", { name: "Trạng thái tên trò chơi" }),
   ).toHaveText("Đã lưu tên");
   await page.reload();
   await expect(title).toHaveValue(`Mobile ${suffix}`);
@@ -311,7 +311,7 @@ for (const sourceType of ["UPLOAD", "CODE", "STORY", "PLATFORMER"]) {
       },
     });
     expect(created.status()).toBe(201);
-    await page.getByRole("link", { name: "Về Studio" }).click();
+    await page.getByRole("link", { name: "Về Xưởng sáng tạo" }).click();
     await page
       .getByRole("link", { name: `${sourceType} ${suffix}`, exact: true })
       .click();
@@ -320,7 +320,7 @@ for (const sourceType of ["UPLOAD", "CODE", "STORY", "PLATFORMER"]) {
     await expect(
       page.getByRole("heading", { name: "Ảnh bìa và thông tin" }),
     ).toBeVisible();
-    await expect(page.getByRole("main", { name: "Game Studio" })).toHaveCount(
+    await expect(page.getByRole("main", { name: "Xưởng sáng tạo trò chơi" })).toHaveCount(
       0,
     );
     expect((await page.locator("main").boundingBox())!.x).toBeGreaterThan(0);

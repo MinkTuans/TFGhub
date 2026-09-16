@@ -94,7 +94,7 @@ function asset(
     projectId: id(1),
     kind: "IMAGE",
     state: "READY",
-    displayName: `Asset ${n}`,
+    displayName: `Tài nguyên ${n}`,
     contentHash: "a".repeat(64),
     mimeType: "image/png",
     byteSize: 128,
@@ -211,7 +211,7 @@ const modules = import.meta.glob(
 );
 async function assetModule(): Promise<AssetModule> {
   const path = "../components/studio/assets/asset-manager.tsx";
-  expect(modules, "Asset Manager UI is not implemented").toHaveProperty(path);
+  expect(modules, "Tài nguyên Manager UI is not implemented").toHaveProperty(path);
   return (await modules[path]!()) as AssetModule;
 }
 
@@ -317,16 +317,8 @@ test("a missing category/search implementation cannot hide API-backed groups or 
 
   const manager = await screen.findByRole("region", { name: "Tài nguyên" });
   for (const name of [
-    "All",
-    "Map-Tileset",
-    "Character",
-    "NPC",
-    "Item",
-    "UI",
-    "Audio",
-    "Effect",
-    "Image",
-    "User",
+    "Tất cả", "Bộ ô bản đồ", "Nhân vật", "Nhân vật phụ", "Vật phẩm",
+    "Giao diện", "Âm thanh", "Hiệu ứng", "Hình ảnh", "Người dùng",
   ])
     expect(within(manager).getByRole("button", { name })).toBeVisible();
   await within(manager).findByText("Forest tiles");
@@ -336,20 +328,20 @@ test("a missing category/search implementation cannot hide API-backed groups or 
   expect(preview).toHaveAttribute("loading", "lazy");
   expect(preview.getAttribute("src")).toContain(items[0]!.thumbnailUrl);
 
-  fireEvent.click(within(manager).getByRole("button", { name: "Character" }));
+  fireEvent.click(within(manager).getByRole("button", { name: "Nhân vật" }));
   await waitFor(() =>
     expect(within(manager).queryByText("Forest tiles")).not.toBeInTheDocument(),
   );
   expect(within(manager).getByText("Hero")).toBeVisible();
   fireEvent.change(
-    within(manager).getByRole("searchbox", { name: "Tìm asset" }),
+    within(manager).getByRole("searchbox", { name: "Tìm tài nguyên" }),
     {
       target: { value: "missing" },
     },
   );
   await within(manager).findByText("Không tìm thấy tài nguyên.");
   fireEvent.change(
-    within(manager).getByRole("combobox", { name: "Loại file" }),
+    within(manager).getByRole("combobox", { name: "Loại tệp" }),
     {
       target: { value: "IMAGE" },
     },
@@ -388,7 +380,7 @@ test("audio previews never preload binary content while browsing the library", a
   );
 
   expect(
-    await screen.findByRole("group", { name: "Asset Quiet theme" }),
+    await screen.findByRole("group", { name: "Tài nguyên Quiet theme" }),
   ).toBeVisible();
   expect(screen.getByLabelText("Nghe thử Quiet theme")).toHaveAttribute(
     "preload",
@@ -424,7 +416,7 @@ test("a missing upload retry implementation loses visible progress or changes th
   );
   const manager = await screen.findByRole("region", { name: "Tài nguyên" });
   const file = new File(["png"], "hero.png", { type: "image/png" });
-  fireEvent.change(within(manager).getByLabelText("Tải asset lên"), {
+  fireEvent.change(within(manager).getByLabelText("Tải tài nguyên lên"), {
     target: { files: [file] },
   });
   await within(manager).findByText("45%");
@@ -456,11 +448,11 @@ test("a missing rename/delete implementation cannot warn on current and retained
   );
   const manager = await screen.findByRole("region", { name: "Tài nguyên" });
   const usedCard = await within(manager).findByRole("group", {
-    name: "Asset Used hero",
+    name: "Tài nguyên Used hero",
   });
   fireEvent.click(within(usedCard).getByRole("button", { name: "Đổi tên" }));
   fireEvent.change(
-    within(usedCard).getByRole("textbox", { name: "Tên asset" }),
+    within(usedCard).getByRole("textbox", { name: "Tên tài nguyên" }),
     {
       target: { value: "Hero final" },
     },
@@ -468,7 +460,7 @@ test("a missing rename/delete implementation cannot warn on current and retained
   fireEvent.click(within(usedCard).getByRole("button", { name: "Lưu tên" }));
   await within(manager).findByText("Hero final");
 
-  fireEvent.click(within(usedCard).getByRole("button", { name: "Xóa asset" }));
+  fireEvent.click(within(usedCard).getByRole("button", { name: "Xóa tài nguyên" }));
   const blocked = await screen.findByRole("dialog", {
     name: "Xóa Hero final?",
   });
@@ -481,10 +473,10 @@ test("a missing rename/delete implementation cannot warn on current and retained
   fireEvent.click(within(blocked).getByRole("button", { name: "Hủy" }));
 
   const unusedCard = within(manager).getByRole("group", {
-    name: "Asset Old prop",
+    name: "Tài nguyên Old prop",
   });
   fireEvent.click(
-    within(unusedCard).getByRole("button", { name: "Xóa asset" }),
+    within(unusedCard).getByRole("button", { name: "Xóa tài nguyên" }),
   );
   const allowed = await screen.findByRole("dialog", { name: "Xóa Old prop?" });
   expect(within(allowed).getByText(/3 phiên bản đã lưu/i)).toBeVisible();
@@ -532,13 +524,13 @@ test("a declaration without semantic dependencies must save asset.forget before 
     </StudioProvider>,
   );
 
-  const card = await screen.findByRole("group", { name: "Asset Former prop" });
-  fireEvent.click(within(card).getByRole("button", { name: "Xóa asset" }));
+  const card = await screen.findByRole("group", { name: "Tài nguyên Former prop" });
+  fireEvent.click(within(card).getByRole("button", { name: "Xóa tài nguyên" }));
   const confirmation = await screen.findByRole("dialog", {
     name: "Xóa Former prop?",
   });
   expect(within(confirmation).getByText(/4 phiên bản đã lưu/i)).toBeVisible();
-  expect(within(confirmation).getByText(/2 bản build/i)).toBeVisible();
+  expect(within(confirmation).getByText(/2 bản dựng/i)).toBeVisible();
   const confirm = within(confirmation).getByRole("button", {
     name: "Xác nhận xóa",
   });
@@ -572,9 +564,9 @@ test("a failed canonical declaration release must never call the tombstone API",
   );
 
   const card = await screen.findByRole("group", {
-    name: "Asset Recoverable prop",
+    name: "Tài nguyên Recoverable prop",
   });
-  fireEvent.click(within(card).getByRole("button", { name: "Xóa asset" }));
+  fireEvent.click(within(card).getByRole("button", { name: "Xóa tài nguyên" }));
   fireEvent.click(
     within(await screen.findByRole("dialog", { name: "Xóa Recoverable prop?" })).getByRole(
       "button",
@@ -626,13 +618,13 @@ test("a list captured before DELETE cannot resurrect a tombstoned READY card", a
   );
   const manager = await screen.findByRole("region", { name: "Tài nguyên" });
   const card = await within(manager).findByRole("group", {
-    name: "Asset Doomed prop",
+    name: "Tài nguyên Doomed prop",
   });
-  fireEvent.change(within(manager).getByRole("searchbox", { name: "Tìm asset" }), {
+  fireEvent.change(within(manager).getByRole("searchbox", { name: "Tìm tài nguyên" }), {
     target: { value: "Doomed" },
   });
   await waitFor(() => expect(calls).toBe(2));
-  fireEvent.click(within(card).getByRole("button", { name: "Xóa asset" }));
+  fireEvent.click(within(card).getByRole("button", { name: "Xóa tài nguyên" }));
   fireEvent.click(
     within(await screen.findByRole("dialog", { name: "Xóa Doomed prop?" })).getByRole(
       "button",
@@ -650,7 +642,7 @@ test("a list captured before DELETE cannot resurrect a tombstoned READY card", a
     });
   });
   expect(
-    within(manager).queryByRole("group", { name: "Asset Doomed prop" }),
+    within(manager).queryByRole("group", { name: "Tài nguyên Doomed prop" }),
   ).not.toBeInTheDocument();
 });
 
@@ -695,13 +687,13 @@ test("a rename out of search cannot be overwritten by a list captured before PAT
     </Wrapper>,
   );
   const manager = await screen.findByRole("region", { name: "Tài nguyên" });
-  const card = await within(manager).findByRole("group", { name: "Asset Hero old" });
-  fireEvent.change(within(manager).getByRole("searchbox", { name: "Tìm asset" }), {
+  const card = await within(manager).findByRole("group", { name: "Tài nguyên Hero old" });
+  fireEvent.change(within(manager).getByRole("searchbox", { name: "Tìm tài nguyên" }), {
     target: { value: "Hero" },
   });
   await waitFor(() => expect(calls).toBe(2));
   fireEvent.click(within(card).getByRole("button", { name: "Đổi tên" }));
-  fireEvent.change(within(card).getByRole("textbox", { name: "Tên asset" }), {
+  fireEvent.change(within(card).getByRole("textbox", { name: "Tên tài nguyên" }), {
     target: { value: "Villain" },
   });
   fireEvent.click(within(card).getByRole("button", { name: "Lưu tên" }));
@@ -748,16 +740,16 @@ test("a delayed PATCH cannot replace a newer completed search with its captured 
   );
   const manager = await screen.findByRole("region", { name: "Tài nguyên" });
   const card = await within(manager).findByRole("group", {
-    name: "Asset Hero pending",
+    name: "Tài nguyên Hero pending",
   });
   fireEvent.click(within(card).getByRole("button", { name: "Đổi tên" }));
-  fireEvent.change(within(card).getByRole("textbox", { name: "Tên asset" }), {
+  fireEvent.change(within(card).getByRole("textbox", { name: "Tên tài nguyên" }), {
     target: { value: "Villain complete" },
   });
   fireEvent.click(within(card).getByRole("button", { name: "Lưu tên" }));
   await waitFor(() => expect(client.update).toHaveBeenCalledTimes(1));
 
-  fireEvent.change(within(manager).getByRole("searchbox", { name: "Tìm asset" }), {
+  fireEvent.change(within(manager).getByRole("searchbox", { name: "Tìm tài nguyên" }), {
     target: { value: "Hero" },
   });
   await waitFor(() =>
@@ -768,7 +760,7 @@ test("a delayed PATCH cannot replace a newer completed search with its captured 
   await act(async () => finishPatch());
   await waitFor(() =>
     expect(
-      within(manager).queryByRole("group", { name: "Asset Villain complete" }),
+      within(manager).queryByRole("group", { name: "Tài nguyên Villain complete" }),
     ).not.toBeInTheDocument(),
   );
   expect(within(manager).queryByText("Hero pending")).not.toBeInTheDocument();
@@ -808,21 +800,21 @@ test("a filtered rename cannot evict metadata for a still-declared semantic refe
   );
   const manager = await screen.findByRole("region", { name: "Tài nguyên" });
   const card = await within(manager).findByRole("group", {
-    name: "Asset Referenced hero",
+    name: "Tài nguyên Referenced hero",
   });
   fireEvent.click(within(card).getByRole("button", { name: "Đổi tên" }));
-  fireEvent.change(within(card).getByRole("textbox", { name: "Tên asset" }), {
+  fireEvent.change(within(card).getByRole("textbox", { name: "Tên tài nguyên" }), {
     target: { value: "Referenced villain" },
   });
   fireEvent.click(within(card).getByRole("button", { name: "Lưu tên" }));
   await waitFor(() => expect(client.update).toHaveBeenCalledTimes(1));
 
-  fireEvent.change(within(manager).getByRole("searchbox", { name: "Tìm asset" }), {
+  fireEvent.change(within(manager).getByRole("searchbox", { name: "Tìm tài nguyên" }), {
     target: { value: "Unrelated" },
   });
   await waitFor(() =>
     expect(
-      within(manager).queryByRole("group", { name: "Asset Referenced hero" }),
+      within(manager).queryByRole("group", { name: "Tài nguyên Referenced hero" }),
     ).not.toBeInTheDocument(),
   );
   await waitFor(() => expect(client.get).toHaveBeenCalledTimes(1));
@@ -836,11 +828,11 @@ test("a filtered rename cannot evict metadata for a still-declared semantic refe
       "Referenced villain",
     ),
   );
-  expect(within(manager).getByRole("searchbox", { name: "Tìm asset" })).toHaveValue(
+  expect(within(manager).getByRole("searchbox", { name: "Tìm tài nguyên" })).toHaveValue(
     "Unrelated",
   );
   expect(
-    within(manager).queryByRole("group", { name: "Asset Referenced villain" }),
+    within(manager).queryByRole("group", { name: "Tài nguyên Referenced villain" }),
   ).not.toBeInTheDocument();
   expect(within(manager).queryByText("Đang tải tham chiếu…")).not.toBeInTheDocument();
 });
@@ -890,9 +882,9 @@ test("a delayed DELETE cannot discard the newer filter and loaded-page snapshot"
   );
   const manager = await screen.findByRole("region", { name: "Tài nguyên" });
   const card = await within(manager).findByRole("group", {
-    name: "Asset Delete pending",
+    name: "Tài nguyên Delete pending",
   });
-  fireEvent.click(within(card).getByRole("button", { name: "Xóa asset" }));
+  fireEvent.click(within(card).getByRole("button", { name: "Xóa tài nguyên" }));
   fireEvent.click(
     within(
       await screen.findByRole("dialog", { name: "Xóa Delete pending?" }),
@@ -900,7 +892,7 @@ test("a delayed DELETE cannot discard the newer filter and loaded-page snapshot"
   );
   await waitFor(() => expect(client.tombstone).toHaveBeenCalledTimes(1));
 
-  fireEvent.click(within(manager).getByRole("button", { name: "Item" }));
+  fireEvent.click(within(manager).getByRole("button", { name: "Vật phẩm" }));
   await within(manager).findByText("Current item 29");
   fireEvent.click(within(manager).getByRole("button", { name: "Tải thêm" }));
   await within(manager).findByText("Current item 59");
@@ -914,7 +906,7 @@ test("a delayed DELETE cannot discard the newer filter and loaded-page snapshot"
   expect(within(manager).queryByText("User survivor")).not.toBeInTheDocument();
   expect(within(manager).getByText("Current item 59")).toBeVisible();
   expect(
-    within(manager).getAllByRole("group", { name: /^Asset Current item/ }),
+    within(manager).getAllByRole("group", { name: /^Tài nguyên Current item/ }),
   ).toHaveLength(60);
 });
 
@@ -949,9 +941,9 @@ test("a successful mutation must rebuild loaded page boundaries and totals", asy
   const manager = await screen.findByRole("region", { name: "Tài nguyên" });
   await within(manager).findByText("Paged 29");
   fireEvent.click(within(manager).getByRole("button", { name: "Tải thêm" }));
-  const first = await within(manager).findByRole("group", { name: "Asset Paged 0" });
+  const first = await within(manager).findByRole("group", { name: "Tài nguyên Paged 0" });
   await within(manager).findByText("Paged 30");
-  fireEvent.click(within(first).getByRole("button", { name: "Xóa asset" }));
+  fireEvent.click(within(first).getByRole("button", { name: "Xóa tài nguyên" }));
   fireEvent.click(
     within(await screen.findByRole("dialog", { name: "Xóa Paged 0?" })).getByRole(
       "button",
@@ -961,7 +953,7 @@ test("a successful mutation must rebuild loaded page boundaries and totals", asy
 
   await waitFor(() => expect(first).not.toBeInTheDocument());
   expect(within(manager).queryByRole("button", { name: "Tải thêm" })).not.toBeInTheDocument();
-  expect(within(manager).getAllByRole("group", { name: /^Asset Paged/ })).toHaveLength(30);
+  expect(within(manager).getAllByRole("group", { name: /^Tài nguyên Paged/ })).toHaveLength(30);
 });
 
 test("unrelated canonical edits cannot refetch cached references while a real ID change resolves only the new ID", async () => {
@@ -978,7 +970,7 @@ test("unrelated canonical edits cannot refetch cached references while a real ID
     const { state, dispatch } = useStudio();
     return (
       <>
-        <output aria-label="Tên Scene hiện tại">{state.document.scenes[0]!.name}</output>
+        <output aria-label="Tên Cảnh hiện tại">{state.document.scenes[0]!.name}</output>
         <button
           type="button"
           onClick={() =>
@@ -988,7 +980,7 @@ test("unrelated canonical edits cannot refetch cached references while a real ID
             })
           }
         >
-          Đổi Scene
+          Đổi Cảnh
         </button>
         <button
           type="button"
@@ -999,7 +991,7 @@ test("unrelated canonical edits cannot refetch cached references while a real ID
             })
           }
         >
-          Khai báo asset mới
+          Khai báo tài nguyên mới
         </button>
       </>
     );
@@ -1027,11 +1019,11 @@ test("unrelated canonical edits cannot refetch cached references while a real ID
       "Cached first",
     ),
   );
-  fireEvent.click(screen.getByRole("button", { name: "Đổi Scene" }));
+  fireEvent.click(screen.getByRole("button", { name: "Đổi Cảnh" }));
   await screen.findByText("Renamed");
   await act(async () => {});
   expect(reads.get(first.id)).toBe(1);
-  fireEvent.click(screen.getByRole("button", { name: "Khai báo asset mới" }));
+  fireEvent.click(screen.getByRole("button", { name: "Khai báo tài nguyên mới" }));
   await waitFor(() =>
     expect(screen.getByLabelText("Resolved asset metadata")).toHaveTextContent(
       "New second",
@@ -1163,7 +1155,7 @@ test("forget then redeclare must evict completed metadata and fetch the authorit
             })
           }
         >
-          Quên asset
+          Quên tài nguyên
         </button>
         <button
           type="button"
@@ -1201,7 +1193,7 @@ test("forget then redeclare must evict completed metadata and fetch the authorit
       "Old cached name",
     ),
   );
-  fireEvent.click(screen.getByRole("button", { name: "Quên asset" }));
+  fireEvent.click(screen.getByRole("button", { name: "Quên tài nguyên" }));
   await waitFor(() =>
     expect(screen.getByLabelText("Redeclared metadata")).toBeEmptyDOMElement(),
   );
@@ -1243,24 +1235,24 @@ test("a transient referenced-asset read failure must stay visible and retry into
   );
 
   const unresolved = await screen.findByRole("group", {
-    name: `Asset reference ${missing.id}`,
+    name: `Tham chiếu tài nguyên ${missing.id}`,
   });
-  expect(within(unresolved).getByText(/temporarily unavailable/i)).toBeVisible();
+  expect(within(unresolved).getByText(/Không thể tải tài nguyên được tham chiếu/i)).toBeVisible();
   expect(unresolved).toHaveAttribute("draggable", "false");
   expect(screen.getByLabelText("Canonical refs")).toHaveTextContent(missing.id);
   fireEvent.click(
-    within(unresolved).getByRole("button", { name: `Thử lại asset ${missing.id}` }),
+    within(unresolved).getByRole("button", { name: `Thử lại tài nguyên ${missing.id}` }),
   );
   const resolved = await screen.findByRole("group", {
-    name: "Asset Deleted after retry",
+    name: "Tài nguyên Deleted after retry",
   });
   expect(resolved).toHaveAttribute("draggable", "false");
   expect(within(resolved).getByText("Đã xóa")).toBeVisible();
 });
 
 test.each([
-  [404, "Không tìm thấy asset được tham chiếu"],
-  [403, "Không có quyền đọc asset được tham chiếu"],
+  [404, "Không tìm thấy tài nguyên được tham chiếu"],
+  [403, "Không có quyền đọc tài nguyên được tham chiếu"],
 ])(
   "a referenced metadata HTTP %s must remain an explicit non-draggable canonical diagnostic",
   async (status, message) => {
@@ -1277,7 +1269,7 @@ test.each([
     );
 
     const unresolved = await screen.findByRole("group", {
-      name: `Asset reference ${assetId}`,
+      name: `Tham chiếu tài nguyên ${assetId}`,
     });
     expect(within(unresolved).getByText(message)).toBeVisible();
     expect(unresolved).toHaveAttribute("draggable", "false");
@@ -1299,7 +1291,7 @@ test("a READY-only reload cannot hide a tombstoned asset that remains canonicall
     </Wrapper>,
   );
   const card = await screen.findByRole("group", {
-    name: "Asset Deleted backdrop",
+    name: "Tài nguyên Deleted backdrop",
   });
   expect(card).toHaveAttribute("draggable", "false");
   expect(within(card).getByText("Đã xóa")).toBeVisible();
@@ -1367,7 +1359,7 @@ test("a missing real drag integration cannot atomically declare, save and reload
       <Workspace />
     </StudioProvider>,
   );
-  const card = await screen.findByRole("group", { name: "Asset Potion" });
+  const card = await screen.findByRole("group", { name: "Tài nguyên Potion" });
   const values = new Map<string, string>();
   const dataTransfer = {
     effectAllowed: "none",
@@ -1394,7 +1386,7 @@ test("a missing real drag integration cannot atomically declare, save and reload
     clientY: 120,
   });
   Object.defineProperty(drop, "dataTransfer", { value: dataTransfer });
-  fireEvent(screen.getByRole("img", { name: "Scene: Main" }), drop);
+  fireEvent(screen.getByRole("img", { name: "Cảnh: Main" }), drop);
   await waitFor(() =>
     expect(studio.state.document.assetIds).toEqual([ready.id]),
   );
@@ -1423,7 +1415,7 @@ test("a missing real drag integration cannot atomically declare, save and reload
       <AssetManager client={client} />
     </StudioProvider>,
   );
-  const reloaded = await screen.findByRole("group", { name: "Asset Potion" });
+  const reloaded = await screen.findByRole("group", { name: "Tài nguyên Potion" });
   expect(within(reloaded).getByText("Đang dùng trong dự án")).toBeVisible();
 });
 
@@ -1485,7 +1477,7 @@ test("a missing keyboard placement action cannot use the validated canvas role a
   );
 
   const add = await screen.findByRole("button", {
-    name: "Thêm Keyboard panel vào Scene",
+    name: "Thêm Keyboard panel vào Cảnh",
   });
   add.focus();
   fireEvent.keyDown(add, { key: "Enter" });

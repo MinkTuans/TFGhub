@@ -223,7 +223,7 @@ async function mount(
   );
   await waitFor(() => expect(studio.state.ready).toBe(true));
   await act(async () => {});
-  const canvas = () => screen.getByRole("img", { name: /^Scene:/ });
+  const canvas = () => screen.getByRole("img", { name: /^Cảnh:/ });
   return {
     ...result,
     canvas,
@@ -506,7 +506,7 @@ test("Scene Manager and canvas grid stay synchronized through settings edits, un
     screen.getByRole("spinbutton", { name: "Kích thước lưới" }),
     { target: { value: "16" } },
   );
-  fireEvent.click(screen.getByRole("button", { name: "Lưu Scene" }));
+  fireEvent.click(screen.getByRole("button", { name: "Lưu Cảnh" }));
   expect(screen.getByRole("button", { name: "Bám lưới" })).toHaveAttribute(
     "aria-pressed",
     "true",
@@ -832,7 +832,7 @@ test("wheel and zoom buttons honor limits, preserve the pointer's world anchor a
   for (let i = 0; i < 100; i++)
     fireEvent.click(screen.getByRole("button", { name: "Thu nhỏ" }));
   expect(Number(app.canvas().getAttribute("data-camera-zoom"))).toBe(0.1);
-  fireEvent.click(screen.getByRole("button", { name: "Vừa Scene" }));
+  fireEvent.click(screen.getByRole("button", { name: "Vừa Cảnh" }));
   expect(app.canvas()).toHaveAttribute("data-camera-zoom", "1");
   expect(app.canvas()).toHaveAttribute("data-camera-x", "0");
   expect(app.studio.state.history.past).toHaveLength(0);
@@ -852,7 +852,7 @@ test.each([
     const zoom = Number(app.canvas().getAttribute("data-camera-zoom"));
     if (action === "Phóng to") expect(zoom).toBeGreaterThanOrEqual(initial);
     else expect(zoom).toBeLessThanOrEqual(initial);
-    fireEvent.click(screen.getByRole("button", { name: "Vừa Scene" }));
+    fireEvent.click(screen.getByRole("button", { name: "Vừa Cảnh" }));
     expect(Number(app.canvas().getAttribute("data-camera-zoom"))).toBe(initial);
   },
 );

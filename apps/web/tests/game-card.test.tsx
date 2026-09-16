@@ -32,7 +32,7 @@ test("excludes the current game before limiting related games to six compact car
   expect(screen.getByRole("link", { name: /Related 5/ })).toBeVisible();
   expect(screen.queryByRole("link", { name: /Related 6/ })).not.toBeInTheDocument();
   expect(screen.queryByText("A demo")).not.toBeInTheDocument();
-  expect(screen.getByRole("heading", { level: 2, name: "Game liên quan" })).toBeVisible();
+  expect(screen.getByRole("heading", { level: 2, name: "Trò chơi liên quan" })).toBeVisible();
   expect(screen.getAllByRole("heading", { level: 3 })).toHaveLength(6);
 });
 

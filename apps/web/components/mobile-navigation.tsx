@@ -13,7 +13,7 @@ export function MobileNavigation({ authenticated }: { authenticated: boolean }) 
   const items = [
     { href: "/", label: "Trang chủ", icon: icons.home },
     { href: "/discover", label: "Khám phá", icon: icons.discover },
-    { href: "/studio", label: "Studio", icon: icons.studio },
+    { href: "/studio", label: "Xưởng sáng tạo", icon: icons.studio },
     { href: authenticated ? "/profile" : "/login", label: authenticated ? "Hồ sơ" : "Tài khoản", icon: icons.user },
   ];
   return <nav className="mobile-dock" aria-label="Điều hướng nhanh">{items.map(({ href, label, icon }) => <Link key={href} href={href} aria-current={pathname === href || (href !== "/" && pathname.startsWith(`${href}/`)) ? "page" : undefined}>

@@ -20,7 +20,7 @@ async function createProject(page: Page) {
   });
   await page.goto("/studio/games/new");
   await page.getByRole("button", { name: "Tạo bản nháp" }).click();
-  await expect(page.getByRole("main", { name: "Game Studio" })).toBeVisible();
+  await expect(page.getByRole("main", { name: "Xưởng sáng tạo trò chơi" })).toBeVisible();
   return page.url().split("/").at(-1)!;
 }
 
@@ -35,13 +35,13 @@ test("upload, rename, drag, autosave and reload keep only the stable asset refer
   const gameId = await createProject(page);
   const manager = page.getByRole("region", { name: "Tài nguyên" });
   await expect(manager).toBeVisible();
-  await manager.getByRole("button", { name: "Item" }).click();
-  await manager.getByLabel("Tải asset lên").setInputFiles({
+  await manager.getByRole("button", { name: "Vật phẩm" }).click();
+  await manager.getByLabel("Tải tài nguyên lên").setInputFiles({
     name: "potion.png",
     mimeType: "image/png",
     buffer: png,
   });
-  const card = manager.getByRole("group", { name: "Asset potion.png" });
+  const card = manager.getByRole("group", { name: "Tài nguyên potion.png" });
   await expect(card).toBeVisible();
   await expect(
     card.getByRole("img", { name: "Xem trước potion.png" }),
@@ -50,12 +50,12 @@ test("upload, rename, drag, autosave and reload keep only the stable asset refer
     card.getByRole("img", { name: "Xem trước potion.png" }),
   ).toHaveJSProperty("naturalWidth", 8);
   await card.getByRole("button", { name: "Đổi tên" }).click();
-  await card.getByRole("textbox", { name: "Tên asset" }).fill("Potion");
+  await card.getByRole("textbox", { name: "Tên tài nguyên" }).fill("Potion");
   await card.getByRole("button", { name: "Lưu tên" }).click();
   await expect(manager.getByText("Potion", { exact: true })).toBeVisible();
 
   await manager
-    .getByRole("group", { name: "Asset Potion" })
+    .getByRole("group", { name: "Tài nguyên Potion" })
     .dragTo(page.locator("canvas"), {
       targetPosition: { x: 180, y: 160 },
     });
@@ -77,11 +77,11 @@ test("upload, rename, drag, autosave and reload keep only the stable asset refer
 
   await page.reload();
   await expect(
-    manager.getByRole("group", { name: "Asset Potion" }),
+    manager.getByRole("group", { name: "Tài nguyên Potion" }),
   ).toContainText("Đang dùng trong dự án");
   await manager
-    .getByRole("group", { name: "Asset Potion" })
-    .getByRole("button", { name: "Xóa asset" })
+    .getByRole("group", { name: "Tài nguyên Potion" })
+    .getByRole("button", { name: "Xóa tài nguyên" })
     .click();
   const warning = page.getByRole("dialog", { name: "Xóa Potion?" });
   await expect(warning).toContainText("đang được dùng trong dự án hiện tại");
@@ -99,18 +99,18 @@ test("upload, rename, drag, autosave and reload keep only the stable asset refer
   await expect(
     page.getByRole("status", { name: "Trạng thái dự án" }),
   ).toHaveText("Đã lưu");
-  await manager.getByRole("button", { name: "UI", exact: true }).click();
-  await manager.getByLabel("Tải asset lên").setInputFiles({
+  await manager.getByRole("button", { name: "Giao diện", exact: true }).click();
+  await manager.getByLabel("Tải tài nguyên lên").setInputFiles({
     name: "panel.png",
     mimeType: "image/png",
     buffer: png,
   });
-  const panel = manager.getByRole("group", { name: "Asset panel.png" });
+  const panel = manager.getByRole("group", { name: "Tài nguyên panel.png" });
   await expect(panel).toBeVisible();
   await page.locator("canvas").focus();
   await page.keyboard.press("Escape");
   await panel
-    .getByRole("button", { name: "Thêm panel.png vào Scene" })
+    .getByRole("button", { name: "Thêm panel.png vào Cảnh" })
     .focus();
   await page.keyboard.press("Enter");
   await expect(
@@ -133,15 +133,15 @@ test("upload, rename, drag, autosave and reload keep only the stable asset refer
     ).properties.assetId,
   ).toBe(withUi.project.assetIds[1]);
 
-  await manager.getByRole("button", { name: "User", exact: true }).click();
-  await manager.getByLabel("Tải asset lên").setInputFiles({
+  await manager.getByRole("button", { name: "Người dùng", exact: true }).click();
+  await manager.getByLabel("Tải tài nguyên lên").setInputFiles({
     name: "unused.png",
     mimeType: "image/png",
     buffer: png,
   });
-  const unused = manager.getByRole("group", { name: "Asset unused.png" });
+  const unused = manager.getByRole("group", { name: "Tài nguyên unused.png" });
   await expect(unused).toBeVisible();
-  await unused.getByRole("button", { name: "Xóa asset" }).click();
+  await unused.getByRole("button", { name: "Xóa tài nguyên" }).click();
   const deletion = page.getByRole("dialog", { name: "Xóa unused.png?" });
   await expect(
     deletion.getByRole("button", { name: "Xác nhận xóa" }),

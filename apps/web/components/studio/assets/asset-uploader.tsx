@@ -1,5 +1,6 @@
 "use client";
 
+import { studioErrorMessage } from "../studio-labels";
 import { useRef, useState, type ChangeEvent } from "react";
 import type { GameAssetSummary } from "@indieforge/contracts";
 import { createStudioId } from "../studio-provider";
@@ -60,7 +61,7 @@ export function AssetUploader({
       replace({
         ...(jobsRef.current.get(job.uploadId) ?? job),
         status: "FAILED",
-        error: error instanceof Error ? error.message : "Tải lên thất bại",
+        error: studioErrorMessage(error, "Tải lên thất bại. Vui lòng thử lại."),
       });
     }
   }
@@ -88,7 +89,7 @@ export function AssetUploader({
           type="file"
           multiple
           accept="image/png,image/jpeg,image/webp,audio/wav,.png,.jpg,.jpeg,.webp,.wav"
-          aria-label="Tải asset lên"
+          aria-label="Tải tài nguyên lên"
           onChange={choose}
         />
       </label>

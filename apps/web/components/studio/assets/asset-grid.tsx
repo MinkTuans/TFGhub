@@ -1,5 +1,6 @@
 "use client";
 
+import { studioLabel, studioErrorMessage } from "../studio-labels";
 import { useState } from "react";
 import type { GameAssetSummary } from "@indieforge/contracts";
 import { StudioConfirmation } from "../studio-confirmation";
@@ -57,7 +58,7 @@ export function AssetGrid({
       setRenaming(null);
     } catch (failure) {
       setError(
-        failure instanceof Error ? failure.message : "Không thể đổi tên",
+        studioErrorMessage(failure, "Không thể đổi tên. Vui lòng thử lại."),
       );
     } finally {
       setBusy(false);
@@ -71,7 +72,7 @@ export function AssetGrid({
       setDeleting(null);
     } catch (failure) {
       setError(
-        failure instanceof Error ? failure.message : "Không thể xóa asset",
+        studioErrorMessage(failure, "Không thể xóa tài nguyên. Vui lòng thử lại."),
       );
     } finally {
       setBusy(false);
@@ -90,7 +91,7 @@ export function AssetGrid({
           <article
             className="studio-asset-card"
             role="group"
-            aria-label={`Asset ${asset.displayName}`}
+            aria-label={`Tài nguyên ${asset.displayName}`}
             key={asset.id}
             draggable={draggable}
             onDragStart={(event) => {
@@ -111,9 +112,9 @@ export function AssetGrid({
                 }}
               >
                 <label>
-                  Tên asset
+                  Tên tài nguyên
                   <input
-                    aria-label="Tên asset"
+                    aria-label="Tên tài nguyên"
                     value={name}
                     maxLength={160}
                     onChange={(event) => setName(event.target.value)}
@@ -130,7 +131,7 @@ export function AssetGrid({
               <>
                 <strong>{asset.displayName}</strong>
                 <small>
-                  {asset.metadata.category ?? "USER"} · {asset.kind}
+                  {studioLabel(asset.metadata.category ?? "USER")} · {studioLabel(asset.kind)}
                 </small>
                 {referenced ? (
                   <span>Đang dùng trong dự án</span>
@@ -142,10 +143,10 @@ export function AssetGrid({
                   {draggable && onPlaceAsset && (
                     <button
                       type="button"
-                      aria-label={`Thêm ${asset.displayName} vào Scene`}
+                      aria-label={`Thêm ${asset.displayName} vào Cảnh`}
                       onClick={() => onPlaceAsset(placementPayload(asset))}
                     >
-                      Thêm vào Scene
+                      Thêm vào Cảnh
                     </button>
                   )}
                   <button
@@ -160,7 +161,7 @@ export function AssetGrid({
                   </button>
                   <button
                     type="button"
-                    aria-label="Xóa asset"
+                    aria-label="Xóa tài nguyên"
                     disabled={asset.state !== "READY"}
                     onClick={() => setDeleting(asset)}
                   >
@@ -182,20 +183,20 @@ export function AssetGrid({
         >
           {referencedAssetIds.has(deleting.id) ? (
             <p>
-              Asset đang được dùng trong dự án hiện tại. Hãy xóa các đối tượng
-              phụ thuộc trước khi xóa asset.
+              Tài nguyên đang được dùng trong dự án hiện tại. Hãy xóa các đối tượng
+              phụ thuộc trước khi xóa tài nguyên.
             </p>
           ) : (
             <>
               <p>
-                Asset sẽ biến mất khỏi thư viện nhưng dữ liệu phụ thuộc vẫn được
+                Tài nguyên sẽ biến mất khỏi thư viện nhưng dữ liệu phụ thuộc vẫn được
                 giữ.
               </p>
               {(deleting.references.revisions > 0 ||
                 deleting.references.builds > 0) && (
                 <p>
                   {deleting.references.revisions} phiên bản đã lưu và{" "}
-                  {deleting.references.builds} bản build vẫn tham chiếu asset
+                  {deleting.references.builds} bản dựng vẫn tham chiếu tài nguyên
                   này.
                 </p>
               )}

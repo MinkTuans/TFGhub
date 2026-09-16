@@ -30,7 +30,7 @@ export default async function GamePage({
         <Link className="game-showcase__back" href="/discover">← Trở về khám phá</Link>
         <div className="game-showcase__banner">
           <GameCover game={game} priority />
-          <div className="game-showcase__caption"><span className="badge">Game độc lập · Trình duyệt</span><p className="game-showcase__title">{game.title}</p><p>Bởi {game.developer.displayName}</p><a href="#play-game" className="button">Chơi game <span aria-hidden="true">→</span></a></div>
+          <div className="game-showcase__caption"><span className="badge">Trò chơi độc lập · Trình duyệt</span><p className="game-showcase__title">{game.title}</p><p>Bởi {game.developer.displayName}</p><a href="#play-game" className="button">Chơi ngay <span aria-hidden="true">→</span></a></div>
         </div>
       </header>
       <div className="game-page__layout" id="play-game">
@@ -48,7 +48,7 @@ export default async function GamePage({
         ) : (
           <section className="game-page__unavailable">
             <h1>{game.title}</h1>
-            <p>Game chưa sẵn sàng để chơi.</p>
+            <p>Trò chơi chưa sẵn sàng để chơi.</p>
           </section>
         )}
         <RelatedGames games={related?.games ?? []} currentSlug={game.slug} />
@@ -58,14 +58,14 @@ export default async function GamePage({
           <div className="game-details__cover"><GameCover game={game} /></div>
           <div>
             <p className="eyebrow">Được tạo bởi cộng đồng TFG</p>
-            <h2>Về game này</h2>
+            <h2>Về trò chơi này</h2>
             <p className="game-card__developer">Bởi {game.developer.displayName}</p>
-            <p className="description">{game.description || "Nhà sáng tạo chưa thêm mô tả cho game này."}</p>
-            <Link href="/discover">Khám phá thêm game</Link>
+            <p className="description">{game.description || "Nhà sáng tạo chưa thêm mô tả cho trò chơi này."}</p>
+            <Link href="/discover">Khám phá thêm trò chơi</Link>
           </div>
         </div>
         <aside className="game-details__info" aria-labelledby="game-info-title">
-          <h2 id="game-info-title">Thông tin game</h2>
+          <h2 id="game-info-title">Thông tin trò chơi</h2>
           <dl>
             <div><dt>Nền tảng</dt><dd>Trình duyệt</dd></div>
             <div><dt>Ngày tạo</dt><dd><time dateTime={game.createdAt}>{new Intl.DateTimeFormat("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "UTC" }).format(new Date(game.createdAt))}</time></dd></div>

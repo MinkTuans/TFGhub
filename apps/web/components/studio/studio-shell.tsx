@@ -47,7 +47,7 @@ export function StudioShell({ initialGame }: { initialGame: GameSummary }) {
   const toggleSidebar = () => setSidebarOpen((open) => !open);
   const toggleInspector = () => setInspectorOpen((open) => !open);
   return (
-    <main className="studio-shell" aria-label="Game Studio">
+    <main className="studio-shell" aria-label="Xưởng sáng tạo trò chơi">
       <StudioTopbar
         initialGame={initialGame}
         sceneId={scene.id}
@@ -104,22 +104,22 @@ export function StudioShell({ initialGame }: { initialGame: GameSummary }) {
       </div>
       <section
         className="studio-mobile"
-        aria-label="Studio trên thiết bị di động"
+        aria-label="Xưởng sáng tạo trên thiết bị di động"
       >
-        <h2>Thông tin game</h2>
+        <h2>Thông tin trò chơi</h2>
         <p>
-          Bạn có thể đổi tên game tại đây. Mở Studio trên máy tính để xem các
-          Scene và bố cục dự án.
+          Bạn có thể đổi tên trò chơi tại đây. Mở Xưởng sáng tạo trên máy tính để xem các
+          Cảnh và bố cục dự án.
         </p>
         <p className="studio-muted">
-          {state.document.scenes.length} Scene · Khung hình{" "}
+          {state.document.scenes.length} Cảnh · Khung hình{" "}
           {state.document.settings.viewport.width} ×{" "}
           {state.document.settings.viewport.height} px
         </p>
       </section>
       <div className="studio-bottom">
-        <span>{state.document.scenes.length} Scene</span>
-        <span>TFG Game Studio</span>
+        <span>{state.document.scenes.length} Cảnh</span>
+        <span>TFG Xưởng sáng tạo trò chơi</span>
       </div>
     </main>
   );

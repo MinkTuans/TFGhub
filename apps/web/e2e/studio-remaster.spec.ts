@@ -10,10 +10,10 @@ for (const width of [390, 768, 1024, 1440]) {
       expect((await page.request.post("/api/games", { data: { title, slug: `${title.toLowerCase()}-${suffix}`, sourceType: "UPLOAD", description: "Forest adventure" } })).ok()).toBe(true);
     }
     await page.goto("/studio");
-    await page.getByLabel("Tìm game của bạn").fill(" FOREST ");
-    await expect(page.getByRole("status")).toHaveText("2 / 2 game");
+    await page.getByLabel("Tìm trò chơi của bạn").fill(" FOREST ");
+    await expect(page.getByRole("status")).toHaveText("2 / 2 trò chơi");
     await page.getByLabel("Trạng thái duyệt").selectOption("APPROVED");
-    await expect(page.getByRole("heading", { name: "Không có game phù hợp" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Không có trò chơi phù hợp" })).toBeVisible();
     await page.getByRole("button", { name: "Xóa bộ lọc" }).click();
     await page.getByLabel("Sắp xếp").selectOption("title");
     await expect(page.locator(".studio-card h3")).toHaveText(["Alpha", "Zebra"]);
@@ -24,7 +24,7 @@ for (const width of [390, 768, 1024, 1440]) {
       await page.screenshot({ path: testInfo.outputPath(`studio-${width}-${theme}.png`), fullPage: true });
     }
     await page.getByRole("link", { name: "Alpha", exact: true }).click();
-    await page.getByRole("navigation", { name: "Các phần quản lý game" }).getByRole("link", { name: "Hiển thị", exact: true }).click();
+    await page.getByRole("navigation", { name: "Các phần quản lý trò chơi" }).getByRole("link", { name: "Hiển thị", exact: true }).click();
     await expect(page).toHaveURL(/#display-heading$/);
     await expect(page.getByRole("heading", { name: "Cài đặt hiển thị" })).toBeInViewport();
     await page.screenshot({ path: testInfo.outputPath(`manage-${width}.png`), fullPage: true });

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   ApplyMutationBatchInput,
+  v2ComponentRegistry,
   EngineProjectV2,
   applyProjectMutations,
   JSON_REQUEST_BYTE_LIMIT,
@@ -768,4 +769,28 @@ describe("shared object command primitives", () => {
     const undone = await transport(identity.gameId, state.pending!);
     expect(undone.document.scenes[0].objects[0].name).toBe("Name 99");
   });
+});
+
+it("localizes generated item and button text without rewriting supplied properties", () => {
+  let sequence = 200;
+  const created = api.createObjectCommand(
+    project().scenes[0],
+    { objectType: "ITEM", name: "User's Item", layerId: id(3) },
+    () => id(sequence++),
+  );
+  expect(created.type).toBe("object.create");
+  if (created.type !== "object.create") throw new Error("Expected object creation");
+  expect(created.objects[0].object.name).toBe("User's Item");
+  expect(created.objects[0].object.components.find((c) => c.type === "InventoryItem")?.properties)
+    .toMatchObject({ itemKey: "item", displayName: "Vật phẩm", quantityMode: "SINGLE" });
+  const added = api.addComponentCommand(id(2), id(200), "UIButton", undefined, () => id(300));
+  expect(added.type).toBe("component.add");
+  if (added.type !== "component.add") throw new Error("Expected component addition");
+  expect(added.component.properties).toMatchObject({ label: "Nút" });
+  const supplied = { ...(added.component.properties as object), label: "Button" };
+  const preserved = api.addComponentCommand(id(2), id(200), "UIButton", supplied, () => id(301));
+  if (preserved.type !== "component.add") throw new Error("Expected component addition");
+  expect(preserved.component.properties).toEqual(supplied);
+  expect(v2ComponentRegistry.InventoryItem.defaults()).toMatchObject({ displayName: "Item" });
+  expect(v2ComponentRegistry.UIButton.defaults()).toMatchObject({ label: "Button" });
 });

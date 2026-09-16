@@ -1,5 +1,6 @@
 "use client";
 
+import { studioLabel } from "./studio-labels";
 import { useState, type FormEvent } from "react";
 import {
   ApplyMutationBatchInput,
@@ -40,7 +41,7 @@ export function SceneManager({
       setError(
         error instanceof StudioMutationSizeError
           ? error.message
-          : "Không thể thay đổi Scene: kiểm tra thông tin, giới hạn và các tham chiếu từ đối tượng, sự kiện hoặc mã nguồn.",
+          : "Không thể thay đổi Cảnh: kiểm tra thông tin, giới hạn và các tham chiếu từ đối tượng, sự kiện hoặc mã nguồn.",
       );
       return false;
     }
@@ -66,7 +67,7 @@ export function SceneManager({
     const next: Scene = {
       id,
       key: `scene-${id}`,
-      name: "Scene mới",
+      name: "Cảnh mới",
       type: "MIXED",
       order: Math.max(...scenes.map((scene) => scene.order)) + 1,
       width: state.document.settings.viewport.width,
@@ -126,8 +127,8 @@ export function SceneManager({
     });
   };
   return (
-    <section aria-label="Quản lý Scene">
-      <nav id="studio-scene-list" aria-label="Danh sách Scene">
+    <section aria-label="Quản lý Cảnh">
+      <nav id="studio-scene-list" aria-label="Danh sách Cảnh">
         {scenes.map((scene, index) => (
           <button
             key={scene.id}
@@ -146,9 +147,9 @@ export function SceneManager({
         className="studio-editor"
         disabled={!state.ready || !!state.resolution || state.batchError}
       >
-        <legend>Quản lý Scene</legend>
+        <legend>Quản lý Cảnh</legend>
         <button type="button" disabled={scenes.length >= 100} onClick={create}>
-          Thêm Scene
+          Thêm Cảnh
         </button>
         <form
           key={JSON.stringify([
@@ -164,7 +165,7 @@ export function SceneManager({
           onSubmit={save}
         >
           <label>
-            Tên Scene
+            Tên Cảnh
             <input
               name="name"
               defaultValue={scene.name}
@@ -173,7 +174,7 @@ export function SceneManager({
             />
           </label>
           <label>
-            Khóa Scene
+            Khóa Cảnh
             <input
               name="key"
               defaultValue={scene.key}
@@ -183,15 +184,15 @@ export function SceneManager({
             />
           </label>
           <label>
-            Loại Scene
+            Loại Cảnh
             <select name="type" defaultValue={scene.type}>
               {["MIXED", "MAP", "STORY", "MINI_GAME", "MENU"].map((type) => (
-                <option key={type}>{type}</option>
+                <option key={type} value={type}>{studioLabel(type)}</option>
               ))}
             </select>
           </label>
           <label>
-            Chiều rộng Scene
+            Chiều rộng Cảnh
             <input
               name="width"
               type="number"
@@ -202,7 +203,7 @@ export function SceneManager({
             />
           </label>
           <label>
-            Chiều cao Scene
+            Chiều cao Cảnh
             <input
               name="height"
               type="number"
@@ -213,7 +214,7 @@ export function SceneManager({
             />
           </label>
           <label>
-            Màu nền Scene
+            Màu nền Cảnh
             <input
               name="color"
               type="color"
@@ -267,16 +268,16 @@ export function SceneManager({
             />
             Bám lưới
           </label>
-          <button type="submit">Lưu Scene</button>
+          <button type="submit">Lưu Cảnh</button>
         </form>
         {state.document.entrySceneId === sceneId ? (
-          <p>Scene bắt đầu</p>
+          <p>Cảnh bắt đầu</p>
         ) : (
           <button
             type="button"
             onClick={() => commit({ type: "scene.entry", sceneId })}
           >
-            Đặt làm Scene bắt đầu
+            Đặt làm Cảnh bắt đầu
           </button>
         )}
         <div className="studio-actions">
@@ -285,14 +286,14 @@ export function SceneManager({
             disabled={position === 0}
             onClick={() => move(-1)}
           >
-            Đưa Scene lên
+            Đưa Cảnh lên
           </button>
           <button
             type="button"
             disabled={position === scenes.length - 1}
             onClick={() => move(1)}
           >
-            Đưa Scene xuống
+            Đưa Cảnh xuống
           </button>
           <button
             type="button"
@@ -311,7 +312,7 @@ export function SceneManager({
                 onSceneChange(newId);
             }}
           >
-            Nhân bản Scene
+            Nhân bản Cảnh
           </button>
           <button
             type="button"
@@ -322,14 +323,14 @@ export function SceneManager({
               setError("");
             }}
           >
-            Xóa Scene
+            Xóa Cảnh
           </button>
         </div>
       </fieldset>
       {error && !selectedForDelete && <p role="alert">{error}</p>}
       {selectedForDelete && (
         <StudioConfirmation
-          title="Xóa Scene"
+          title="Xóa Cảnh"
           onCancel={() => {
             setDeleting(null);
             setError("");
@@ -355,16 +356,16 @@ export function SceneManager({
         >
           <p>
             Xóa “{selectedForDelete.name}”, các lớp, đối tượng và biến của
-            Scene. Các tham chiếu từ nơi khác phải được gỡ trước khi xóa.
+            Cảnh. Các tham chiếu từ nơi khác phải được gỡ trước khi xóa.
           </p>
           {state.document.entrySceneId === deleting && (
             <label>
-              Scene bắt đầu thay thế
+              Cảnh bắt đầu thay thế
               <select
                 value={replacement}
                 onChange={(event) => setReplacement(event.target.value)}
               >
-                <option value="">Chọn Scene</option>
+                <option value="">Chọn Cảnh</option>
                 {scenes
                   .filter((scene) => scene.id !== deleting)
                   .map((scene) => (

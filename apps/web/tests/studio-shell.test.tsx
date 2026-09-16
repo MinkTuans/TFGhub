@@ -167,15 +167,15 @@ async function shell(overrides: Partial<StudioProviderProps> = {}) {
 test("ENGINE server route loads owner/project identity and opens accessible Studio navigation", async () => {
   preparePage();
   render(await GameWorkspacePage({ params: Promise.resolve({ id: game.id }) }));
-  expect(screen.getByRole("link", { name: "Về Studio" })).toHaveAttribute(
+  expect(screen.getByRole("link", { name: "Về Xưởng sáng tạo" })).toHaveAttribute(
     "href",
     "/studio",
   );
-  expect(screen.getByRole("main", { name: "Game Studio" })).toBeVisible();
-  expect(screen.getByRole("textbox", { name: "Tên game" })).toHaveValue(
+  expect(screen.getByRole("main", { name: "Xưởng sáng tạo trò chơi" })).toBeVisible();
+  expect(screen.getByRole("textbox", { name: "Tên trò chơi" })).toHaveValue(
     "Đảo nhỏ",
   );
-  expect(screen.getByRole("combobox", { name: "Scene hiện tại" })).toHaveValue(
+  expect(screen.getByRole("combobox", { name: "Cảnh hiện tại" })).toHaveValue(
     id(2),
   );
   expect(screen.getByText("Bản nháp")).toBeVisible();
@@ -201,7 +201,7 @@ test.each(["UPLOAD", "CODE", "STORY", "PLATFORMER"] as const)(
     expect(screen.getByRole("button", { name: "Lưu hiển thị" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Gửi duyệt" })).toBeDisabled();
     expect(
-      screen.queryByRole("main", { name: "Game Studio" }),
+      screen.queryByRole("main", { name: "Xưởng sáng tạo trò chơi" }),
     ).not.toBeInTheDocument();
     expect(privateGet).toHaveBeenCalledTimes(1);
   },
@@ -232,12 +232,12 @@ test.each([
       await GameWorkspacePage({ params: Promise.resolve({ id: game.id }) }),
     );
     expect(screen.getByRole("alert")).toHaveTextContent("Chưa thể mở dự án");
-    expect(screen.getByRole("link", { name: "Về Studio" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Về Xưởng sáng tạo" })).toHaveAttribute(
       "href",
       "/studio",
     );
     expect(
-      screen.queryByRole("textbox", { name: "Tên game" }),
+      screen.queryByRole("textbox", { name: "Tên trò chơi" }),
     ).not.toBeInTheDocument();
   },
 );
@@ -322,7 +322,7 @@ test("conflict resolution feedback keeps both choices actionable after failure a
     screen.getByRole("button", { name: "Bỏ thay đổi và tải bản máy chủ" }),
   ).toBeDisabled();
   expect(screen.getByRole("button", { name: "Hoàn tác" })).toBeDisabled();
-  expect(screen.getByRole("button", { name: "Thêm Scene" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Thêm Cảnh" })).toBeDisabled();
   await act(async () => reject(new Error("offline")));
   expect(screen.getByRole("alert")).toHaveTextContent(/thử lại/i);
   expect(
@@ -341,15 +341,15 @@ test("title submits only trimmed owner metadata, indicates pending, and preserve
       resolve = done;
     });
   });
-  const title = screen.getByRole("textbox", { name: "Tên game" });
+  const title = screen.getByRole("textbox", { name: "Tên trò chơi" });
   fireEvent.change(title, { target: { value: "  Đảo mùa hè  " } });
   expect(
-    screen.getByRole("status", { name: "Trạng thái tên game" }),
+    screen.getByRole("status", { name: "Trạng thái tên trò chơi" }),
   ).toHaveTextContent("Chưa lưu");
   fireEvent.click(screen.getByRole("button", { name: "Lưu tên" }));
   expect(title).toBeDisabled();
   expect(
-    screen.getByRole("status", { name: "Trạng thái tên game" }),
+    screen.getByRole("status", { name: "Trạng thái tên trò chơi" }),
   ).toHaveTextContent("Đang lưu");
   expect(requests).toHaveLength(1);
   expect(requests[0].url).toMatch(/\/games\/engine-game$/);
@@ -367,7 +367,7 @@ test("title submits only trimmed owner metadata, indicates pending, and preserve
   );
   expect(title).toHaveValue("Đảo mùa hè");
   expect(
-    screen.getByRole("status", { name: "Trạng thái tên game" }),
+    screen.getByRole("status", { name: "Trạng thái tên trò chơi" }),
   ).toHaveTextContent("Đã lưu");
   expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   expect(h.studio.state.document).toEqual(project);
@@ -376,11 +376,11 @@ test("title submits only trimmed owner metadata, indicates pending, and preserve
 
 test("whitespace-only titles cannot be saved and keyboard tooltips explain the control", async () => {
   await shell();
-  const title = screen.getByRole("textbox", { name: "Tên game" });
+  const title = screen.getByRole("textbox", { name: "Tên trò chơi" });
   fireEvent.change(title, { target: { value: "   " } });
   fireEvent.submit(title.closest("form")!);
   expect(screen.getByRole("alert")).toHaveTextContent("1–80");
-  const settings = screen.getByRole("button", { name: "Cài đặt Studio" });
+  const settings = screen.getByRole("button", { name: "Cài đặt Xưởng sáng tạo" });
   fireEvent.focus(settings);
   expect(screen.getByRole("tooltip")).toHaveTextContent("Bố cục");
   expect(settings).toHaveAccessibleDescription(/Bố cục/);
@@ -390,11 +390,11 @@ test("whitespace-only titles cannot be saved and keyboard tooltips explain the c
 
 test("current Scene navigation synchronizes panels without changing the canonical project", async () => {
   const h = await shell();
-  fireEvent.change(screen.getByRole("combobox", { name: "Scene hiện tại" }), {
+  fireEvent.change(screen.getByRole("combobox", { name: "Cảnh hiện tại" }), {
     target: { value: id(3) },
   });
   expect(
-    within(screen.getByRole("region", { name: "Tổng quan Scene" })).getByRole(
+    within(screen.getByRole("region", { name: "Tổng quan Cảnh" })).getByRole(
       "heading",
       { name: "Bến cảng" },
     ),
@@ -404,10 +404,10 @@ test("current Scene navigation synchronizes panels without changing the canonica
     "true",
   );
   expect(
-    screen.getByRole("region", { name: "Thông tin Scene" }),
+    screen.getByRole("region", { name: "Thông tin Cảnh" }),
   ).toHaveTextContent("800 × 480");
   fireEvent.click(screen.getByRole("button", { name: "Khởi đầu" }));
-  expect(screen.getByRole("combobox", { name: "Scene hiện tại" })).toHaveValue(
+  expect(screen.getByRole("combobox", { name: "Cảnh hiện tại" })).toHaveValue(
     id(2),
   );
   expect(h.studio.state.document).toEqual(project);
@@ -417,27 +417,27 @@ test("current Scene navigation synchronizes panels without changing the canonica
 test("panel disclosures and settings change actual visibility and remain reversible", async () => {
   await shell();
   fireEvent.click(
-    screen.getByRole("button", { name: "Thu gọn danh sách Scene" }),
+    screen.getByRole("button", { name: "Thu gọn danh sách Cảnh" }),
   );
   expect(
     screen.queryByRole("button", { name: "Khởi đầu" }),
   ).not.toBeInTheDocument();
-  fireEvent.click(screen.getByRole("button", { name: "Mở danh sách Scene" }));
+  fireEvent.click(screen.getByRole("button", { name: "Mở danh sách Cảnh" }));
   expect(screen.getByRole("button", { name: "Khởi đầu" })).toBeVisible();
-  const settings = screen.getByRole("button", { name: "Cài đặt Studio" });
+  const settings = screen.getByRole("button", { name: "Cài đặt Xưởng sáng tạo" });
   fireEvent.click(settings);
   expect(settings).toHaveAttribute("aria-expanded", "true");
   fireEvent.click(
-    screen.getByRole("checkbox", { name: "Hiện thông tin Scene" }),
+    screen.getByRole("checkbox", { name: "Hiện thông tin Cảnh" }),
   );
   expect(
-    screen.queryByRole("region", { name: "Thông tin Scene" }),
+    screen.queryByRole("region", { name: "Thông tin Cảnh" }),
   ).not.toBeInTheDocument();
   fireEvent.click(
-    screen.getByRole("checkbox", { name: "Hiện thông tin Scene" }),
+    screen.getByRole("checkbox", { name: "Hiện thông tin Cảnh" }),
   );
-  expect(screen.getByRole("region", { name: "Thông tin Scene" })).toBeVisible();
-  fireEvent.keyDown(screen.getByRole("region", { name: "Cài đặt Studio" }), {
+  expect(screen.getByRole("region", { name: "Thông tin Cảnh" })).toBeVisible();
+  fireEvent.keyDown(screen.getByRole("region", { name: "Cài đặt Xưởng sáng tạo" }), {
     key: "Escape",
   });
   expect(settings).toHaveAttribute("aria-expanded", "false");
@@ -453,7 +453,7 @@ test("undo and redo use the existing provider history and expose project save st
   act(() =>
     h.studio.dispatch({
       type: "commit",
-      mutations: [{ type: "scene.rename", sceneId: id(2), name: "Scene mới" }],
+      mutations: [{ type: "scene.rename", sceneId: id(2), name: "Cảnh mới" }],
     }),
   );
   expect(
@@ -464,7 +464,7 @@ test("undo and redo use the existing provider history and expose project save st
   expect(h.studio.state.document.scenes[0].name).toBe("Khởi đầu");
   expect(redo).toBeEnabled();
   fireEvent.click(redo);
-  expect(h.studio.state.document.scenes[0].name).toBe("Scene mới");
+  expect(h.studio.state.document.scenes[0].name).toBe("Cảnh mới");
 });
 
 test("failed recovery is visible and its retry action reads recovery again", async () => {
@@ -502,12 +502,12 @@ test("the shell provides a read-only canvas without future editing controls or b
       name: /Chạy thử|Xuất bản|AI|Thêm đối tượng|Tài nguyên|Mã nguồn|Kiểm tra/,
     }),
   ).not.toBeInTheDocument();
-  expect(screen.getByRole("img", { name: "Scene: Khởi đầu" }).tagName).toBe(
+  expect(screen.getByRole("img", { name: "Cảnh: Khởi đầu" }).tagName).toBe(
     "CANVAS",
   );
   expect(document.querySelector("iframe")).toBeNull();
   expect(screen.getByText(/máy tính/)).toBeInTheDocument();
-  fireEvent.click(screen.getByRole("button", { name: "Cài đặt Studio" }));
+  fireEvent.click(screen.getByRole("button", { name: "Cài đặt Xưởng sáng tạo" }));
   expect(alert).not.toHaveBeenCalled();
 });
 
@@ -530,15 +530,15 @@ test("the real center canvas redraws the current canonical scene at DPR without 
   });
   vi.stubGlobal("devicePixelRatio", 2);
   const h = await shell();
-  const canvas = screen.getByRole("img", { name: "Scene: Khởi đầu" });
+  const canvas = screen.getByRole("img", { name: "Cảnh: Khởi đầu" });
   expect(canvas).toHaveAttribute("width", "1280");
   expect(canvas).toHaveAttribute("height", "960");
   expect(calls).toContainEqual({ name: "fillRect", args: [0, 0, 640, 480] });
   calls.length = 0;
-  fireEvent.change(screen.getByRole("combobox", { name: "Scene hiện tại" }), {
+  fireEvent.change(screen.getByRole("combobox", { name: "Cảnh hiện tại" }), {
     target: { value: id(3) },
   });
-  const switchedCanvas = screen.getByRole("img", { name: "Scene: Bến cảng" });
+  const switchedCanvas = screen.getByRole("img", { name: "Cảnh: Bến cảng" });
   expect(switchedCanvas).toHaveAttribute("width", "1280");
   expect(calls).toContainEqual({ name: "fillRect", args: [0, 0, 800, 480] });
   fireEvent.pointerDown(switchedCanvas, { clientX: 10, clientY: 10 });

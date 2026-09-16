@@ -1,5 +1,6 @@
 "use client";
 
+import { studioLabel } from "./studio-labels";
 import { useState } from "react";
 import { ApplyMutationBatchInput } from "@indieforge/contracts";
 import { createStudioId, useStudio } from "./studio-provider";
@@ -111,7 +112,7 @@ export function LayerList({ sceneId }: { sceneId: string }) {
                   Loại lớp
                   <select name="type" defaultValue={layer.type}>
                     {["WORLD", "UI", "COLLISION"].map((type) => (
-                      <option key={type}>{type}</option>
+                      <option key={type} value={type}>{studioLabel(type)}</option>
                     ))}
                   </select>
                 </label>

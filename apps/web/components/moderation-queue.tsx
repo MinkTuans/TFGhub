@@ -56,10 +56,10 @@ export function ModerationQueue({
         },
       );
       setGames((current) => current.filter(({ id }) => id !== game.id));
-      setMessage(action === "approve" ? "Đã duyệt game." : "Đã từ chối game.");
+      setMessage(action === "approve" ? "Đã duyệt trò chơi." : "Đã từ chối trò chơi.");
     } catch (failure) {
       setError(
-        apiErrorMessage(failure, "Không thể duyệt game này. Vui lòng thử lại."),
+        apiErrorMessage(failure, "Không thể duyệt trò chơi này. Vui lòng thử lại."),
       );
     } finally {
       setReviewing((current) => {
@@ -72,15 +72,15 @@ export function ModerationQueue({
 
   return (
     <section
-      aria-label="Game chờ duyệt"
+      aria-label="Trò chơi chờ duyệt"
       data-hydrated={hydrated}
       data-testid="moderation-queue"
     >
-      <p className="moderation-count">{games.length} game chờ duyệt</p>
+      <p className="moderation-count">{games.length} trò chơi chờ duyệt</p>
       {message && <p role="status">{message}</p>}
       {error && <p role="alert">{error}</p>}
       {games.length === 0 ? (
-        <EmptyState title="Đã xử lý hết hàng đợi" description="Không có game nào đang chờ duyệt." />
+        <EmptyState title="Đã xử lý hết hàng đợi" description="Không có trò chơi nào đang chờ duyệt." />
       ) : (
         <div className="moderation-grid">
           {games.map((game) => {
@@ -122,7 +122,7 @@ export function ModerationQueue({
                 <h3>Chơi thử & kiểm tra</h3>
                 {game.artifactReady && game.artifactVersion > 0 ? (
                   <iframe
-                    title="Chơi thử game"
+                    title="Chơi thử trò chơi"
                     src={`${resolvePublicApiBaseUrl()}/games/${encodeURIComponent(game.id)}/preview/?v=${game.artifactVersion}`}
                     sandbox="allow-scripts allow-pointer-lock"
                   />

@@ -30,7 +30,7 @@ export function UploadEditor({
       onUploaded(await api.post<GameSummary>(`/games/${gameId}/upload`, form));
     } catch (error) {
       setError(
-        apiErrorMessage(error, "Không thể tải game lên. Vui lòng thử lại."),
+        apiErrorMessage(error, "Không thể tải trò chơi lên. Vui lòng thử lại."),
       );
     } finally {
       setPending(false);
@@ -39,7 +39,7 @@ export function UploadEditor({
 
   return (
     <section className="panel editor-panel" aria-labelledby="upload-heading">
-      <h2 id="upload-heading">Tải game HTML5</h2>
+      <h2 id="upload-heading">Tải trò chơi HTML5</h2>
       <form onSubmit={upload} className="form-stack">
         <label>
           Tệp ZIP HTML5
@@ -53,7 +53,7 @@ export function UploadEditor({
         <p className="hint">Đặt index.html ở thư mục gốc của tệp ZIP.</p>
         {error && <p role="alert">{error}</p>}
         <button disabled={pending}>
-          {pending ? "Đang tải…" : "Tải game lên"}
+          {pending ? "Đang tải…" : "Tải trò chơi lên"}
         </button>
       </form>
     </section>

@@ -1,3 +1,4 @@
+import { studioLabel, studioFieldLabel } from "../components/studio/studio-labels";
 import {
   act,
   cleanup,
@@ -251,9 +252,9 @@ async function mount(
     },
   };
 }
-const tree = () => screen.getByRole("tree", { name: "Đối tượng Scene" });
+const tree = () => screen.getByRole("tree", { name: "Đối tượng Cảnh" });
 const row = (name: string) => within(tree()).getByRole("treeitem", { name });
-const canvas = () => screen.getByRole("img", { name: /^Scene:/ });
+const canvas = () => screen.getByRole("img", { name: /^Cảnh:/ });
 function clickCanvas(x = 50, y = 50) {
   for (const phase of ["down", "up"])
     fireEvent(
@@ -384,11 +385,11 @@ test("deleted selection falls back to scene and does not return on undo or a sce
   await act(async () => h.studio.dispatch({ type: "undo" }));
   expect(canvas()).not.toHaveAttribute("data-selected-object-id");
   select("Locked");
-  fireEvent.change(screen.getByRole("combobox", { name: "Scene hiện tại" }), {
+  fireEvent.change(screen.getByRole("combobox", { name: "Cảnh hiện tại" }), {
     target: { value: id(5) },
   });
   expect(canvas()).not.toHaveAttribute("data-selected-object-id");
-  fireEvent.change(screen.getByRole("combobox", { name: "Scene hiện tại" }), {
+  fireEvent.change(screen.getByRole("combobox", { name: "Cảnh hiện tại" }), {
     target: { value: id(2) },
   });
   expect(canvas()).not.toHaveAttribute("data-selected-object-id");
@@ -429,58 +430,57 @@ test("schema-driven fields edit complete components and invalid coupled values p
   });
   const h = await mount(document);
   clickCanvas();
-  const health = screen.getByRole("group", { name: "Health" });
-  expect(within(health).getByText("tfg.v2.health.v1")).toBeVisible();
-  expect(within(health).getByText("Version 1")).toBeVisible();
+  const health = screen.getByRole("group", { name: "Sức khỏe" });
+  expect(within(health).getByText("Phiên bản 1")).toBeVisible();
   fireEvent.change(
-    within(health).getByRole("spinbutton", { name: "current" }),
+    within(health).getByRole("spinbutton", { name: "Hiện tại" }),
     { target: { value: "120" } },
   );
-  fireEvent.click(within(health).getByRole("button", { name: "Lưu Health" }));
+  fireEvent.click(within(health).getByRole("button", { name: "Lưu Sức khỏe" }));
   expect(within(health).getByRole("alert")).toHaveTextContent(
-    "Current health cannot exceed maximum health",
+    "Sức khỏe hiện tại không được vượt quá mức tối đa.",
   );
   expect(h.studio.state.history.past).toHaveLength(0);
   fireEvent.change(
-    within(health).getByRole("spinbutton", { name: "maximum" }),
+    within(health).getByRole("spinbutton", { name: "Tối đa" }),
     { target: { value: "150" } },
   );
-  fireEvent.click(within(health).getByRole("button", { name: "Lưu Health" }));
+  fireEvent.click(within(health).getByRole("button", { name: "Lưu Sức khỏe" }));
   expect(
     h.studio.state.document.scenes[0].objects[0].components.at(-1)?.properties,
   ).toEqual({ current: 120, maximum: 150 });
   expect(h.studio.state.history.past).toHaveLength(1);
   await act(async () => h.studio.dispatch({ type: "undo" }));
   expect(
-    within(screen.getByRole("group", { name: "Health" })).getByRole(
+    within(screen.getByRole("group", { name: "Sức khỏe" })).getByRole(
       "spinbutton",
-      { name: "current" },
+      { name: "Hiện tại" },
     ),
   ).toHaveValue(100);
 });
 test("registry add/defaults, discriminated fields, nullable references and JSON fields retain validation authority", async () => {
   const h = await mount();
   select("Locked");
-  fireEvent.change(screen.getByRole("combobox", { name: "Thêm component" }), {
+  fireEvent.change(screen.getByRole("combobox", { name: "Thêm thành phần" }), {
     target: { value: "Collider" },
   });
-  fireEvent.click(screen.getByRole("button", { name: "Thêm component" }));
-  const collider = screen.getByRole("group", { name: "Collider" });
+  fireEvent.click(screen.getByRole("button", { name: "Thêm thành phần" }));
+  const collider = screen.getByRole("group", { name: "Vùng va chạm" });
   expect(
-    within(collider).getByRole("spinbutton", { name: "width" }),
+    within(collider).getByRole("spinbutton", { name: "Chiều rộng" }),
   ).toHaveValue(32);
-  fireEvent.change(within(collider).getByRole("combobox", { name: "shape" }), {
+  fireEvent.change(within(collider).getByRole("combobox", { name: "Hình dạng" }), {
     target: { value: "CIRCLE" },
   });
   expect(
-    within(collider).queryByRole("spinbutton", { name: "width" }),
+    within(collider).queryByRole("spinbutton", { name: "Chiều rộng" }),
   ).toBeNull();
   fireEvent.change(
-    within(collider).getByRole("spinbutton", { name: "radius" }),
+    within(collider).getByRole("spinbutton", { name: "Bán kính" }),
     { target: { value: "24" } },
   );
   fireEvent.click(
-    within(collider).getByRole("button", { name: "Lưu Collider" }),
+    within(collider).getByRole("button", { name: "Lưu Vùng va chạm" }),
   );
   expect(
     h.studio.state.document.scenes[0].objects
@@ -494,16 +494,16 @@ test("registry add/defaults, discriminated fields, nullable references and JSON 
     isTrigger: false,
     collisionLayerId: null,
   });
-  const savedCollider = screen.getByRole("group", { name: "Collider" });
+  const savedCollider = screen.getByRole("group", { name: "Vùng va chạm" });
   fireEvent.change(
-    within(savedCollider).getByRole("textbox", { name: "collisionLayerId" }),
+    within(savedCollider).getByRole("textbox", { name: "Mã lớp va chạm" }),
     { target: { value: id(4) } },
   );
   const before = h.studio.state.document;
   fireEvent.click(
-    within(savedCollider).getByRole("button", { name: "Lưu Collider" }),
+    within(savedCollider).getByRole("button", { name: "Lưu Vùng va chạm" }),
   );
-  expect(screen.getByRole("alert")).toHaveTextContent(/COLLISION/);
+  expect(screen.getByRole("alert")).toHaveTextContent(/phải tham chiếu một lớp va chạm/);
   expect(h.studio.state.document).toBe(before);
 });
 test("typed object edits validate parent cycles atomically and pending component edits recover through existing storage", async () => {
@@ -519,13 +519,13 @@ test("typed object edits validate parent cycles atomically and pending component
   expect(screen.getByRole("alert")).toBeVisible();
   expect(h.studio.state.history.past).toHaveLength(0);
   clickCanvas();
-  const transform = screen.getByRole("group", { name: "Transform" });
+  const transform = screen.getByRole("group", { name: "Biến đổi" });
   fireEvent.change(
-    within(transform).getByRole("spinbutton", { name: "rotation" }),
+    within(transform).getByRole("spinbutton", { name: "Góc xoay" }),
     { target: { value: "45" } },
   );
   fireEvent.click(
-    within(transform).getByRole("button", { name: "Lưu Transform" }),
+    within(transform).getByRole("button", { name: "Lưu Biến đổi" }),
   );
   await waitFor(() =>
     expect(h.studio.state.persistedVersion).toBe(h.studio.state.version),
@@ -564,27 +564,27 @@ test("moving an object to an occupied layer appends its order and undo restores 
 test("JSON component drafts reject invalid data, reset visibly to registry defaults and remove through history", async () => {
   const h = await mount();
   select("Locked");
-  fireEvent.change(screen.getByRole("combobox", { name: "Thêm component" }), {
+  fireEvent.change(screen.getByRole("combobox", { name: "Thêm thành phần" }), {
     target: { value: "Custom" },
   });
-  fireEvent.click(screen.getByRole("button", { name: "Thêm component" }));
-  const custom = screen.getByRole("group", { name: "Custom" });
-  const config = within(custom).getByRole("textbox", { name: "config" });
+  fireEvent.click(screen.getByRole("button", { name: "Thêm thành phần" }));
+  const custom = screen.getByRole("group", { name: "Tùy chỉnh" });
+  const config = within(custom).getByRole("textbox", { name: "Cấu hình" });
   fireEvent.change(config, { target: { value: "{broken" } });
   const before = h.studio.state.document;
-  fireEvent.click(within(custom).getByRole("button", { name: "Lưu Custom" }));
+  fireEvent.click(within(custom).getByRole("button", { name: "Lưu Tùy chỉnh" }));
   expect(within(custom).getByRole("alert")).toBeVisible();
   expect(h.studio.state.document).toBe(before);
   fireEvent.click(
-    within(custom).getByRole("button", { name: "Mặc định Custom" }),
+    within(custom).getByRole("button", { name: "Mặc định Tùy chỉnh" }),
   );
-  expect(within(custom).getByRole("textbox", { name: "config" })).toHaveValue(
+  expect(within(custom).getByRole("textbox", { name: "Cấu hình" })).toHaveValue(
     "{}",
   );
-  fireEvent.change(within(custom).getByRole("textbox", { name: "config" }), {
+  fireEvent.change(within(custom).getByRole("textbox", { name: "Cấu hình" }), {
     target: { value: '{"effect":{"color":"blue"}}' },
   });
-  fireEvent.click(within(custom).getByRole("button", { name: "Lưu Custom" }));
+  fireEvent.click(within(custom).getByRole("button", { name: "Lưu Tùy chỉnh" }));
   expect(
     h.studio.state.document.scenes[0].objects
       .find((o) => o.id === id(12))!
@@ -594,15 +594,15 @@ test("JSON component drafts reject invalid data, reset visibly to registry defau
     config: { effect: { color: "blue" } },
   });
   fireEvent.click(
-    within(screen.getByRole("group", { name: "Custom" })).getByRole("button", {
-      name: "Gỡ Custom",
+    within(screen.getByRole("group", { name: "Tùy chỉnh" })).getByRole("button", {
+      name: "Gỡ Tùy chỉnh",
     }),
   );
-  expect(screen.queryByRole("group", { name: "Custom" })).toBeNull();
+  expect(screen.queryByRole("group", { name: "Tùy chỉnh" })).toBeNull();
   await act(async () => h.studio.dispatch({ type: "undo" }));
   expect(
-    within(screen.getByRole("group", { name: "Custom" })).getByRole("textbox", {
-      name: "config",
+    within(screen.getByRole("group", { name: "Tùy chỉnh" })).getByRole("textbox", {
+      name: "Cấu hình",
     }),
   ).toHaveValue(JSON.stringify({ effect: { color: "blue" } }, null, 2));
 });
@@ -610,15 +610,15 @@ test("JSON component drafts reject invalid data, reset visibly to registry defau
 test("successful property saves preserve keyboard focus on the save control", async () => {
   await mount();
   clickCanvas();
-  const component = screen.getByRole("group", { name: "Transform" });
+  const component = screen.getByRole("group", { name: "Biến đổi" });
   fireEvent.change(
-    within(component).getByRole("spinbutton", { name: "rotation" }),
+    within(component).getByRole("spinbutton", { name: "Góc xoay" }),
     { target: { value: "20" } },
   );
-  const save = within(component).getByRole("button", { name: "Lưu Transform" });
+  const save = within(component).getByRole("button", { name: "Lưu Biến đổi" });
   save.focus();
   fireEvent.click(save);
-  expect(screen.getByRole("button", { name: "Lưu Transform" })).toHaveFocus();
+  expect(screen.getByRole("button", { name: "Lưu Biến đổi" })).toHaveFocus();
   fireEvent.change(screen.getByRole("textbox", { name: "Tên đối tượng" }), {
     target: { value: "Keyboard item" },
   });
@@ -671,7 +671,7 @@ test.each(["ctrlKey", "metaKey"])(
     // jsdom has no native Tab navigation; the official browser case tabs here.
     const handle = screen.getByRole("button", { name: "Đổi kích thước" });
     handle.focus();
-    const width = () => screen.getByRole("spinbutton", { name: "width" });
+    const width = () => screen.getByRole("spinbutton", { name: "Chiều rộng" });
     fireEvent.keyDown(document.activeElement!, { key: "ArrowRight" });
     fireEvent.keyDown(document.activeElement!, { key: "ArrowRight" });
     expect(width()).toHaveValue(42);
@@ -839,7 +839,7 @@ test.each([
     confirm.focus();
     fireEvent.click(confirm);
     expect(screen.getByRole("dialog")).toBe(dialog);
-    expect(within(dialog).getByRole("alert")).toHaveTextContent(/referenc/i);
+    expect(within(dialog).getByRole("alert")).toHaveTextContent(/tham chiếu/i);
     expect(confirm).toHaveFocus();
     expect(h.studio.state.document).toBe(before.document);
     expect(h.studio.state.history).toBe(before.history);
@@ -856,12 +856,12 @@ test.each([
     expect(surface === "canvas" ? canvas() : row("Group")).toHaveFocus();
     expect(canvas()).toHaveAttribute("data-selected-object-id", id(10));
     select("Pending one");
-    const camera = screen.getByRole("group", { name: "Camera" });
+    const camera = screen.getByRole("group", { name: "Máy quay" });
     fireEvent.change(
-      within(camera).getByRole("textbox", { name: "followObjectId" }),
+      within(camera).getByRole("textbox", { name: "Mã đối tượng theo dõi" }),
       { target: { value: "" } },
     );
-    fireEvent.click(within(camera).getByRole("button", { name: "Lưu Camera" }));
+    fireEvent.click(within(camera).getByRole("button", { name: "Lưu Máy quay" }));
     const fixed = h.studio.state.document;
     const historyLength = h.studio.state.history.past.length;
     dialog = openDelete();
@@ -917,7 +917,7 @@ test.each(["canvas", "tree"])(
     fireEvent.click(
       within(dialog).getByRole("button", { name: "Xác nhận xóa" }),
     );
-    expect(within(dialog).getByRole("alert")).toHaveTextContent(/referenc/i);
+    expect(within(dialog).getByRole("alert")).toHaveTextContent(/tham chiếu/i);
     expect(h.studio.state.document).toBe(before.document);
     expect(h.studio.state.history).toBe(before.history);
     expect(h.studio.state.pending).toBe(before.pending);
@@ -941,7 +941,7 @@ test("tree-focused held Space pans without moving objects or handing focus back,
   expect(canvas()).toHaveAttribute("data-camera-x", "-30");
   expect(h.studio.state.document).toBe(before);
   fireEvent.blur(window);
-  fireEvent.click(screen.getByRole("button", { name: "Vừa Scene" }));
+  fireEvent.click(screen.getByRole("button", { name: "Vừa Cảnh" }));
   clickCanvas();
   fireEvent.pointerDown(canvas(), { button: 0, clientX: 60, clientY: 70 });
   fireEvent.pointerMove(canvas(), { clientX: 90, clientY: 90 });
@@ -985,7 +985,7 @@ test("keyboard deletion and undo affect only the focused Studio once", async () 
   const first = await mount(),
     second = await mount();
   const firstCanvas = within(first.container).getByRole("img", {
-    name: /^Scene:/,
+    name: /^Cảnh:/,
   });
   fireEvent.pointerDown(firstCanvas, { button: 0, clientX: 60, clientY: 70 });
   fireEvent.pointerUp(firstCanvas, { clientX: 60, clientY: 70 });
@@ -1027,12 +1027,12 @@ test.each([
     });
     const h = await mount(initial, { transport: true });
     clickCanvas();
-    const group = screen.getByRole("group", { name: type });
-    const control = () => within(group).getByRole("textbox", { name: field });
+    const group = screen.getByRole("group", { name: studioLabel(type) });
+    const control = () => within(group).getByRole("textbox", { name: studioFieldLabel(field) });
     expect(control()).toHaveValue(original);
     fireEvent.change(control(), { target: { value: edited } });
     const save = within(group).getByRole("button", {
-      name: `Lưu ${type}`,
+      name: `Lưu ${studioLabel(type)}`,
     });
     save.focus();
     fireEvent.click(save);
@@ -1057,7 +1057,7 @@ test.each([
     const saved = structuredClone(h.server);
     h.unmount();
     await mount(saved);
-    expect(screen.getByRole("textbox", { name: field })).toHaveValue(edited);
+    expect(screen.getByRole("textbox", { name: studioFieldLabel(field) })).toHaveValue(edited);
   },
 );
 
@@ -1428,10 +1428,10 @@ test("native browser drops READY fixtures, edits, undoes, autosaves and reloads 
         `${String(error)}\nBrowser diagnostics: ${errors.join("; ")}`,
       );
     }
-    const canvas = page.getByRole("img", { name: "Scene: Main" }),
+    const canvas = page.getByRole("img", { name: "Cảnh: Main" }),
       group = page.getByRole("treeitem", { name: "Group", exact: true });
     const treeTop = await page
-      .getByRole("tree", { name: "Đối tượng Scene" })
+      .getByRole("tree", { name: "Đối tượng Cảnh" })
       .evaluate((element) => element.getBoundingClientRect().top);
     expect(treeTop).toBeLessThan(150);
     await group.click();
@@ -1481,20 +1481,20 @@ test("native browser drops READY fixtures, edits, undoes, autosaves and reloads 
       .fill("Collected item");
     await page.getByRole("button", { name: "Lưu đối tượng" }).click();
     const item = page.getByRole("group", {
-      name: "InventoryItem",
+      name: "Vật phẩm",
       exact: true,
     });
-    await item.getByRole("spinbutton", { name: "maximumQuantity" }).fill("7");
+    await item.getByRole("spinbutton", { name: "Số lượng tối đa" }).fill("7");
     await item
-      .getByRole("button", { name: "Lưu InventoryItem", exact: true })
+      .getByRole("button", { name: "Lưu Vật phẩm", exact: true })
       .click();
     await page.getByRole("button", { name: "Undo", exact: true }).click();
     await browserExpect(
-      item.getByRole("spinbutton", { name: "maximumQuantity" }),
+      item.getByRole("spinbutton", { name: "Số lượng tối đa" }),
     ).toHaveValue("1");
     await page.getByRole("button", { name: "Redo", exact: true }).click();
     await browserExpect(
-      item.getByRole("spinbutton", { name: "maximumQuantity" }),
+      item.getByRole("spinbutton", { name: "Số lượng tối đa" }),
     ).toHaveValue("7");
     await browserExpect(
       page.getByRole("status", { name: "Save state" }),
@@ -1528,3 +1528,43 @@ test("native browser drops READY fixtures, edits, undoes, autosaves and reloads 
     await server.close();
   }
 }, 60_000);
+
+test("Vietnamese component labels keep canonical enum and property values", async () => {
+  const h = await mount();
+  clickCanvas();
+  fireEvent.change(screen.getByRole("combobox", { name: "Thêm thành phần" }), {
+    target: { value: "Movement" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Thêm thành phần" }));
+  const movement = screen.getByRole("group", { name: "Di chuyển" });
+  const controls = within(movement).getByRole("combobox", { name: "Điều khiển" });
+  expect(within(controls).getByRole("option", { name: "Người chơi" })).toHaveValue("PLAYER");
+  fireEvent.change(controls, { target: { value: "PLAYER" } });
+  fireEvent.click(within(movement).getByRole("button", { name: "Lưu Di chuyển" }));
+  expect(h.studio.state.document.scenes[0].objects.find((object) => object.id === id(11))?.components.find((component) => component.type === "Movement")?.properties).toMatchObject({ controls: "PLAYER", initialDirection: "DOWN" });
+});
+
+test.each([
+  ["InventoryItem", "displayName", "Item", "Vật phẩm"],
+  ["UIButton", "label", "Button", "Nút"],
+] as const)("%s preserves existing text until an explicit localized reset", async (type, field, existing, localized) => {
+  const document = project();
+  document.scenes[0].objects[0].components.push({
+    id: id(990), type, version: 1,
+    properties: { ...(v2ComponentRegistry[type].defaults() as object), [field]: existing },
+  });
+  const h = await mount(document);
+  clickCanvas();
+  const group = screen.getByRole("group", { name: studioLabel(type) });
+  const input = () => within(group).getByRole("textbox", { name: studioFieldLabel(field) });
+  expect(input()).toHaveValue(existing);
+  fireEvent.click(within(group).getByRole("button", { name: `Mặc định ${studioLabel(type)}` }));
+  expect(input()).toHaveValue(localized);
+  expect(h.studio.state.document.scenes[0].objects[0].components.at(-1)?.properties)
+    .toMatchObject({ [field]: existing });
+  fireEvent.click(within(group).getByRole("button", { name: `Lưu ${studioLabel(type)}` }));
+  expect(h.studio.state.document.scenes[0].objects[0].components.at(-1)?.properties)
+    .toMatchObject({ [field]: localized });
+  await act(async () => h.studio.dispatch({ type: "undo" }));
+  expect(input()).toHaveValue(existing);
+});

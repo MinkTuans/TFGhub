@@ -16,11 +16,11 @@ export function DiscoverSearch({ query }: { query: string }) {
   return (
     <>
       <form method="get" action="/discover" className="search-form" onSubmit={search} aria-busy={pending}>
-        <label>Tìm kiếm game<input name="query" placeholder="Tên game hoặc ý tưởng bạn muốn khám phá…" defaultValue={query} maxLength={200} disabled={pending} /></label>
+        <label>Tìm kiếm trò chơi<input name="query" placeholder="Tên trò chơi hoặc ý tưởng bạn muốn khám phá…" defaultValue={query} maxLength={200} disabled={pending} /></label>
         <button disabled={pending}>{pending ? "Đang tìm…" : "Tìm kiếm"}</button>
       </form>
       {pending && <div className="catalog-search-loading" role="status">
-        Đang tìm kiếm game…
+        Đang tìm kiếm trò chơi…
         <div className="skeleton" aria-hidden="true" />
       </div>}
     </>

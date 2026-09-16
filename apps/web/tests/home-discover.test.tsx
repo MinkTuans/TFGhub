@@ -32,18 +32,18 @@ test("puts creators first with four game-making methods and a three-step process
 
   render(await Home());
 
-  expect(screen.getByRole("link", { name: "Mở Studio" })).toHaveAttribute(
+  expect(screen.getByRole("link", { name: "Mở Xưởng sáng tạo" })).toHaveAttribute(
     "href",
     "/studio",
   );
-  expect(screen.getByRole("link", { name: "Khám phá game" })).toHaveAttribute(
+  expect(screen.getByRole("link", { name: "Khám phá trò chơi" })).toHaveAttribute(
     "href",
     "/discover",
   );
-  for (const method of ["ZIP HTML5", "Code", "Truyện & quiz", "Platformer"]) {
+  for (const method of ["Tệp nén HTML5", "Lập trình", "Truyện và câu đố", "Vượt chướng ngại vật"]) {
     expect(screen.getByText(method)).toBeVisible();
   }
-  for (const step of ["1. Tạo game", "2. Xem trước", "3. Gửi duyệt"]) {
+  for (const step of ["1. Tạo trò chơi", "2. Xem trước", "3. Gửi duyệt"]) {
     expect(screen.getByText(step)).toBeVisible();
   }
   expect(getGames).toHaveBeenCalledWith("/discover?limit=4");
@@ -54,8 +54,8 @@ test("retains creator sections when Home featured games cannot load", async () =
 
   render(await Home());
 
-  expect(screen.getByText("ZIP HTML5")).toBeVisible();
-  expect(screen.getByRole("alert")).toHaveTextContent("Không thể tải game lúc này");
+  expect(screen.getByText("Tệp nén HTML5")).toBeVisible();
+  expect(screen.getByRole("alert")).toHaveTextContent("Không thể tải trò chơi lúc này");
   expect(screen.getByRole("link", { name: "Thử tải lại" })).toHaveAttribute("href", "/");
 });
 
@@ -64,11 +64,11 @@ test("renders Vietnamese Discover search and empty copy", async () => {
 
   render(await DiscoverPage({ searchParams: Promise.resolve({ query: "none" }) }));
 
-  expect(screen.getByRole("heading", { name: "Khám phá game" })).toBeVisible();
-  expect(screen.getByRole("textbox", { name: "Tìm kiếm game" })).toHaveValue("none");
+  expect(screen.getByRole("heading", { name: "Khám phá trò chơi" })).toBeVisible();
+  expect(screen.getByRole("textbox", { name: "Tìm kiếm trò chơi" })).toHaveValue("none");
   expect(screen.getByRole("button", { name: "Tìm kiếm" })).toBeVisible();
-  expect(screen.getByText("Chưa có game phù hợp.")).toBeVisible();
-  expect(screen.getByRole("link", { name: "Xem tất cả game" })).toHaveAttribute(
+  expect(screen.getByText("Chưa có trò chơi phù hợp.")).toBeVisible();
+  expect(screen.getByRole("link", { name: "Xem tất cả trò chơi" })).toHaveAttribute(
     "href",
     "/discover",
   );
@@ -92,10 +92,10 @@ test("renders Vietnamese recovery copy when Discover fails", async () => {
 test("keeps the home concept and gives an empty community a real next action", async () => {
   getGames.mockResolvedValue({ games: [], nextCursor: null });
   render(await Home());
-  expect(screen.getByText("A HOME FOR SMALL GAMES")).toBeVisible();
-  expect(screen.getByRole("heading", { level: 1, name: "Every great game starts with a small idea." })).toBeVisible();
+  expect(screen.getByText("NƠI ƯƠM MẦM NHỮNG TRÒ CHƠI")).toBeVisible();
+  expect(screen.getByRole("heading", { level: 1, name: "Mỗi trò chơi lớn đều bắt đầu từ một ý tưởng nhỏ." })).toBeVisible();
   expect(screen.getByRole("link", { name: "Tạo tài khoản" })).toHaveAttribute("href", "/register");
-  expect(screen.getByRole("heading", { name: "Chưa có game công khai" })).toBeVisible();
+  expect(screen.getByRole("heading", { name: "Chưa có trò chơi công khai" })).toBeVisible();
   expect(screen.queryByRole("alert")).not.toBeInTheDocument();
 });
 
@@ -106,7 +106,7 @@ test("keeps the search and opaque cursor when moving to the next catalog page", 
     viewportWidth: 16, viewportHeight: 9, createdAt: "2026-09-07T07:00:00Z",
   }], nextCursor: "opaque/+ next" });
   render(await DiscoverPage({ searchParams: Promise.resolve({ query: "tiny & quest", cursor: "previous" }) }));
-  expect(screen.getByText("1 game trong trang này")).toBeVisible();
+  expect(screen.getByText("1 trò chơi trong trang này")).toBeVisible();
   expect(screen.getByText("Kết quả cho “tiny & quest”")).toBeVisible();
   const next = screen.getByRole("link", { name: "Trang tiếp theo" });
   const url = new URL(next.getAttribute("href")!, "https://example.test");

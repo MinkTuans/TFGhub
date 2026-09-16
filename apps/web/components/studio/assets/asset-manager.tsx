@@ -1,5 +1,6 @@
 "use client";
 
+import { studioErrorMessage } from "../studio-labels";
 import {
   useCallback,
   useEffect,
@@ -77,16 +78,16 @@ export type AssetClient = {
 };
 
 const categories = [
-  ["All", ""],
-  ["Map-Tileset", "MAP_TILESET"],
-  ["Character", "CHARACTER"],
-  ["NPC", "NPC"],
-  ["Item", "ITEM"],
-  ["UI", "UI"],
-  ["Audio", "AUDIO"],
-  ["Effect", "EFFECT"],
-  ["Image", "IMAGE"],
-  ["User", "USER"],
+  ["Tất cả", ""],
+  ["Bộ ô bản đồ", "MAP_TILESET"],
+  ["Nhân vật", "CHARACTER"],
+  ["Nhân vật phụ", "NPC"],
+  ["Vật phẩm", "ITEM"],
+  ["Giao diện", "UI"],
+  ["Âm thanh", "AUDIO"],
+  ["Hiệu ứng", "EFFECT"],
+  ["Hình ảnh", "IMAGE"],
+  ["Người dùng", "USER"],
 ] as const;
 
 const endpoint = (path: string) =>
@@ -164,7 +165,7 @@ export function createAssetClient(): AssetClient {
           if (request.status >= 200 && request.status < 300) {
             const parsed = GameAssetSummary.safeParse(payload);
             if (parsed.success) resolve(parsed.data);
-            else reject(new Error("Phản hồi upload không hợp lệ"));
+            else reject(new Error("Phản hồi tải lên không hợp lệ"));
           } else {
             const message =
               payload && typeof payload === "object" && "message" in payload
@@ -177,7 +178,7 @@ export function createAssetClient(): AssetClient {
           reject(new Error("Mất kết nối khi tải lên")),
         );
         request.addEventListener("abort", () =>
-          reject(new Error("Upload đã bị hủy")),
+          reject(new Error("Tải lên đã bị hủy")),
         );
         const form = new FormData();
         form.set("uploadId", input.uploadId);
@@ -272,9 +273,7 @@ export function AssetManager({
       } catch (failure) {
         if (sequence === request.current)
           setError(
-            failure instanceof Error
-              ? failure.message
-              : "Không thể tải thư viện tài nguyên",
+            studioErrorMessage(failure, "Không thể tải thư viện tài nguyên. Vui lòng thử lại."),
           );
       } finally {
         if (sequence === request.current) setLoading(false);
@@ -306,15 +305,13 @@ export function AssetManager({
 
   function referenceMessage(error: unknown) {
     if (error instanceof ApiError && error.status === 404)
-      return "Không tìm thấy asset được tham chiếu";
+      return "Không tìm thấy tài nguyên được tham chiếu";
     if (
       error instanceof ApiError &&
       (error.status === 401 || error.status === 403)
     )
-      return "Không có quyền đọc asset được tham chiếu";
-    return error instanceof Error
-      ? error.message
-      : "Không thể tải asset được tham chiếu";
+      return "Không có quyền đọc tài nguyên được tham chiếu";
+    return studioErrorMessage(error, "Không thể tải tài nguyên được tham chiếu. Vui lòng thử lại.");
   }
 
   function pumpReferenceQueue() {
@@ -548,10 +545,10 @@ export function AssetManager({
       asset.id,
     );
     if (referencedAssetIds.has(asset.id))
-      return Promise.reject(new Error("Asset vẫn còn phụ thuộc trong dự án."));
+      return Promise.reject(new Error("Tài nguyên vẫn còn phụ thuộc trong dự án."));
     if (!declared && acknowledged)
       return Promise.reject(
-        new Error("Khai báo asset chưa được lưu; hãy thử lưu lại trước."),
+        new Error("Khai báo tài nguyên chưa được lưu; hãy thử lưu lại trước."),
       );
     if (!declared)
       return client.tombstone(state.identity.gameId, asset.id).then(async () => {
@@ -560,14 +557,14 @@ export function AssetManager({
         await latestLoad.current();
       });
     if (deletion.current)
-      return Promise.reject(new Error("Một asset khác đang được xử lý."));
+      return Promise.reject(new Error("Một tài nguyên khác đang được xử lý."));
     const mutations = [
       { type: "asset.forget" as const, assetId: asset.id },
     ];
     try {
       prepareStudioCommit(state, mutations);
     } catch {
-      return Promise.reject(new Error("Không thể gỡ khai báo asset."));
+      return Promise.reject(new Error("Không thể gỡ khai báo tài nguyên."));
     }
     return new Promise<void>((resolve, reject) => {
       deletion.current = { asset, resolve, reject, started: false };
@@ -584,7 +581,7 @@ export function AssetManager({
       state.recoveryError ||
       state.batchError
     ) {
-      operation.reject(new Error("Không thể lưu việc gỡ khai báo asset."));
+      operation.reject(new Error("Không thể lưu việc gỡ khai báo tài nguyên."));
       deletion.current = null;
       return;
     }
@@ -613,7 +610,7 @@ export function AssetManager({
       })
       .catch((error) =>
         operation.reject(
-          error instanceof Error ? error : new Error("Không thể xóa asset"),
+          error instanceof Error ? error : new Error("Không thể xóa tài nguyên"),
         ),
       )
       .finally(() => {
@@ -658,10 +655,10 @@ export function AssetManager({
       </div>
       <div className="studio-asset-filters">
         <label>
-          <span>Tìm asset</span>
+          <span>Tìm tài nguyên</span>
           <input
             type="search"
-            aria-label="Tìm asset"
+            aria-label="Tìm tài nguyên"
             value={search}
             maxLength={160}
             onChange={(event) => {
@@ -671,9 +668,9 @@ export function AssetManager({
           />
         </label>
         <label>
-          <span>Loại file</span>
+          <span>Loại tệp</span>
           <select
-            aria-label="Loại file"
+            aria-label="Loại tệp"
             value={kind}
             onChange={(event) => {
               setPageCount(1);
@@ -683,7 +680,7 @@ export function AssetManager({
             <option value="">Tất cả</option>
             <option value="IMAGE">Hình ảnh</option>
             <option value="AUDIO">Âm thanh</option>
-            <option value="FONT">Font</option>
+            <option value="FONT">Phông chữ</option>
             <option value="OTHER">Khác</option>
           </select>
         </label>
@@ -720,7 +717,7 @@ export function AssetManager({
                 <article
                   className="studio-asset-card"
                   role="group"
-                  aria-label={`Asset reference ${entry.assetId}`}
+                  aria-label={`Tham chiếu tài nguyên ${entry.assetId}`}
                   draggable={false}
                   key={entry.assetId}
                 >
@@ -734,7 +731,7 @@ export function AssetManager({
                       </span>
                       <button
                         type="button"
-                        aria-label={`Thử lại asset ${entry.assetId}`}
+                        aria-label={`Thử lại tài nguyên ${entry.assetId}`}
                         onClick={() => retryReference(entry.assetId)}
                       >
                         Thử lại

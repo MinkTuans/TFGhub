@@ -1,3 +1,4 @@
+import { studioLabel, studioFieldLabel } from "../components/studio/studio-labels";
 import { randomUUID } from "node:crypto";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import {
@@ -163,7 +164,7 @@ async function setup(
   );
   expect(saved.status(), await saved.text()).toBe(201);
   await page.reload();
-  const canvas = page.getByRole("img", { name: "Scene: Gesture Canvas" });
+  const canvas = page.getByRole("img", { name: "Cảnh: Gesture Canvas" });
   await expect(canvas).toBeVisible();
   await expect(
     page.getByRole("status", { name: "Trạng thái dự án" }),
@@ -228,7 +229,7 @@ for (const [surface, reference] of [
     await expect(dialog.getByRole("button", { name: "Hủy" })).toBeFocused();
     const confirm = dialog.getByRole("button", { name: "Xác nhận xóa" });
     await confirm.click();
-    await expect(dialog.getByRole("alert")).toContainText(/referenc/i);
+    await expect(dialog.getByRole("alert")).toContainText(/tham chiếu/i);
     await expect(confirm).toBeFocused();
     await expect(app.canvas).toHaveAttribute(
       "data-selected-object-id",
@@ -244,9 +245,9 @@ for (const [surface, reference] of [
       .getByRole("treeitem", { name: "Incoming camera", exact: true })
       .click();
     await page
-      .getByRole("textbox", { name: "followObjectId", exact: true })
+      .getByRole("textbox", { name: "Mã đối tượng theo dõi", exact: true })
       .fill("");
-    await page.getByRole("button", { name: "Lưu Camera", exact: true }).click();
+    await page.getByRole("button", { name: "Lưu Máy quay", exact: true }).click();
     await expect(
       page.getByRole("status", { name: "Trạng thái dự án" }),
     ).toHaveText("Đã lưu");
@@ -300,10 +301,10 @@ test("native directional keyboard resize with canonical snap persists every acce
     const requests = app.requests.length;
     await page.keyboard.press(key);
     await expect(
-      page.getByRole("spinbutton", { name: "width", exact: true }),
+      page.getByRole("spinbutton", { name: "Chiều rộng", exact: true }),
     ).toHaveValue(String(width));
     await expect(
-      page.getByRole("spinbutton", { name: "height", exact: true }),
+      page.getByRole("spinbutton", { name: "Chiều cao", exact: true }),
     ).toHaveValue(String(height));
     await expect(
       page.getByRole("status", { name: "Trạng thái dự án" }),
@@ -335,10 +336,10 @@ test("native directional keyboard resize with canonical snap persists every acce
     page.getByRole("button", { name: "Bám lưới", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
   await expect(
-    page.getByRole("spinbutton", { name: "width", exact: true }),
+    page.getByRole("spinbutton", { name: "Chiều rộng", exact: true }),
   ).toHaveValue("1");
   await expect(
-    page.getByRole("spinbutton", { name: "height", exact: true }),
+    page.getByRole("spinbutton", { name: "Chiều cao", exact: true }),
   ).toHaveValue("1");
   expect((await app.head()).project).toEqual(saved.project);
 });
@@ -385,7 +386,7 @@ for (const modifier of ["Control", "Meta"]) {
       exact: true,
     });
     await expect(handle).toBeFocused();
-    const width = page.getByRole("spinbutton", { name: "width", exact: true });
+    const width = page.getByRole("spinbutton", { name: "Chiều rộng", exact: true });
     await page.keyboard.press("ArrowRight");
     await page.keyboard.press("ArrowRight");
     await expect(width).toHaveValue("42");
@@ -418,7 +419,7 @@ for (const modifier of ["Control", "Meta"]) {
     ).toBe(42);
     await page.reload();
     await expect(
-      page.getByRole("spinbutton", { name: "width", exact: true }),
+      page.getByRole("spinbutton", { name: "Chiều rộng", exact: true }),
     ).toHaveValue("42");
   });
 }
@@ -528,15 +529,15 @@ test("native multiline component strings edit, undo and reload exact canonical n
     ["InventoryItem", "description"],
     ["Text", "text"],
   ]) {
-    const component = page.getByRole("group", { name: type, exact: true });
+    const component = page.getByRole("group", { name: studioLabel(type), exact: true });
     const textbox = component.getByRole("textbox", {
-      name: field,
+      name: studioFieldLabel(field),
       exact: true,
     });
     await expect(textbox).toHaveValue(original);
     await textbox.fill(edited);
     const save = component.getByRole("button", {
-      name: `Lưu ${type}`,
+      name: `Lưu ${studioLabel(type)}`,
       exact: true,
     });
     await save.click();
@@ -564,10 +565,10 @@ test("native multiline component strings edit, undo and reload exact canonical n
   ).toBe(edited);
   await page.reload();
   await expect(
-    page.getByRole("textbox", { name: "text", exact: true }),
+    page.getByRole("textbox", { name: "Nội dung", exact: true }),
   ).toHaveValue(edited);
   await expect(
-    page.getByRole("textbox", { name: "description", exact: true }),
+    page.getByRole("textbox", { name: "Mô tả", exact: true }),
   ).toHaveValue(edited);
   expect((await app.head()).project).toEqual(saved);
 });
@@ -602,23 +603,23 @@ test("hierarchy and inspector edit the official canonical project, retain select
   await page
     .getByRole("button", { name: "Lưu đối tượng", exact: true })
     .click();
-  const transform = page.getByRole("group", { name: "Transform", exact: true });
+  const transform = page.getByRole("group", { name: "Biến đổi", exact: true });
   await transform
-    .getByRole("spinbutton", { name: "rotation", exact: true })
+    .getByRole("spinbutton", { name: "Góc xoay", exact: true })
     .fill("30");
   await transform
-    .getByRole("button", { name: "Lưu Transform", exact: true })
+    .getByRole("button", { name: "Lưu Biến đổi", exact: true })
     .click();
   await expect(
-    transform.getByRole("button", { name: "Lưu Transform", exact: true }),
+    transform.getByRole("button", { name: "Lưu Biến đổi", exact: true }),
   ).toBeFocused();
   await page.getByRole("button", { name: "Hoàn tác", exact: true }).click();
   await expect(
-    transform.getByRole("spinbutton", { name: "rotation", exact: true }),
+    transform.getByRole("spinbutton", { name: "Góc xoay", exact: true }),
   ).toHaveValue("0");
   await page.getByRole("button", { name: "Làm lại", exact: true }).click();
   await expect(
-    transform.getByRole("spinbutton", { name: "rotation", exact: true }),
+    transform.getByRole("spinbutton", { name: "Góc xoay", exact: true }),
   ).toHaveValue("30");
   await expect(
     page.getByRole("status", { name: "Trạng thái dự án" }),
@@ -864,7 +865,7 @@ test("native locked picking, pointer capture cancellation, Space pan, wheel and 
   const point = await client(app.canvas, 100, 100);
   await page.mouse.move(point.x, point.y);
   await page.mouse.wheel(0, -200);
-  await page.getByRole("button", { name: "Vừa Scene" }).click();
+  await page.getByRole("button", { name: "Vừa Cảnh" }).click();
   expect(await app.canvas.getAttribute("data-camera-x")).toBe(before);
   await page.waitForTimeout(800);
   expect(app.requests).toHaveLength(0);

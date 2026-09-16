@@ -77,7 +77,7 @@ export function createAssetDrop({
     value.kind !== "IMAGE" ||
     !roles.includes(value.role as (typeof roles)[number])
   )
-    throw new Error("Dữ liệu kéo thả asset không hợp lệ.");
+    throw new Error("Dữ liệu kéo thả tài nguyên không hợp lệ.");
   const assetId = value.assetId as string;
   const matches = metadata.filter(
     (item) => record(item) && item.id === assetId,
@@ -99,18 +99,18 @@ export function createAssetDrop({
     asset.width <= 0 ||
     asset.height <= 0
   )
-    throw new Error("Asset không sẵn sàng hoặc không thuộc dự án.");
+    throw new Error("Tài nguyên không sẵn sàng hoặc không thuộc dự án.");
   const scene = document.scenes.find((scene) => scene.id === sceneId);
   const layer = scene?.layers.find((layer) => layer.id === layerId);
   if (!scene || !layer || !layer.visible || layer.locked)
-    throw new Error("Lớp nhận asset bị ẩn, khóa hoặc không tồn tại.");
+    throw new Error("Lớp nhận tài nguyên bị ẩn, khóa hoặc không tồn tại.");
   if (
     client.x < rect.left ||
     client.x > rect.left + rect.width ||
     client.y < rect.top ||
     client.y > rect.top + rect.height
   )
-    throw new Error("Thả asset bên trong Canvas.");
+    throw new Error("Thả tài nguyên bên trong Khung vẽ.");
   let world = clientToWorld(client, rect, camera);
   if (
     world.x < 0 ||
@@ -118,7 +118,7 @@ export function createAssetDrop({
     world.x > scene.width ||
     world.y > scene.height
   )
-    throw new Error("Thả asset bên trong Scene.");
+    throw new Error("Thả tài nguyên bên trong Cảnh.");
   if (scene.settings.grid.snap)
     world = {
       x:

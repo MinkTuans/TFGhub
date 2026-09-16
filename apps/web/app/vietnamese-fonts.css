@@ -1,0 +1,8 @@
+/* Full glyph sets, self-hosted: Vietnamese precomposed and combining characters. */
+@font-face { font-family: 'TFG Sans'; src: url('/fonts/be-vietnam-pro-regular.woff2') format('woff2'); font-style: normal; font-weight: 400; font-display: swap; }
+@font-face { font-family: 'TFG Sans'; src: url('/fonts/be-vietnam-pro-semibold.woff2') format('woff2'); font-style: normal; font-weight: 600; font-display: swap; }
+@font-face { font-family: 'TFG Sans'; src: url('/fonts/be-vietnam-pro-bold.woff2') format('woff2'); font-style: normal; font-weight: 700; font-display: swap; }
+@font-face { font-family: 'TFG Serif'; src: url('/fonts/lora-variable.woff2') format('woff2'); font-style: normal; font-weight: 400 700; font-display: swap; }
+:root { --font-body: 'TFG Sans', sans-serif; --font-heading: 'TFG Serif', serif; }
+
+@font-face { font-family: 'TFG Mono'; src: url('/fonts/jetbrains-mono-variable.woff2') format('woff2'); font-style: normal; font-weight: 100 800; font-display: swap; }
