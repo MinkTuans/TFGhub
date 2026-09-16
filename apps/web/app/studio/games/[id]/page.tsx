@@ -59,6 +59,7 @@ export default async function GameWorkspacePage({
   return (
     <main className="workspace-page">
       <header className="page-heading">
+        <Link href="/studio">← Về Studio</Link>
         <h1>{game.title}</h1>
       </header>
       <GameWorkspace initialGame={game} />

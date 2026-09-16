@@ -73,6 +73,12 @@ export function GameWorkspace({ initialGame }: { initialGame: GameSummary }) {
 
   return (
     <div className="workspace">
+      <nav className="workspace-sections" aria-label="Các phần quản lý game">
+        <a href="#cover-heading">Thông tin & ảnh bìa</a>
+        <a href="#display-heading">Hiển thị</a>
+        <a href="#game-editor">Nội dung & chơi thử</a>
+        <a href="#submission-heading">Xuất bản</a>
+      </nav>
       <section
         className="panel workspace-overview"
         aria-labelledby="cover-heading"
@@ -132,7 +138,7 @@ export function GameWorkspace({ initialGame }: { initialGame: GameSummary }) {
           </button>
         </form>
       </section>
-      <div className="workspace-editor">
+      <div className="workspace-editor" id="game-editor" tabIndex={-1}>
         {game.sourceType === "UPLOAD" && (
           <UploadEditor gameId={game.id} onUploaded={setGame} />
         )}

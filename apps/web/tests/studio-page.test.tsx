@@ -59,3 +59,32 @@ test.each([
     expect(term.nextElementSibling).toHaveTextContent(String(counts[index]));
   });
 });
+
+test("owner search combines review filters, sorts results and resets an empty match without changing totals", async () => {
+  vi.mocked(privateGet).mockResolvedValue([
+    { id: "one", slug: "one", title: "Zebra", description: "Forest adventure", reviewState: "DRAFT", visibility: "DRAFT", updatedAt: "2026-09-10", coverVersion: 0 },
+    { id: "two", slug: "two", title: "Alpha", description: "Forest puzzle", reviewState: "APPROVED", visibility: "PUBLIC", updatedAt: "2026-09-11", coverVersion: 0 },
+  ]);
+  render(await StudioPage());
+  fireEvent.change(screen.getByLabelText("Tìm game của bạn"), { target: { value: " FOREST " } });
+  expect(screen.getByRole("status")).toHaveTextContent("2 / 2 game");
+  fireEvent.change(screen.getByLabelText("Trạng thái duyệt"), { target: { value: "DRAFT" } });
+  expect(screen.getByRole("link", { name: "Zebra" })).toHaveAttribute("href", "/studio/games/one");
+  expect(screen.queryByRole("link", { name: "Alpha" })).not.toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText("Tìm game của bạn"), { target: { value: "missing" } });
+  expect(screen.getByRole("heading", { name: "Không có game phù hợp" })).toBeVisible();
+  fireEvent.click(screen.getByRole("button", { name: "Xóa bộ lọc" }));
+  fireEvent.change(screen.getByLabelText("Sắp xếp"), { target: { value: "title" } });
+  expect(screen.getAllByRole("heading", { level: 3 }).map((node) => node.textContent)).toEqual(["Alpha", "Zebra"]);
+  expect(screen.getByRole("status")).toHaveTextContent("2 / 2 game");
+  expect(within(screen.getByRole("region", { name: "Thống kê game" })).getByText("Đã duyệt").nextElementSibling).toHaveTextContent("1");
+});
+
+test("Studio sends only card metadata across the interactive list boundary", async () => {
+  vi.mocked(privateGet).mockResolvedValue([{ id: "one", reviewState: "DRAFT", projectData: { javascript: "large source" } }]);
+  const page = await StudioPage();
+  const section = page.props.children.find((child: { props?: { "aria-labelledby"?: string } }) => child.props?.["aria-labelledby"] === "games-heading");
+  const list = section.props.children.find((child: { props?: { games?: unknown } }) => child.props?.games);
+  expect(list.props.games[0]).not.toHaveProperty("projectData");
+  expect(list.props.games[0]).toMatchObject({ id: "one", reviewState: "DRAFT" });
+});

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { GameSummary } from "@indieforge/contracts";
 import { privateGet } from "../../lib/session";
-import { GameCover } from "../../components/game-cover";
+import { StudioGameList } from "../../components/studio-game-list";
 
 const reviewLabels = {
   DRAFT: "Bản nháp",
@@ -15,7 +15,7 @@ export default async function StudioPage() {
   const counts = { DRAFT: 0, PENDING: 0, APPROVED: 0, REJECTED: 0 };
   for (const game of games) counts[game.reviewState] += 1;
   return (
-    <main>
+    <main className="studio-dashboard">
       <header className="page-heading">
         <p className="eyebrow">Chào mừng bạn đến với Studio.</p>
         <h1>Studio của bạn</h1>
@@ -38,33 +38,7 @@ export default async function StudioPage() {
             Tạo game
           </Link>
         </div>
-        {games.length === 0 ? (
-          <p>Bạn chưa có bản nháp. Bắt đầu với một ý tưởng và tên game.</p>
-        ) : (
-          <div className="grid">
-            {games.map((game) => (
-              <article className="card studio-card" key={game.id}>
-                <GameCover game={game} ownerGameId={game.id} />
-                <div className="studio-card__body">
-                  <h3>
-                    <Link href={`/studio/games/${game.id}`}>{game.title}</Link>
-                  </h3>
-                  <p className="badge">
-                    {game.visibility === "DRAFT"
-                      ? "Bản nháp"
-                      : game.visibility === "PUBLIC"
-                        ? "Công khai"
-                        : "Không niêm yết"}
-                  </p>
-                  <p className="badge" data-state={game.reviewState}>
-                    {reviewLabels[game.reviewState]}
-                  </p>
-                  <p className="description">{game.description}</p>
-                </div>
-              </article>
-            ))}
-          </div>
-        )}
+        <StudioGameList games={games.map(({ id, slug, title, description, visibility, reviewState, updatedAt, coverVersion, coverContentType }) => ({ id, slug, title, description, visibility, reviewState, updatedAt, coverVersion, coverContentType }))} />
       </section>
     </main>
   );

@@ -2,6 +2,10 @@
 
 This release-oriented summary records major architecture/product milestones. It is not a deployment ledger; a development commit does not prove production rollout.
 
+## 2026-09-16 — Creator dashboard and management presentation (development only)
+
+Studio now searches and filters real owner games, sorts by update/name and distinguishes empty results from an empty account. Card data excludes full project payloads across the client boundary. Creation guidance preserves the single-click blank ENGINE flow; legacy management adds section navigation. Verified46 focused unit tests,9 production-browser checks across four widths and both themes, changed-file lint and production build. No deployment; moderation and final audit remain in the [plan](../superpowers/plans/2026-09-16-ui-remaster.md).
+
 ## 2026-09-16 — Accounts/profile remaster (development only)
 
 Added responsive split account forms, password visibility/confirmation and a separate profile save after registration, with retry that never repeats a successful account creation. Profile uses real owner data and private workspace links. Scoped streaming skeletons to protected routes to restore public no-JavaScript rendering and unpublished-game HTTP404; search retains native GET with client progress. Verified59 unit and29 production-browser tests, clean changed-file lint and successful build. Remaining Studio/moderation/final audit scope is recorded in the [plan](../superpowers/plans/2026-09-16-ui-remaster.md). No deployment.
