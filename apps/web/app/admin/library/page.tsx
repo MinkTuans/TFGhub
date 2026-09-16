@@ -7,7 +7,7 @@ export default async function AdminLibraryPage({ searchParams }: { searchParams?
   if (session?.role !== "ADMIN") redirect("/");
   const [categories, documents] = await Promise.all([
     privateGet<AdminCategory[]>("/admin/library/categories"),
-    privateGet<AdminDocumentList>("/admin/library/documents?offset=0&limit=20"),
+    privateGet<AdminDocumentList>("/admin/library/documents?offset=0&limit=6"),
   ]);
   const sourcePath = (await searchParams)?.sourcePath;
   let document: AdminDocument | null = null;

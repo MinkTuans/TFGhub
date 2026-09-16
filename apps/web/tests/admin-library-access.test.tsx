@@ -16,6 +16,7 @@ test("ADMIN loads library and admin root redirects to library", async () => {
   vi.mocked(optionalSession).mockResolvedValue({ id: "a", email: "a@example.test", role: "ADMIN" });
   vi.mocked(privateGet).mockImplementation(async (path) => path.endsWith("categories") ? [] : { items: [], total: 0 });
   render(await Page({}));
+  expect(privateGet).toHaveBeenCalledWith("/admin/library/documents?offset=0&limit=6");
   expect(screen.getByRole("heading", { name: "Thư viện website" })).toBeVisible();
   await expect(AdminPage()).rejects.toThrow("redirect:/admin/library");
 });

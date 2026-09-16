@@ -7,7 +7,7 @@ import { MarkdownReader } from "./markdown-reader";
 import styles from "./library.module.css";
 
 const base = "/admin/library";
-const limit = 20;
+const limit = 6;
 type Draft = { title: string; content: string; categoryId: string };
 type CategoryDraft = { id?: string; version?: number; name: string; description: string };
 function message(error: unknown) {
@@ -39,10 +39,15 @@ export function AdminLibrary({ initialCategories, initialDocuments, initialDocum
   const busy = useRef(false);
   const mutationSaved = useRef(false);
   const reader = useRef<HTMLElement>(null);
+  const categoryRail = useRef<HTMLDivElement>(null);
+  function slideCategories(direction: number) {
+    const rail = categoryRail.current;
+    rail?.scrollBy({ left: direction * rail.clientWidth * .8, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth" });
+  }
   const editingDocument = draft !== null;
   const editingCategory = categoryDraft !== null;
   useEffect(() => {
-    if (window.innerWidth <= 1100 && (selected || editingDocument || editingCategory)) reader.current?.scrollIntoView?.({ behavior: "smooth", block: "start" });
+    if (window.innerWidth <= 760 && (selected || editingDocument || editingCategory)) reader.current?.scrollIntoView?.({ behavior: "smooth", block: "start" });
   }, [selected, editingDocument, editingCategory]);
   const dirty = (draft !== null || categoryDraft !== null) && JSON.stringify(draft ?? categoryDraft) !== baseline;
   function mayLeave() { return !dirty || window.confirm("Bạn có thay đổi chưa lưu. Bỏ các thay đổi này?"); }
@@ -153,15 +158,24 @@ export function AdminLibrary({ initialCategories, initialDocuments, initialDocum
     {error && <div className={styles.error} role="alert">{error}{conflict && <button disabled={pending} onClick={reload}>Tải lại bản mới nhất</button>}</div>}
     {notice && <p className={styles.notice} role="status">{notice}</p>}
     <div className={styles.workspace}>
-      <aside className={styles.sidebar} aria-label="Danh mục thư viện"><div className={styles.sectionHeading}><h2>Danh mục</h2><span>{categories.length}</span></div>
-        <button className={`button-ghost ${styles.category}`} aria-pressed={!categoryId} disabled={pending} onClick={() => filter("", activeQuery)}>Tất cả tài liệu <span>{categories.reduce((sum, item) => sum + item.documentCount, 0)}</span></button>
-        {categories.map((item) => <button key={item.id} className={`button-ghost ${styles.category}`} aria-pressed={categoryId === item.id} disabled={pending} onClick={() => filter(item.id, activeQuery)}>{item.name}<span>{item.documentCount}</span></button>)}
-        <button className="button-ghost" disabled={pending} onClick={() => editCategory()}>Thêm danh mục</button>
+      <aside className={styles.sidebar} aria-label="Danh mục thư viện">
+        <div className={styles.categoryHeading}>
+          <div className={styles.sectionHeading}><h2>Danh mục</h2><span>{categories.length}</span></div>
+          <div className={styles.categoryControls}>
+            <button type="button" className="button-ghost" aria-label="Trượt danh mục sang trái" onClick={() => slideCategories(-1)}>←</button>
+            <button type="button" className="button-ghost" aria-label="Trượt danh mục sang phải" onClick={() => slideCategories(1)}>→</button>
+            <button type="button" className="button-ghost" disabled={pending} onClick={() => editCategory()}>Thêm danh mục</button>
+          </div>
+        </div>
+        <div ref={categoryRail} className={styles.categoryRail} role="region" aria-label="Trượt danh mục" tabIndex={0}>
+          <button className={`button-ghost ${styles.category}`} aria-pressed={!categoryId} disabled={pending} onClick={() => filter("", activeQuery)}><strong>Tất cả tài liệu</strong><span>{categories.reduce((sum, item) => sum + item.documentCount, 0)}</span></button>
+          {categories.map((item) => <button key={item.id} className={`button-ghost ${styles.category}`} aria-pressed={categoryId === item.id} disabled={pending} title={item.name} onClick={() => filter(item.id, activeQuery)}><strong>{item.name}</strong><span>{item.documentCount}</span></button>)}
+        </div>
         {currentCategory && <div className={styles.categoryDetails}><p>{currentCategory.description || "Chưa có mô tả."}</p><div className={styles.actions}><button className="button-ghost" disabled={pending} onClick={() => editCategory(currentCategory)}>Sửa danh mục</button><button className={`button-danger ${styles.danger}`} disabled={pending || currentCategory.documentCount > 0} title={currentCategory.documentCount ? "Chuyển hoặc xóa hết tài liệu trước" : undefined} onClick={() => removeCategory(currentCategory)}>Xóa danh mục</button></div>{currentCategory.documentCount > 0 && <small>Chuyển hoặc xóa hết tài liệu trước khi xóa danh mục.</small>}</div>}
       </aside>
       <section className={styles.list} aria-label="Danh sách tài liệu"><form className={styles.search} onSubmit={(event) => { event.preventDefault(); filter(categoryId, query); }}><label htmlFor="library-search">Tìm tài liệu</label><div><input id="library-search" maxLength={200} placeholder="Tiêu đề hoặc nội dung…" value={query} onChange={(event) => setQuery(event.target.value)} /><button disabled={pending}>Tìm</button></div></form><p className={styles.count}>{documents.total} tài liệu{activeQuery && ` · “${activeQuery}”`}</p>
         <div className={styles.documentList}>{documents.items.map((item) => <button className={`button-ghost ${styles.document}`} aria-label={item.title} aria-pressed={selected?.id === item.id} disabled={pending} key={item.id} onClick={() => select(item.id)}><strong>{item.title}</strong><span>{categories.find((category) => category.id === item.categoryId)?.name ?? "Danh mục"}</span></button>)}{!documents.items.length && <p className={styles.empty}>Chưa có tài liệu phù hợp. Thử từ khóa khác hoặc viết tài liệu đầu tiên.</p>}</div>
-        <div className={styles.pagination}><button className="button-ghost" disabled={pending || offset === 0} onClick={() => filter(categoryId, activeQuery, Math.max(0, offset - limit))}>Trước</button><span>Trang {Math.floor(offset / limit) + 1}</span><button className="button-ghost" disabled={pending || offset + limit >= documents.total} onClick={() => filter(categoryId, activeQuery, offset + limit)}>Sau</button></div>
+        <div className={styles.pagination}><button className="button-ghost" disabled={pending || offset === 0} onClick={() => filter(categoryId, activeQuery, Math.max(0, offset - limit))}>Trước</button><span>Trang {Math.floor(offset / limit) + 1} / {Math.max(1, Math.ceil(documents.total / limit))}</span><button className="button-ghost" disabled={pending || offset + limit >= documents.total} onClick={() => filter(categoryId, activeQuery, offset + limit)}>Sau</button></div>
       </section>
       <section ref={reader} className={styles.reader} aria-label="Nội dung tài liệu">
         {categoryDraft ? <form onSubmit={saveCategory}><h2>{categoryDraft.id ? "Chỉnh sửa danh mục" : "Danh mục mới"}</h2><fieldset disabled={pending}><label>Tên danh mục<input required maxLength={100} value={categoryDraft.name} onChange={(event) => setCategoryDraft({ ...categoryDraft, name: event.target.value })} /></label><label htmlFor="library-category-description">Mô tả</label><textarea id="library-category-description" maxLength={500} rows={5} value={categoryDraft.description} onChange={(event) => setCategoryDraft({ ...categoryDraft, description: event.target.value })} /><div className={styles.actions}><button>{pending ? "Đang lưu…" : "Lưu danh mục"}</button><button type="button" className="button-ghost" onClick={() => { if (mayLeave()) discard(); }}>Hủy chỉnh sửa</button></div></fieldset></form>

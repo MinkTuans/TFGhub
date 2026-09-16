@@ -23,3 +23,5 @@ links. Empty categories may be deleted; documents must first be moved or removed
 Concurrent stale saves/deletes are rejected with a version conflict. Guest, USER
 and MODERATOR sessions cannot access these records. Library edits persist in
 PostgreSQL and do not change executable source files or application configuration.
+
+The administrator documentation library displays six documents per page with equal-size cards and a horizontally scrollable category rail. On phones, document cards form two columns and the reader opens below the list.

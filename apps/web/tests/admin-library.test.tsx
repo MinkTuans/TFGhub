@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, expect, test, vi } from "vitest";
 import { AdminLibrary } from "../components/admin-library/admin-library";
 import { api, ApiError } from "../lib/api-client";
@@ -57,4 +57,37 @@ test("populated textarea labels remain exact and exclude editable content", asyn
  const description = screen.getByLabelText("Mô tả") as HTMLTextAreaElement;
  expect(description).toHaveValue("Tài liệu vận hành");
  expect(Array.from(description.labels ?? [], label => label.textContent).join(" ")).toBe("Mô tả");
+});
+
+test("paginates six documents at a time and resets when filtering", async () => {
+ const entries = Array.from({ length: 7 }, (_, index) => ({ ...document, id: `doc-${index}`, title: `Tài liệu ${index + 1}` }));
+ vi.mocked(api.get).mockImplementation(async (path) => {
+  if (path.endsWith("/categories")) return [category];
+  const url = new URL(path, "http://local.test");
+  const offset = Number(url.searchParams.get("offset"));
+  const limit = Number(url.searchParams.get("limit"));
+  return { items: entries.slice(offset, offset + limit), total: entries.length };
+ });
+ render(<AdminLibrary initialCategories={[category]} initialDocuments={{ items: entries.slice(0, 6), total: 7 }} />);
+ const list = within(screen.getByRole("region", { name: "Danh sách tài liệu" }));
+ expect(list.getAllByRole("button", { name: /^Tài liệu/ })).toHaveLength(6);
+ fireEvent.click(list.getByRole("button", { name: "Sau" }));
+ await waitFor(() => expect(api.get).toHaveBeenCalledWith(expect.stringContaining("offset=6&limit=6")));
+ expect(await list.findByRole("button", { name: "Tài liệu 7" })).toBeVisible();
+ expect(list.queryByRole("button", { name: "Tài liệu 1" })).not.toBeInTheDocument();
+ expect(list.getByRole("button", { name: "Sau" })).toBeDisabled();
+ fireEvent.click(list.getByRole("button", { name: "Trước" }));
+ expect(await list.findByRole("button", { name: "Tài liệu 1" })).toBeVisible();
+ fireEvent.click(list.getByRole("button", { name: "Sau" }));
+ expect(await list.findByRole("button", { name: "Tài liệu 7" })).toBeVisible();
+ fireEvent.click(screen.getByRole("button", { name: /^Hướng dẫn/ }));
+ await waitFor(() => expect(api.get).toHaveBeenCalledWith(expect.stringContaining("categoryId=cat&query=&offset=0&limit=6")));
+ expect(await list.findByRole("button", { name: "Tài liệu 1" })).toBeVisible();
+ expect(list.getByText("Trang 1 / 2")).toBeVisible();
+});
+test("category slider exposes a named keyboard-accessible scroll area and controls", () => {
+ setup();
+ expect(screen.getByRole("region", { name: "Trượt danh mục" })).toHaveAttribute("tabindex", "0");
+ expect(screen.getByRole("button", { name: "Trượt danh mục sang trái" })).toHaveAttribute("type", "button");
+ expect(screen.getByRole("button", { name: "Trượt danh mục sang phải" })).toHaveAttribute("type", "button");
 });
