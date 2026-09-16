@@ -1,6 +1,6 @@
 # Admin users and games management — 2026-09-16
 
-Status: verified locally; production build/deployment pending.
+Status: completed and verified live at http://161.248.81.59 on 2026-09-16. Code commit: `e08f497`.
 
 ## Delivered scope
 
@@ -23,8 +23,17 @@ Status: verified locally; production build/deployment pending.
 - Initial dev browser failure traced to the temporary proxy missing WebSocket upgrade support; direct Next and corrected proxy both work. This was test infrastructure, not product code.
 - Independent API/UI review found no outstanding blocking issue.
 
-Evidence: `/tmp/tfg-admin-management/` on the deployment host (ephemeral). All mutation tests used disposable data; production smoke will be read-only.
+Evidence: `/tmp/tfg-admin-management/` on the deployment host (ephemeral). All mutation tests used disposable data; production smoke was read-only.
 
 ## Deployment
 
-Pending build, consistent backup, additive migration, API/web switch and live checks.
+- Docker API/web build passed, including production Next compilation and TypeScript.
+- Consistent PostgreSQL/artifact backup: `backups/20260916T135034-796264.database.dump`, `.artifacts.tar.gz`, and validated `.sha256` manifest.
+- Migration `20260916140000_admin_management` applied successfully and recorded once.
+- API image: `sha256:ab643f661628e681e120bf4910ef81877ef7bb1f8597bd7e24ad8c274f9f2fc9`.
+- Web image: `sha256:e8597196368df19537b4acf9863372ef88542f6611a6cb364ea469fa06cccdf5`.
+- Previous images retained as `indieforge-api:rollback-before-admin-management-20260916` and `indieforge-web:rollback-before-admin-management-20260916`. Migration is additive and compatible with rollback.
+- API/web healthy, public `/api/health` returned OK.
+- Live browser passed guest route/API protection and admin navigation, private list responses and read-only editors at 390/1440 pixels, dark/light. No page errors or horizontal overflow. No real user/game mutations during smoke.
+- First live harness start could not read its copied token-generation script due file permissions; fixed permissions and reran successfully. The generated short-lived token was never printed and its temporary file was removed afterward.
+- Disposable PostgreSQL and preview processes stopped; temporary test sessions and live token deleted. Existing requested admin account was retained; no account provisioning or document reseeding performed.
