@@ -26,3 +26,15 @@
 .page .danger { color: var(--danger); background: transparent; border: 1px solid var(--border); }
 .pagination { font-size: .8rem; }
 @media (max-width: 760px) { .page { padding: 1rem; } .workspace, .cards { grid-template-columns: minmax(0,1fr); } .navigation { gap: .25rem; } .navigation a { padding: .65rem .5rem; } }
+
+/* Let the editor determine the shared row height; only list items scroll. */
+.workspace > .panel { margin-block: 0; }
+.listPanel { display: flex; flex-direction: column; min-height: 0; }
+.listPanel .list { min-height: 0; max-height: 32rem; overflow-y: auto; overscroll-behavior-y: contain; scrollbar-gutter: stable; align-content: start; }
+@media (min-width: 761px) {
+  .workspace[data-editing="true"] .listPanel { contain: size; align-self: stretch; }
+  .workspace[data-editing="true"] .listPanel .list { flex: 1; max-height: none; }
+}
+@media (max-width: 760px) {
+  .listPanel .list { max-height: min(26rem, 60dvh); }
+}

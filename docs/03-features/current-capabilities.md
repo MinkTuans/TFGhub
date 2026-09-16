@@ -37,3 +37,5 @@ The administrator documentation library displays six documents per page with equ
 Public game detail supports explicitly launched plays, bounded active playtime, one rating per signed-in user (replace/remove), plain-text paginated comments and game-reported high scores when enabled. Detail views and Studio/moderator previews do not increment plays. Comment authors and moderators/admins may delete comments; creator ownership alone does not authorize deleting others.
 
 `/studio/games/[id]/analytics` is private to the owner or ADMIN. It shows real aggregate plays, estimated account/browser participants, average active time, ratings/comments, a 30-day UTC chart and score collection settings. The dedicated moderator comment view exposes no creator analytics. Payments, favorites and ranked leaderboards remain unimplemented. Historical activity is not fabricated. See [activity and score integration](../04-workflows/game-scores-and-analytics.md).
+
+Admin users/game lists match the selected editor height on desktop, with independently scrolling rows and fixed pagination controls. Stacked phone lists use bounded scrolling so the editor remains accessible.
