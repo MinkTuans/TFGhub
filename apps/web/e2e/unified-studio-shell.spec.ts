@@ -9,9 +9,12 @@ test.skip(
   "Unified Studio requires an explicitly opted-in disposable PostgreSQL/API stack",
 );
 
+const apiBase = (process.env.E2E_API_URL ?? "/api").replace(/\/$/, "");
+const api = (path: string) => `${apiBase}${path}`;
+
 async function createProject(page: Page) {
   const suffix = randomUUID();
-  const register = await page.request.post("/api/auth/register", {
+  const register = await page.request.post(api("/auth/register"), {
     data: {
       email: `studio-shell-${suffix}@example.test`,
       password: "studio-password123",
@@ -52,7 +55,7 @@ test("scene and layer edits autosave canonical revisions, survive reload, and un
   const read = async () =>
     (
       await (
-        await page.request.get(`/api/games/${gameId}/engine-project`)
+        await page.request.get(api(`/games/${gameId}/engine-project`))
       ).json()
     ).project;
   const before = await read();
@@ -161,12 +164,12 @@ test("desktop opens a full-width dark shell, reads the saved Scene, collapses pa
   // Read a saved rename through the real API and confirm local navigation
   // does not advance the revision. Two-Scene selection is covered in unit tests.
   const read = await (
-    await page.request.get(`/api/games/${gameId}/engine-project`)
+    await page.request.get(api(`/games/${gameId}/engine-project`))
   ).json();
   const sceneId = read.project.scenes[0].id;
   read.project.scenes[0].name = "Bến cảng";
   const saved = await page.request.post(
-    `/api/games/${gameId}/engine-project/mutations`,
+    api(`/games/${gameId}/engine-project/mutations`),
     {
       data: {
         baseRevision: read.revision.revisionNumber,
@@ -190,7 +193,7 @@ test("desktop opens a full-width dark shell, reads the saved Scene, collapses pa
     "true",
   );
   const sceneRead = await (
-    await page.request.get(`/api/games/${gameId}/engine-project`)
+    await page.request.get(api(`/games/${gameId}/engine-project`))
   ).json();
   expect(sceneRead.revision.revisionNumber).toBe(1);
   expect(sceneRead.project).toEqual(read.project);
@@ -298,7 +301,7 @@ for (const sourceType of ["UPLOAD", "CODE", "STORY", "PLATFORMER"]) {
     page,
   }, testInfo) => {
     const { suffix } = await createProject(page);
-    const created = await page.request.post("/api/games", {
+    const created = await page.request.post(api("/games"), {
       data: {
         title: `${sourceType} ${suffix}`,
         slug: `legacy-${suffix}`,

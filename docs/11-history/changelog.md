@@ -2,6 +2,10 @@
 
 This release-oriented summary records major architecture/product milestones. It is not a deployment ledger; a development commit does not prove production rollout.
 
+## 2026-09-16 — Remaster audit complete (development only)
+
+Completed the remaining disposable PostgreSQL audit: assets1/1 and unified Studio7/7 passed, covering persistence, desktop/mobile editing and all four legacy editor transitions. Fixed the Studio E2E helper to honor `E2E_API_URL` in direct-API test environments. All seven remaster layers are verified within existing API capabilities; no deployment performed. Exact evidence and retained limitations: [delivery plan](../superpowers/plans/2026-09-16-ui-remaster.md).
+
 ## 2026-09-16 — Moderation presentation and broad UI audit (development only)
 
 Review queue now shows actual pending count, readable UTC submission dates, separate preview/decision areas and an explicit empty state. Review concurrency payloads and authorization remain unchanged. Scoped preview sizing avoids inherited oversized frames on mobile. Full frontend unit473/473 and production browser58/58 passed; final sizing regression4/4 passed after rebuild. Full lint retains one existing warning. Real ENGINE/assets integration remains open in the [plan](../superpowers/plans/2026-09-16-ui-remaster.md). No deployment.

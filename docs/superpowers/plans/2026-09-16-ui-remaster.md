@@ -1,6 +1,6 @@
 # TFG UI remaster — audit and implementation plan
 
-Status: in progress. User authorizes implementation and commits in `deploy-ip-preview`; no deployment performed for this task.
+Status: implementation and audit complete. User authorizes implementation and commits in `deploy-ip-preview`; no deployment performed for this task.
 
 ## Direction and constraints
 
@@ -24,7 +24,7 @@ Data: discovery supports query/cursor/limit, newest catalog entries, covers and 
 - [x] 4. Accounts/profile (`components/auth-form.tsx`, `app/login/page.tsx`, `app/register/page.tsx`, `app/profile/page.tsx`). Shared split layout, password visibility/confirmation, submitting/validation; inspect registration/profile contracts before adding display name. Test login/register/profile/logout and failure states.
 - [x] 5. Studio and create/manage (`app/studio/page.tsx`, `app/studio/games/new/page.tsx`, `components/game-form.tsx`, `components/game-workspace.tsx`). Creator summary, actual game counts, searchable/filterable owner games, clear draft-to-release actions; preserve all editors and ENGINE preview. Test owner data/empty/filter/action routes and existing asset workflow.
 - [x] 6. Moderation (`app/moderation/page.tsx`, `components/moderation-queue.tsx`). Queue hierarchy and review disclosure, accurate statuses and rejection validation; retain artifactVersion/submittedAt stale-review protection. No unsupported approved/rejected-history tabs. Test approve/reject/error/access.
-- [ ] 7. Final route/browser audit. Run web suite, lint, typecheck, production build; test all routes at 1440/1024/768/390px, both themes, reduced motion, keyboard, loading/empty/error/success, no overflow/console errors/broken links. Keep screenshots and exact results. Commit only verified changes. Deployment is a separate step, never repeat it without tested changes.
+- [x] 7. Final route/browser audit. Run web suite, lint, typecheck, production build; test all routes at 1440/1024/768/390px, both themes, reduced motion, keyboard, loading/empty/error/success, no overflow/console errors/broken links. Keep screenshots and exact results. Commit only verified changes. Deployment is a separate step, never repeat it without tested changes.
 
 ## Risks and verification evidence
 
@@ -92,3 +92,15 @@ Layer6 implementation clarifies pending count, empty queue, human-readable UTC s
 Final audit: full web unit **473/473 PASS,21 files,178.71s**, including Canvas with original timeouts. Full lint zero errors and one existing hierarchy-panel aria-description warning. Additional browser audit covers protected delayed loading, populated profiles with reduced motion/keyboard at four widths/two themes, moderation layouts, and1024px account/catalog checks. Production build PASS after removing an unsupported Testing Library query option in the new test (test-only TypeScript error); production browser **58/58 PASS (3.9m)**, no skips. Visual inspection subsequently found moderation preview inherited global min-height; a new ratio assertion failed (0.501 vs1.778) before the scoped height:auto/min-height:0 fix. Final production rebuild PASS, four affected browser cases **4/4 PASS (17.8s)** and final changed-file lint clean. Reviewer approved the scoped fix; corrected mobile screenshot inspected. Audit screenshots retained at `/tmp/tfg-ui-remaster-20260916/final`. Docker available; real ENGINE/assets lane still needs separate execution after the local browser audit.
 
 Visual follow-up also reproduced a negative12px overlap between review heading and guidance caused by the global hint margin. Scoped heading-adjacent hint spacing to8px and added browser geometry assertion; Final production rebuild PASS, final affected-case browser **4/4 PASS (19.9s)**, lint clean and reviewer confirmed the scoped spacing fix. Corrected mobile screenshot inspected and archived. Layer6 ready to commit; layer7 remains open for the disposable ENGINE/assets lane and final delivery review.
+
+
+## Final real-stack audit — 2026-09-16
+
+Ran an ephemeral copy of `scripts/run-studio-assets-e2e.sh` with both assets and unified Studio specs, isolated PostgreSQL16/migrations/storage/API/web and system Chrome. The assets journey passed (upload, rename, drag, autosave, reload and immutable asset references). Seven unified Studio cases initially failed before reaching the UI: their hardcoded same-origin `/api` registration returned404 against this direct-API lane. Updated only the test helper to honor existing `E2E_API_URL`, retaining `/api` as its default, consistently with the assets spec. Rerunning those seven cases; assets is not repeated. No application/API behavior changed. Independent final cross-slice review found no material remaining findings; final gate is the real-stack rerun and cleanup.
+
+
+### Final verified delivery
+
+Real-stack retry: **7/7 unified Studio cases PASS (1.5m)**, zero skips. Covers scene/layer autosave, reload, undo/delete, desktop/mobile metadata editing, and return from ENGINE to each legacy editor. Assets: **1/1 PASS (21.7s)** in the preceding real-stack run, unchanged since that pass. The initial7 setup failures are retained above; resolved by the test-only API URL configuration fix, reviewed and linted clean. Docker container and temporary API/web/database ports3210/3211/55439 are gone after successful cleanup. Six ENGINE/legacy screenshots archived under `/tmp/tfg-ui-remaster-20260916/engine`; desktop/mobile inspected.
+
+All seven delivery layers are now complete within existing API capabilities. No invented genre filters, play/follower metrics, release history, public creator route or ENGINE publication support. ENGINE editing remains desktop-focused with existing mobile metadata mode. No production deployment, merge or push performed; branch `deploy/ip-preview` and worktree are preserved as requested. Known nonblocking issue: the pre-existing full-lint `aria-description` warning in Studio hierarchy. Final independent review found no material cross-slice issues. Prior production build,473unit,58browser and final4visual regression results remain the application-code evidence; this final commit changes only test configuration and documentation.
