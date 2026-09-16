@@ -37,6 +37,7 @@ export function StudioGameList({ games }: { games: StudioCardGame[] }) {
           <span className="badge" data-state={game.reviewState}>{reviewLabels[game.reviewState]}</span>
         </div>
         <p className="description">{game.description || "Thêm mô tả để giới thiệu trò chơi của bạn."}</p>
+        <Link href={`/studio/games/${encodeURIComponent(game.id)}/analytics`}>Xem thống kê</Link>
         <p className="hint">Cập nhật <time dateTime={game.updatedAt}>{new Date(game.updatedAt).toLocaleDateString("vi-VN", { timeZone: "UTC" })}</time></p>
       </div>
       <Link className="studio-card__open" href={`/studio/games/${encodeURIComponent(game.id)}`} aria-label={`Mở ${game.title}`}><span aria-hidden="true">→</span></Link>

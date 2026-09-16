@@ -75,3 +75,7 @@ admin edits or resurrect deletions. The seed holds a transaction-scoped advisory
 lock and commits categories, documents and marker atomically.
 
 Migration `20260916140000_admin_management` adds `User.isActive` (default true) and positive `adminVersion` (default1), preserving existing accounts and games. Administrator user changes serialize with a PostgreSQL advisory lock and enforce version checks; deletion locks/checks the target and all related content before acting.
+
+## Engagement persistence
+
+Migration `20260916150000_game_engagement` adds `Game.scoresEnabled` (false), `GamePlay` (hashed participant/capability, sequence and active seconds), `GamePlayRequest` (durable idempotency/debounce receipts), `GameRating` (unique user/game), `GameComment`, `GameCommentCooldown` (survives comment deletion), and `GameScore` (one maximum per play). SQL checks enforce rating, nonnegative duration, sequence and score bounds. Game deletion cascades engagement records; user deletion cascades their ratings/comments and detaches play identity while preserving pseudonymous aggregates. No historical totals are seeded.

@@ -11,6 +11,11 @@ vi.mock("../lib/api-client", async (importOriginal) => {
 
 const props = { title: "Tiny Quest", src: "/api/play/tiny-quest/", viewportWidth: 1600, viewportHeight: 900 };
 const game = { slug: "tiny-quest", title: "Tiny Quest", description: "A tiny adventure", developer: { displayName: "Minh" }, artifactReady: true, artifactVersion: 1, coverVersion: 0, coverContentType: null, viewportWidth: 1600, viewportHeight: 900, createdAt: "2026-09-07T00:00:00Z" };
+function engagementRead(path: string) {
+  if (path === "/auth/me") throw new ApiError(401, "guest");
+  if (path.includes("/comments")) return { items: [], total: 0 };
+  return { totalPlays: 0, uniquePlayers: 0, averagePlaySeconds: null, ratingAverage: null, ratingCount: 0, ratingDistribution: [], commentCount: 0, highScore: null, scoresEnabled: false };
+}
 let resize: ResizeObserverCallback;
 let observed: Element;
 const disconnect = vi.fn();
@@ -128,9 +133,11 @@ test("refits on fullscreen resize and disconnects measurement on unmount", () =>
 
 test("renders SSR game details, two ads and related games with the existing public play URL", async () => {
   vi.stubEnv("NEXT_PUBLIC_API_URL", "https://tfg.example/api");
-  vi.mocked(api.get).mockImplementation(async (path) => path.startsWith("/games/") ? game : { games: [game, { ...game, slug: "sky", title: "Sky" }], nextCursor: null });
+  vi.mocked(api.get).mockImplementation(async (path) => path.startsWith("/games/") ? game : path.startsWith("/discover") ? { games: [game, { ...game, slug: "sky", title: "Sky" }], nextCursor: null } : engagementRead(path));
   render(await GamePage({ params: Promise.resolve({ slug: "tiny-quest" }) }));
   expect(screen.getByRole("heading", { level: 1, name: "Tiny Quest" })).toBeVisible();
+  expect(screen.queryByTitle("Chơi Tiny Quest")).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Bắt đầu chơi" }));
   expect(screen.getByTitle("Chơi Tiny Quest")).toHaveAttribute("src", "https://tfg.example/api/play/tiny-quest/");
   expect(screen.getAllByText("Quảng cáo")).toHaveLength(2);
   expect(screen.getByRole("link", { name: /Sky/ })).toHaveAttribute("href", "/games/sky");
@@ -144,12 +151,12 @@ test("keeps the SSR player available when related discovery fails", async () => 
     throw new ApiError(503, "unavailable");
   });
   render(await GamePage({ params: Promise.resolve({ slug: "tiny-quest" }) }));
-  expect(screen.getByTitle("Chơi Tiny Quest")).toBeVisible();
+  expect(screen.getByRole("button", { name: "Bắt đầu chơi" })).toBeVisible();
   expect(screen.queryByRole("heading", { name: "Trò chơi liên quan" })).not.toBeInTheDocument();
 });
 
 test("does not embed an unavailable artifact", async () => {
-  vi.mocked(api.get).mockImplementation(async (path) => path.startsWith("/games/") ? { ...game, artifactReady: false } : { games: [], nextCursor: null });
+  vi.mocked(api.get).mockImplementation(async (path) => path.startsWith("/games/") ? { ...game, artifactReady: false } : path.startsWith("/discover") ? { games: [], nextCursor: null } : engagementRead(path));
   render(await GamePage({ params: Promise.resolve({ slug: "tiny-quest" }) }));
   expect(screen.queryByTitle("Chơi Tiny Quest")).not.toBeInTheDocument();
 });
@@ -165,12 +172,13 @@ test("propagates primary game failures", async () => {
 });
 
 test("adds product information from the public summary without inventing release history", async () => {
-  vi.mocked(api.get).mockImplementation(async (path) => path.startsWith("/discover") ? { games: [], nextCursor: null } : game);
+  vi.mocked(api.get).mockImplementation(async (path) => path.startsWith("/discover") ? { games: [], nextCursor: null } : path.startsWith("/games/") ? game : engagementRead(path));
   render(await GamePage({ params: Promise.resolve({ slug: game.slug }) }));
   expect(screen.getByRole("heading", { name: "Thông tin trò chơi" })).toBeVisible();
   expect(screen.getByText("Trình duyệt")).toBeVisible();
   expect(screen.getByText("Bản dựng #1")).toBeVisible();
   expect(screen.getByText("07/09/2026")).toHaveAttribute("dateTime", game.createdAt);
+  fireEvent.click(screen.getByRole("button", { name: "Bắt đầu chơi" }));
   expect(screen.getByTitle("Chơi Tiny Quest")).toHaveAttribute("sandbox", "allow-scripts allow-pointer-lock");
   expect(screen.queryByText("Lịch sử phát hành")).not.toBeInTheDocument();
 });

@@ -61,6 +61,7 @@ export default async function GameWorkspacePage({
       <header className="page-heading">
         <Link href="/studio">← Về Xưởng sáng tạo</Link>
         <h1>{game.title}</h1>
+        <Link href={`/studio/games/${encodeURIComponent(game.id)}/analytics`}>Xem thống kê</Link>
       </header>
       <GameWorkspace initialGame={game} />
     </main>

@@ -1,3 +1,4 @@
+import { EngagementModule } from './engagement/engagement.module.js';
 import { Module } from '@nestjs/common';
 import { AdminManagementModule } from './admin-management/admin-management.module.js';
 import { AdminLibraryModule } from './admin-library/admin-library.module.js';
@@ -13,6 +14,7 @@ import { GameAssetsModule } from './game-assets/game-assets.module.js';
 @Module({
   imports: [
     AuthModule,
+    EngagementModule,
     AdminLibraryModule,
     AdminManagementModule,
     DevelopersModule,

@@ -94,6 +94,10 @@ model User {
   gameBuilds        GameBuild[]             @relation("BuildCreator")
   submittedReleases GameRelease[]           @relation("ReleaseSubmitter")
   reviewedReleases  GameRelease[]           @relation("ReleaseReviewer")
+  plays GamePlay[]
+  ratings GameRating[]
+  comments GameComment[]
+  commentCooldowns GameCommentCooldown[]
 }
 
 model DeveloperProfile {
@@ -128,6 +132,12 @@ model Game {
   createdAt                 DateTime        @default(now())
   updatedAt                 DateTime        @updatedAt
   owner                     User            @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  scoresEnabled             Boolean @default(false)
+  plays                     GamePlay[]
+  playRequests              GamePlayRequest[]
+  ratings                   GameRating[]
+  comments                  GameComment[]
+  commentCooldowns          GameCommentCooldown[]
   engineProject             EngineProject?
   builds                    GameBuild[]
   releases                  GameRelease[]
@@ -298,4 +308,63 @@ model AdminDocument {
   category   AdminCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
 
   @@index([categoryId])
+}
+
+model GamePlay {
+  id String @id @default(uuid())
+  gameId String
+  userId String?
+  participantKey String
+  tokenHash String
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+  lastHeartbeatAt DateTime @default(now())
+  sequence Int @default(0)
+  activeSeconds Int @default(0)
+  game Game @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+  score GameScore?
+  requests GamePlayRequest[]
+  @@index([gameId, createdAt])
+  @@index([gameId, participantKey, createdAt])
+}
+model GamePlayRequest {
+  gameId String
+  participantKey String
+  requestId String
+  playId String
+  game Game @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  play GamePlay @relation(fields: [playId], references: [id], onDelete: Cascade)
+  @@id([gameId, participantKey, requestId])
+}
+model GameRating {
+  gameId String
+  userId String
+  rating Int
+  game Game @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@id([gameId, userId])
+}
+model GameComment {
+  id String @id @default(cuid())
+  gameId String
+  userId String
+  body String @db.VarChar(2000)
+  createdAt DateTime @default(now())
+  game Game @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([gameId, createdAt, id])
+}
+model GameCommentCooldown {
+  gameId String
+  userId String
+  lastCommentAt DateTime
+  game Game @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@id([gameId, userId])
+}
+model GameScore {
+  playId String @id
+  score Int
+  play GamePlay @relation(fields: [playId], references: [id], onDelete: Cascade)
 }

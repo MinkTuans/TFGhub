@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import type { DiscoverGamesResponse, PublicGameSummary } from "@indieforge/contracts";
 import { api, ApiError, resolvePublicApiBaseUrl } from "../../../lib/api-client";
 import { AdSlot } from "../../../components/ad-slot";
+import { GameEngagement } from "../../../components/game-engagement";
 import { GamePlayer } from "../../../components/game-player";
 import { RelatedGames } from "../../../components/related-games";
 
@@ -41,6 +42,7 @@ export default async function GamePage({
         {game.artifactReady && game.artifactVersion > 0 ? (
           <GamePlayer
             title={game.title}
+            slug={game.slug}
             src={`${resolvePublicApiBaseUrl()}/play/${encodeURIComponent(game.slug)}/`}
             viewportWidth={game.viewportWidth}
             viewportHeight={game.viewportHeight}
@@ -73,6 +75,7 @@ export default async function GamePage({
           </dl>
         </aside>
       </article>
+      <GameEngagement key={game.slug} slug={game.slug} title={game.title} />
     </main>
   );
 }

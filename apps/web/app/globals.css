@@ -580,3 +580,50 @@ footer { padding: 2.5rem 0; border-top: 1px solid var(--border); font-size: 0.87
 .moderation-card__decision .actions { margin-top: 1rem; }
 @media (max-width: 768px) { .moderation-page .moderation-card { grid-template-columns: 1fr; } }
 .moderation-card h3 + .hint { margin: .5rem 0 1rem; }
+
+/* Community and private creator analytics share the active theme tokens. */
+.game-engagement { width: min(100%, 80rem); margin: 2rem auto; display: grid; gap: 1.5rem; }
+.game-engagement > .panel, .analytics-sections > .panel { padding: clamp(1rem, 3vw, 2rem); min-width: 0; }
+.engagement-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .75rem; }
+.engagement-heading h2 { margin: .25rem 0 1rem; }
+.engagement-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .75rem; margin: 1.5rem 0; }
+.engagement-metrics > div { background: var(--page); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 1rem; }
+.engagement-metrics dt { color: var(--muted); font-size: .875rem; }
+.engagement-metrics dd { margin: .5rem 0; font-size: clamp(1.1rem, 2vw, 1.7rem); font-weight: 700; overflow-wrap: anywhere; }
+.engagement-metrics small { color: var(--muted); }
+.rating-distribution { display: grid; gap: .4rem; max-width: 30rem; margin: 1.5rem 0; }
+.rating-distribution > div { display: grid; grid-template-columns: 3rem minmax(0, 1fr) 2rem; gap: .75rem; align-items: center; }
+.rating-distribution meter { width: 100%; height: 1rem; accent-color: var(--primary); }
+.rating-editor { display: grid; justify-items: start; gap: .75rem; margin: 1.5rem 0; }
+.rating-editor p { margin: 0; font-weight: 600; }
+.game-engagement .rating-buttons { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: .4rem; width: 100%; max-width: 20rem; }
+.game-engagement .rating-buttons button { min-width: 0; min-height: 2.8rem; padding: .5rem .25rem; }
+.rating-buttons button[aria-pressed="true"] { background: var(--primary); color: var(--on-primary); border-color: var(--primary); }
+.community-form { display: grid; gap: .75rem; padding: 1rem 0; }
+.community-form label, .community-form textarea { width: 100%; }
+.community-list { list-style: none; padding: 0; margin: 1rem 0; }
+.community-list > li { padding: 1.25rem 0; border-top: 1px solid var(--border); }
+.community-list time { color: var(--muted); font-size: .85rem; }
+.community-body { white-space: pre-wrap; overflow-wrap: anywhere; }
+.engagement-pagination { display: flex; align-items: center; justify-content: space-between; gap: .5rem; flex-wrap: wrap; margin-top: 1rem; }
+.analytics-page { max-width: 76rem; }
+.analytics-sections { display: grid; gap: 1.5rem; }
+.game-engagement .hint, .analytics-sections .hint { margin: .75rem 0; line-height: 1.6; }
+.game-engagement small.hint, .game-engagement span.hint, .analytics-sections small.hint, .analytics-sections span.hint { margin: 0; }
+.plays-chart { display: flex; align-items: flex-end; gap: clamp(2px, .5vw, 8px); height: 13rem; border-bottom: 1px solid var(--control-border); margin: 2rem 0 .5rem; padding: 0 .25rem; background: repeating-linear-gradient(to top, transparent 0, transparent calc(25% - 1px), var(--border) calc(25% - 1px), var(--border) 25%); }
+.plays-chart__column { flex: 1; height: 100%; display: flex; align-items: flex-end; }
+.plays-chart__column > div { width: 100%; background: var(--primary); border-radius: 3px 3px 0 0; }
+.analytics-data { margin-top: 1.5rem; }
+.analytics-data summary { cursor: pointer; font-weight: 600; }
+.analytics-table { max-height: 20rem; overflow: auto; margin-top: .75rem; }
+.analytics-table table { width: 100%; border-collapse: collapse; }
+.analytics-table th, .analytics-table td { text-align: left; padding: .6rem; border-bottom: 1px solid var(--border); }
+.score-setting { display: flex; align-items: center; gap: .75rem; margin: 1rem 0; }
+.score-setting input { width: 1.25rem; height: 1.25rem; accent-color: var(--primary); }
+.analytics-sections code { overflow-wrap: anywhere; }
+@media (max-width: 640px) {
+  .engagement-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .engagement-metrics > div { padding: .75rem; }
+  .engagement-pagination { font-size: .85rem; }
+  .engagement-pagination button { padding: .6rem; }
+}

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useSyncExternalStore } from "react";
 import { api, resolvePublicApiBaseUrl } from "../lib/api-client";
 import { EmptyState } from "./empty-state";
@@ -95,6 +96,7 @@ export function ModerationQueue({
                 <div className="moderation-card__info">
 
                 <h2>{game.title}</h2>
+                <Link href={`/moderation/games/${encodeURIComponent(game.id)}/comments`}>Kiểm duyệt bình luận</Link>
                 <p>Tác giả: {game.creator.displayName ?? "Chưa có tên"}</p>
                 <p>
                   Nguồn:{" "}

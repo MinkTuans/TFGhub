@@ -130,6 +130,7 @@ export function StudioTopbar({
           <span>TFG</span> Xưởng sáng tạo
         </h1>
         <span className="studio-badge">{publication}</span>
+        <Link href={`/studio/games/${encodeURIComponent(game.id)}/analytics`}>Thống kê</Link>
       </div>
       <form className="studio-title" onSubmit={saveTitle}>
         <label htmlFor="studio-game-title">Tên trò chơi</label>
