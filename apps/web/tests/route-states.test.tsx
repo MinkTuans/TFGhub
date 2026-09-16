@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { expect, test, vi } from "vitest";
 import RouteError from "../app/error";
 import GlobalError from "../app/global-error";
-import Loading from "../app/loading";
+import Loading from "../components/page-loading";
 
 const failure = new Error("private server diagnostic must not be rendered");
 

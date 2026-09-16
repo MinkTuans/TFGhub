@@ -2,6 +2,10 @@
 
 This release-oriented summary records major architecture/product milestones. It is not a deployment ledger; a development commit does not prove production rollout.
 
+## 2026-09-16 — Accounts/profile remaster (development only)
+
+Added responsive split account forms, password visibility/confirmation and a separate profile save after registration, with retry that never repeats a successful account creation. Profile uses real owner data and private workspace links. Scoped streaming skeletons to protected routes to restore public no-JavaScript rendering and unpublished-game HTTP404; search retains native GET with client progress. Verified59 unit and29 production-browser tests, clean changed-file lint and successful build. Remaining Studio/moderation/final audit scope is recorded in the [plan](../superpowers/plans/2026-09-16-ui-remaster.md). No deployment.
+
 ## 2026-09-16 — Recoverable routes and catalog remaster (development only)
 
 Added loading skeletons and page/root error recovery using Next's re-fetching retry, verified against controlled API failures in the production browser build. Discover now has explicit responsive columns, contextual result counts and shared empty states; game details show existing public metadata beside the preserved sandbox player. No production API/schema/session changes. Validation and remaining remaster scope: [plan](../superpowers/plans/2026-09-16-ui-remaster.md).

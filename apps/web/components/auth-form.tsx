@@ -1,71 +1,96 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import Link from "next/link";
+import { useId, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { LoginInput, RegisterInput } from "@indieforge/contracts";
+import { DeveloperProfileInput, LoginInput, RegisterInput } from "@indieforge/contracts";
 import { api } from "../lib/api-client";
 import { apiErrorMessage } from "../lib/api-error-message";
+import { PasswordField } from "./password-field";
+
+type RegistrationProfile = { displayName: string; bio: string };
 
 export function AuthForm({ mode }: { mode: "register" | "login" }) {
   const router = useRouter();
+  const hintId = useId();
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
+  const busy = useRef(false);
+  // Retain only the profile for retries; never repeat a successful registration.
+  const [createdProfile, setCreatedProfile] = useState<RegistrationProfile | null>(null);
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const input = (mode === "register" ? RegisterInput : LoginInput).safeParse(
-      Object.fromEntries(new FormData(event.currentTarget)),
-    );
-    if (!input.success) {
-      setError("Nhập email hợp lệ và mật khẩu từ 10–128 ký tự.");
-      return;
+    if (busy.current) return;
+    let profile = createdProfile;
+    let credentials: { email: string; password: string } | undefined;
+    if (!createdProfile) {
+      const raw = Object.fromEntries(new FormData(event.currentTarget));
+      const input = (mode === "register" ? RegisterInput : LoginInput).safeParse(raw);
+      if (!input.success) {
+        setError("Nhập email hợp lệ và mật khẩu từ 10–128 ký tự.");
+        return;
+      }
+      credentials = input.data;
+      if (mode === "register") {
+        if (raw.confirmPassword !== credentials.password) {
+          setError("Mật khẩu xác nhận chưa khớp.");
+          return;
+        }
+        const details = DeveloperProfileInput.safeParse({ displayName: raw.displayName });
+        if (!details.success) {
+          setError("Tên hiển thị cần có 2–50 ký tự.");
+          return;
+        }
+        profile = details.data;
+      }
     }
     setError("");
+    busy.current = true;
     setPending(true);
+    let accountCreated = createdProfile !== null;
     try {
-      await api.post(`/auth/${mode}`, input.data);
+      if (!accountCreated) {
+        await api.post(`/auth/${mode}`, credentials);
+        if (profile) {
+          accountCreated = true;
+          setCreatedProfile(profile);
+        }
+      }
+      if (profile) await api.put("/developers/me", profile);
       router.replace("/studio");
       router.refresh();
-    } catch (error) {
-      setError(
-        apiErrorMessage(
-          error,
-          mode === "register"
-            ? "Không thể tạo tài khoản. Vui lòng thử lại."
-            : "Không thể đăng nhập. Vui lòng thử lại.",
-        ),
-      );
+    } catch (failure) {
+      setError(apiErrorMessage(failure, accountCreated
+        ? "Không thể lưu hồ sơ. Tài khoản đã được tạo; hãy thử lưu hồ sơ lại."
+        : mode === "register" ? "Không thể tạo tài khoản. Vui lòng thử lại." : "Không thể đăng nhập. Vui lòng thử lại."));
     } finally {
+      busy.current = false;
       setPending(false);
     }
   }
+
   return (
-    <form method="post" onSubmit={submit} className="form-stack panel">
-      <label>
-        Email
-        <input name="email" type="email" autoComplete="email" required />
-      </label>
-      <label>
-        Mật khẩu
-        <input
-          name="password"
-          type="password"
-          minLength={10}
-          maxLength={128}
-          autoComplete={
-            mode === "register" ? "new-password" : "current-password"
-          }
-          required
-        />
-      </label>
-      {mode === "register" && <p className="hint">Sử dụng ít nhất 10 ký tự.</p>}
+    <form method="post" onSubmit={submit} className="form-stack auth-form" aria-busy={pending}>
+      {createdProfile ? (
+        <>
+          <p role="status">Tài khoản đã được tạo. {pending ? "Đang lưu hồ sơ của bạn…" : "Bạn có thể tiếp tục hoàn thiện hồ sơ."}</p>
+          <p>Tên hiển thị: <strong>{createdProfile.displayName}</strong></p>
+        </>
+      ) : (
+        <>
+          {mode === "register" && <label>Tên hiển thị<input name="displayName" autoComplete="nickname" minLength={2} maxLength={50} disabled={pending} required /></label>}
+          <label>Email<input name="email" type="email" autoComplete="email" disabled={pending} required /></label>
+          <PasswordField name="password" label="Mật khẩu" autoComplete={mode === "register" ? "new-password" : "current-password"} disabled={pending} describedBy={mode === "register" ? hintId : undefined} />
+          {mode === "register" && <>
+            <p className="hint" id={hintId}>Sử dụng từ 10–128 ký tự.</p>
+            <PasswordField name="confirmPassword" label="Xác nhận mật khẩu" autoComplete="new-password" disabled={pending} />
+          </>}
+        </>
+      )}
       {error && <p role="alert">{error}</p>}
-      <button disabled={pending}>
-        {pending
-          ? "Vui lòng chờ…"
-          : mode === "register"
-            ? "Tạo tài khoản"
-            : "Đăng nhập"}
-      </button>
+      <button type="submit" disabled={pending}>{pending ? "Vui lòng chờ…" : createdProfile ? "Thử lưu hồ sơ" : mode === "register" ? "Tạo tài khoản" : "Đăng nhập"}</button>
+      {createdProfile && !pending && <Link href="/profile">Đi đến hồ sơ của bạn</Link>}
     </form>
   );
 }

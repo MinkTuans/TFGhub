@@ -9,6 +9,8 @@ vi.mock("../lib/api-client", async (importOriginal) => {
   return { ...actual, api: { get: vi.fn() } };
 });
 
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
+
 const getGames = vi.mocked(api.get);
 
 afterEach(() => {

@@ -27,10 +27,15 @@ test("root session outages get a complete fallback document and can retry", asyn
   await expect(page.getByRole("heading", { name: "Every great game starts with a small idea." })).toBeVisible();
 });
 
-test("slow catalog requests show loading content before the real games", async ({ page, request }) => {
+test("slow catalog searches show progress before the next results", async ({ page, request }) => {
+  await page.goto("/discover");
   await request.post("/__test/api-fault?mode=discover-delay");
-  await page.goto("/discover", { waitUntil: "commit" });
-  await expect(page.getByRole("status")).toHaveText("Đang tải nội dung…");
-  await expect(page.getByRole("heading", { name: "Tiny Quest", exact: true })).toBeVisible();
+  await page.getByRole("textbox", { name: "Tìm kiếm game" }).fill("Tiny Quest");
+  await page.getByRole("button", { name: "Tìm kiếm", exact: true }).click();
+  await expect(page.getByRole("status")).toContainText("Đang tìm kiếm game…");
+  await expect(page.getByRole("heading", { name: "Kết quả cho “Tiny Quest”", exact: true })).toBeVisible();
+  await expect(page.getByRole("status")).toHaveCount(0);
+  await page.getByRole("button", { name: "Tìm kiếm", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Tìm kiếm", exact: true })).toBeEnabled();
   await expect(page.getByRole("status")).toHaveCount(0);
 });

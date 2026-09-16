@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { DiscoverGamesResponse } from "@indieforge/contracts";
+import { DiscoverSearch } from "../../components/discover-search";
 import { EmptyState } from "../../components/empty-state";
 import { GameCard } from "../../components/game-card";
 import { api, ApiError } from "../../lib/api-client";
@@ -34,13 +35,7 @@ export default async function DiscoverPage({
       <p className="discover-page__lede">
         Những game nhỏ, ý tưởng mới và những người tạo ra chúng.
       </p>
-      <form action="/discover" className="search-form">
-        <label>
-          Tìm kiếm game
-          <input name="query" placeholder="Tên game hoặc ý tưởng bạn muốn khám phá…" defaultValue={query} maxLength={200} />
-        </label>
-        <button>Tìm kiếm</button>
-      </form>
+      <DiscoverSearch key={query} query={query} />
       {error && (
         <div className="discover-state" role="alert">
           <p>{error}</p>
