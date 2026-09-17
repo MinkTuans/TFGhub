@@ -472,7 +472,7 @@ function CanvasSession({
       const layerId =
         target?.layerId ??
         [...scene.layers]
-          .sort((a, b) => a.order - b.order)
+          .sort((a, b) => b.order - a.order)
           .find(
             (layer) =>
               layer.visible &&

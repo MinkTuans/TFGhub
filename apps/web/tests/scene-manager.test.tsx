@@ -934,6 +934,7 @@ async function shell(initial = project(), persist = false) {
     </StudioProvider>,
   );
   await act(async () => {});
+  fireEvent.click(screen.getByRole("button", { name: "Thiết kế" }));
   return {
     get studio() {
       return studio;
@@ -951,6 +952,7 @@ async function shell(initial = project(), persist = false) {
         </StudioProvider>,
       );
       await act(async () => {});
+      fireEvent.click(screen.getByRole("button", { name: "Thiết kế" }));
     },
   };
 }

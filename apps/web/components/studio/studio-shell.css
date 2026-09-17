@@ -715,3 +715,280 @@
     gap: 0.5rem 1rem;
   }
 }
+
+/* Task navigation stays available at every viewport; panels preserve editor state. */
+.studio-shell [hidden] {
+  display: none !important;
+}
+.studio-task-nav {
+  display: flex;
+  gap: 0.4rem;
+  overflow-x: auto;
+  padding: 0.8rem 1rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+.studio-task-nav button {
+  flex: 0 0 auto;
+  padding: 0.7rem 1rem;
+  border-radius: 0.6rem;
+}
+.studio-task-nav button span {
+  opacity: 0.55;
+  margin-right: 0.5rem;
+  font-size: 0.75rem;
+}
+.studio-task-nav button[aria-pressed="true"] {
+  background: var(--primary);
+  color: white;
+  border-color: transparent;
+}
+.studio-task-panel {
+  padding: clamp(1rem, 3vw, 2.5rem);
+  max-width: 90rem;
+  margin: 0 auto;
+}
+.studio-task-panel h2 {
+  font-size: clamp(1.4rem, 3vw, 2rem);
+  margin-bottom: 0.8rem;
+}
+.studio-task-panel h3 {
+  margin: 1.5rem 0 0.7rem;
+}
+.studio-task-panel p {
+  line-height: 1.65;
+  margin-bottom: 1rem;
+  max-width: 75ch;
+}
+.studio-task-panel label {
+  display: grid;
+  gap: 0.4rem;
+  margin: 0.6rem 0;
+}
+.studio-task-panel label:has(input[type="checkbox"]) {
+  display: flex;
+  align-items: center;
+}
+.studio-task-panel textarea,
+.studio-task-panel input:not([type="checkbox"]):not([type="file"]),
+.studio-task-panel select {
+  max-width: 100%;
+  width: 100%;
+  padding: 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 0.4rem;
+  background: var(--surface);
+  color: inherit;
+}
+.studio-task-panel textarea {
+  resize: vertical;
+}
+.studio-task-panel fieldset {
+  margin: 1rem 0;
+  padding: 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+}
+.studio-task-actions,
+.studio-presets {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  align-items: center;
+  margin: 1rem 0;
+}
+.studio-task-actions button,
+.studio-presets button,
+.studio-task-panel form button {
+  padding: 0.65rem 1rem;
+}
+.studio-presets {
+  margin: 0;
+  padding: 0.7rem 1rem;
+  border-bottom: 1px solid var(--border);
+}
+.studio-start-cards {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+  margin: 1.5rem 0;
+}
+.studio-start-card {
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  padding: 1.4rem;
+  border: 1px solid var(--border);
+  border-radius: 0.8rem;
+  background: var(--surface);
+}
+.studio-start-card > span {
+  font-size: 1.8rem;
+  opacity: 0.55;
+}
+.studio-start-card strong {
+  font-size: 1.1rem;
+}
+.studio-start-card p {
+  font-weight: normal;
+  margin: 0;
+}
+.studio-eyebrow {
+  letter-spacing: 0.16em;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+.studio-code-layout {
+  display: grid;
+  grid-template-columns: minmax(10rem, 16rem) minmax(0, 1fr);
+  gap: 1.5rem;
+}
+.studio-code-layout nav button {
+  display: block;
+  width: 100%;
+  margin: 0.4rem 0;
+  padding: 0.7rem;
+  text-align: left;
+}
+.studio-code-layout textarea,
+.studio-task-panel pre {
+  font:
+    0.9rem/1.6 ui-monospace,
+    monospace;
+}
+.studio-task-panel pre {
+  overflow: auto;
+  padding: 1rem;
+}
+.studio-play iframe {
+  width: 100%;
+  height: min(65vh, 650px);
+  border: 1px solid var(--border);
+  border-radius: 0.6rem;
+  background: #111827;
+}
+.studio-project-files {
+  margin-top: 2rem;
+  border-top: 1px solid var(--border);
+}
+.studio-template-choice {
+  display: grid;
+  gap: 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: 0.7rem;
+  padding: 1rem;
+  margin: 0.6rem 0;
+  cursor: pointer;
+}
+.studio-template-choice:has(input:checked) {
+  border-color: var(--accent, #2563eb);
+}
+.studio-template-choice span {
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+@media (max-width: 63.99rem) {
+  .studio-start-cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .studio-shell .studio-layout {
+    display: flex;
+    flex-direction: column;
+  }
+  .studio-shell .studio-sidebar,
+  .studio-shell .studio-inspector {
+    width: 100%;
+    max-height: none;
+  }
+  .studio-shell .studio-topbar__tools {
+    display: flex;
+    flex-wrap: wrap;
+    width: 100%;
+  }
+  .studio-shell .studio-canvas {
+    min-height: 24rem;
+  }
+  .studio-shell .studio-settings {
+    display: block;
+  }
+}
+@media (max-width: 40rem) {
+  .studio-start-cards,
+  .studio-code-layout {
+    grid-template-columns: 1fr;
+  }
+  .studio-task-nav {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  .studio-task-nav button {
+    padding: 0.65rem;
+  }
+  .studio-task-nav button span {
+    display: none;
+  }
+  .studio-code-layout nav {
+    display: flex;
+    overflow-x: auto;
+    gap: 0.4rem;
+  }
+  .studio-code-layout nav button {
+    flex: 0 0 auto;
+    width: auto;
+  }
+}
+
+.studio-task-nav button[aria-pressed="true"] {
+  color: var(--on-primary);
+}
+.studio-shell .studio-task-panel h2 {
+  font-size: clamp(1.4rem, 3vw, 2rem);
+  margin-bottom: 0.8rem;
+}
+.studio-shell .studio-task-panel p {
+  margin-bottom: 1rem;
+}
+.studio-shell .studio-task-panel {
+  margin: 0 auto;
+  width: 100%;
+}
+@media (min-width: 64rem) {
+  .studio-shell .studio-layout {
+    height: calc(100dvh - 17rem);
+    min-height: 36rem;
+    overflow: hidden;
+  }
+  .studio-shell .studio-sidebar,
+  .studio-shell .studio-inspector {
+    overflow-y: auto;
+    min-height: 0;
+  }
+}
+
+.studio-task-nav button {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid transparent;
+}
+.studio-task-nav button[aria-pressed="true"] {
+  background: var(--primary);
+  color: var(--on-primary);
+}
+.studio-asset-groups button {
+  background: var(--surface-raised);
+  color: var(--text);
+}
+.studio-asset-groups button[aria-pressed="true"] {
+  background: #164252;
+  color: var(--primary);
+}
+.studio-task-panel input[type="file"] {
+  max-width: 100%;
+}
+.studio-upload-button input[type="file"] {
+  width: 1px;
+  max-width: 1px;
+  padding: 0;
+}

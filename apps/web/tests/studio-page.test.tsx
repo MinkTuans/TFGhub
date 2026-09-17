@@ -10,7 +10,7 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ replace, refresh: vi.fn(
 vi.mock("../lib/session", () => ({ privateGet: vi.fn() }));
 afterEach(() => { vi.resetAllMocks(); vi.unstubAllGlobals(); });
 
-test("one Create click posts a blank draft once and replaces the route with its Studio workspace", async () => {
+test("one Create click posts a named pixel template once and replaces the route with its Studio workspace", async () => {
   let finish!: (response: Response) => void;
   const fetch = vi.fn(() => new Promise<Response>((resolve) => { finish = resolve; }));
   vi.stubGlobal("fetch", fetch);
@@ -21,7 +21,7 @@ test("one Create click posts a blank draft once and replaces the route with its 
   fireEvent.click(button);
   expect(button).toBeDisabled();
   expect(fetch).toHaveBeenCalledTimes(1);
-  expect(fetch).toHaveBeenCalledWith(expect.stringMatching(/\/games\/engine-projects$/), expect.objectContaining({ method: "POST", body: JSON.stringify({ title: "Trò chơi chưa có tên" }), credentials: "include" }));
+  expect(fetch).toHaveBeenCalledWith(expect.stringMatching(/\/games\/engine-projects$/), expect.objectContaining({ method: "POST", body: JSON.stringify({ title: "Đảo của tôi", template: "PIXEL_ADVENTURE" }), credentials: "include" }));
   await act(async () => finish(new Response(JSON.stringify({ game: { id: "returned-game" }, project: { status: "SUPPORTED" } }))));
   await waitFor(() => expect(replace).toHaveBeenCalledWith("/studio/games/returned-game"));
   expect(button).toBeDisabled();
@@ -96,4 +96,15 @@ test("Studio navigation links creators to their game list and profile", async ()
   const nav = screen.getByRole("navigation", { name: "Không gian sáng tạo" });
   expect(within(nav).getByRole("link", { name: "Trò chơi của bạn" })).toHaveAttribute("href", "#games-heading");
   expect(within(nav).getByRole("link", { name: "Hồ sơ của bạn" })).toHaveAttribute("href", "/profile");
+});
+
+test("creator chooses a name and blank template explicitly", async () => {
+  const fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({ game: { id: "blank" } })));
+  vi.stubGlobal("fetch", fetch);
+  render(await NewGamePage());
+  fireEvent.change(screen.getByRole("textbox", { name: "Tên trò chơi" }), { target: { value: "Vườn của An" } });
+  fireEvent.click(screen.getByRole("radio", { name: /Dự án 2D trống/ }));
+  fireEvent.click(screen.getByRole("button", { name: "Tạo bản nháp" }));
+  await waitFor(() => expect(replace).toHaveBeenCalledWith("/studio/games/blank"));
+  expect(fetch).toHaveBeenCalledWith(expect.stringMatching(/\/games\/engine-projects$/), expect.objectContaining({ body: JSON.stringify({ title: "Vườn của An", template: "BLANK" }) }));
 });

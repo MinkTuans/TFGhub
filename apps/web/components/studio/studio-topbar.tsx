@@ -56,6 +56,7 @@ export function StudioButton({
 
 export function StudioTopbar({
   initialGame,
+  onGameChange,
   sceneId,
   onSceneChange,
   settingsOpen,
@@ -63,6 +64,7 @@ export function StudioTopbar({
   settingsRef,
 }: {
   initialGame: GameSummary;
+  onGameChange?: (game: GameSummary) => void;
   sceneId: string;
   onSceneChange: (id: string) => void;
   settingsOpen: boolean;
@@ -93,6 +95,7 @@ export function StudioTopbar({
         parsed.data,
       );
       setGame(saved);
+      onGameChange?.(saved);
       setTitle(saved.title);
     } catch (error) {
       setError(apiErrorMessage(error, "Không thể lưu tên. Vui lòng thử lại."));
@@ -112,14 +115,14 @@ export function StudioTopbar({
           CONFLICT: "Xung đột phiên bản",
         }[state.status];
   const publication =
-    game.visibility === "PUBLIC" && game.reviewState === "APPROVED"
+    initialGame.visibility === "PUBLIC" && initialGame.reviewState === "APPROVED"
       ? "Đã xuất bản"
       : {
           DRAFT: "Bản nháp",
           PENDING: "Chờ duyệt",
           APPROVED: "Đã duyệt",
           REJECTED: "Bị từ chối",
-        }[game.reviewState];
+        }[initialGame.reviewState];
   return (
     <header className="studio-topbar">
       <div className="studio-topbar__identity">
@@ -181,7 +184,7 @@ export function StudioTopbar({
           Phiên bản {state.acknowledged.revision}
         </span>
       </div>
-      <div className="studio-desktop studio-topbar__tools">
+      <div className="studio-topbar__tools">
         <div className="studio-history" role="group" aria-label="Lịch sử dự án">
           <StudioButton
             tooltip="Hoàn tác thay đổi dự án"

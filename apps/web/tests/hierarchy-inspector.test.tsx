@@ -240,6 +240,7 @@ async function mount(
     </StudioProvider>,
   );
   await waitFor(() => expect(studio.state.ready).toBe(true));
+  fireEvent.click(within(result.container).getByRole("button", { name: "Thiết kế" }));
   return {
     ...result,
     storage,
@@ -266,9 +267,15 @@ function clickCanvas(x = 50, y = 50) {
         button: 0,
       }),
     );
+  openAdvanced();
+}
+function openAdvanced() {
+  const summary = screen.queryByText("Thuộc tính nâng cao", { selector: "summary" });
+  if (summary && !summary.closest("details")?.open) fireEvent.click(summary);
 }
 function select(name: string) {
   fireEvent.click(row(name));
+  openAdvanced();
 }
 
 test("canvas selection expands cross-layer ancestors, focuses the hierarchy row and drives inspector without document edits", async () => {
@@ -1429,7 +1436,7 @@ test("native browser drops READY fixtures, edits, undoes, autosaves and reloads 
       );
     }
     const canvas = page.getByRole("img", { name: "Cảnh: Main" }),
-      group = page.getByRole("treeitem", { name: "Group", exact: true });
+      group = page.getByRole("treeitem", { name: "Group" });
     const treeTop = await page
       .getByRole("tree", { name: "Đối tượng Cảnh" })
       .evaluate((element) => element.getBoundingClientRect().top);
@@ -1448,7 +1455,7 @@ test("native browser drops READY fixtures, edits, undoes, autosaves and reloads 
       page.getByRole("textbox", { name: "Tên đối tượng" }),
     ).toHaveValue("Fixture");
     await browserExpect(
-      page.getByRole("treeitem", { name: "Fixture", exact: true }),
+      page.getByRole("treeitem", { name: "Fixture" }),
     ).toBeFocused();
     const droppedId = await canvas.getAttribute("data-selected-object-id");
     expect(droppedId).toBeTruthy();
@@ -1480,19 +1487,20 @@ test("native browser drops READY fixtures, edits, undoes, autosaves and reloads 
       .getByRole("textbox", { name: "Tên đối tượng" })
       .fill("Collected item");
     await page.getByRole("button", { name: "Lưu đối tượng" }).click();
+    await page.getByText("Thuộc tính nâng cao", { exact: true }).click();
     const item = page.getByRole("group", {
       name: "Vật phẩm",
       exact: true,
     });
     await item.getByRole("spinbutton", { name: "Số lượng tối đa" }).fill("7");
     await item
-      .getByRole("button", { name: "Lưu Vật phẩm", exact: true })
+      .getByRole("button", { name: "Lưu Vật phẩm" })
       .click();
-    await page.getByRole("button", { name: "Undo", exact: true }).click();
+    await page.getByRole("button", { name: "Undo" }).click();
     await browserExpect(
       item.getByRole("spinbutton", { name: "Số lượng tối đa" }),
     ).toHaveValue("1");
-    await page.getByRole("button", { name: "Redo", exact: true }).click();
+    await page.getByRole("button", { name: "Redo" }).click();
     await browserExpect(
       item.getByRole("spinbutton", { name: "Số lượng tối đa" }),
     ).toHaveValue("7");
@@ -1505,7 +1513,7 @@ test("native browser drops READY fixtures, edits, undoes, autosaves and reloads 
       page.getByRole("status", { name: "Save state" }),
     ).toHaveText("SAVED");
     await browserExpect(
-      page.getByRole("treeitem", { name: "Collected item", exact: true }),
+      page.getByRole("treeitem", { name: "Collected item" }),
     ).toHaveAttribute("aria-selected", "true");
     await browserExpect(canvas).toHaveAttribute(
       "data-selected-object-id",

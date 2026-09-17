@@ -14,10 +14,22 @@ import { StudioToast } from "./studio-toast";
 import { useStudioSelection } from "./studio-selection";
 import "./studio-shell.css";
 import { AssetManager } from "./assets/asset-manager";
+import { PixelStudioGuide } from "../pixel-studio-guide";
+import {
+  studioTasks,
+  StudioStart,
+  StudioCode,
+  StudioPlay,
+  StudioPresets,
+  StudioAudioAssets,
+  type StudioTask,
+} from "./studio-task-panels";
 
 export function StudioShell({ initialGame }: { initialGame: GameSummary }) {
   const { state } = useStudio();
+  const [game, setGame] = useState(initialGame);
   const { selection, selectScene } = useStudioSelection();
+  const [task, setTask] = useState<StudioTask>("Bắt đầu");
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [inspectorOpen, setInspectorOpen] = useState(true);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -49,7 +61,8 @@ export function StudioShell({ initialGame }: { initialGame: GameSummary }) {
   return (
     <main className="studio-shell" aria-label="Xưởng sáng tạo trò chơi">
       <StudioTopbar
-        initialGame={initialGame}
+        initialGame={game}
+        onGameChange={setGame}
         sceneId={scene.id}
         onSceneChange={selectScene}
         settingsOpen={settingsOpen}
@@ -57,6 +70,55 @@ export function StudioShell({ initialGame }: { initialGame: GameSummary }) {
         settingsRef={settingsRef}
       />
       <StudioToast />
+      <nav className="studio-task-nav" aria-label="Các bước sáng tạo">
+        {studioTasks.map((item, index) => (
+          <button
+            key={item}
+            aria-pressed={task === item}
+            aria-controls={`studio-task-${index}`}
+            onClick={() => setTask(item)}
+          >
+            <span aria-hidden="true">{String(index + 1).padStart(2, "0")}</span>
+            {item}
+          </button>
+        ))}
+      </nav>
+      <div id="studio-task-0" hidden={task !== "Bắt đầu"}>
+        {task === "Bắt đầu" && <StudioStart onTask={setTask} />}
+      </div>
+      <section
+        id="studio-task-2"
+        className="studio-task-panel"
+        hidden={task !== "Tài nguyên"}
+        aria-label="Nhập ảnh và âm thanh"
+      >
+        <h2>Nhập ảnh / âm thanh</h2>
+        <p>
+          Chọn Tải lên để nhập PNG, JPG, WebP hoặc WAV (tối đa 10 MiB mỗi tệp).
+          Chọn “Thêm vào Cảnh” trên ảnh để thêm vào cảnh hiện tại.
+        </p>
+        <AssetManager
+          onAssetsChange={setAssets}
+          onPlaceAsset={(payload) => {
+            setTask("Thiết kế");
+            requestAnimationFrame(() => assetPlacement.current?.(payload));
+          }}
+        />
+        <StudioAudioAssets assets={assets} />
+      </section>
+      <div id="studio-task-3" hidden={task !== "Code"}>
+        <StudioCode scene={scene} />
+      </div>
+      <div id="studio-task-4" hidden={task !== "Chơi thử & xuất bản"}>
+        <StudioPlay initialGame={game} onGameChange={setGame} />
+      </div>
+      <div
+        id="studio-task-5"
+        className="studio-task-panel"
+        hidden={task !== "Hướng dẫn"}
+      >
+        {task === "Hướng dẫn" && <PixelStudioGuide compact />}
+      </div>
       {settingsOpen && (
         <StudioSettings
           document={state.document}
@@ -70,52 +132,34 @@ export function StudioShell({ initialGame }: { initialGame: GameSummary }) {
           }}
         />
       )}
-      <div
-        className="studio-desktop studio-layout"
-        data-sidebar={sidebarOpen}
-        data-inspector={inspectorOpen}
-      >
-        <StudioSidebar
-          scenes={state.document.scenes}
-          sceneId={scene.id}
-          onSceneChange={selectScene}
-          open={sidebarOpen}
-          onToggle={toggleSidebar}
-          assetManager={
-            <AssetManager
-              onAssetsChange={setAssets}
-              onPlaceAsset={(payload) => assetPlacement.current?.(payload)}
-            />
-          }
-        />
-        <StudioSceneOverview
-          scene={scene}
-          pixelArt={state.document.settings.pixelArt}
-          assetMetadata={assetMetadata}
-          registerAssetPlacement={(handler) => {
-            assetPlacement.current = handler;
-          }}
-        />
-        <StudioInspector
-          scene={scene}
-          open={inspectorOpen}
-          onToggle={toggleInspector}
-        />
-      </div>
-      <section
-        className="studio-mobile"
-        aria-label="Xưởng sáng tạo trên thiết bị di động"
-      >
-        <h2>Thông tin trò chơi</h2>
-        <p>
-          Bạn có thể đổi tên trò chơi tại đây. Mở Xưởng sáng tạo trên máy tính để xem các
-          Cảnh và bố cục dự án.
-        </p>
-        <p className="studio-muted">
-          {state.document.scenes.length} Cảnh · Khung hình{" "}
-          {state.document.settings.viewport.width} ×{" "}
-          {state.document.settings.viewport.height} px
-        </p>
+      <section id="studio-task-1" hidden={task !== "Thiết kế"}>
+        <StudioPresets scene={scene} />
+        <div
+          className="studio-layout"
+          data-sidebar={sidebarOpen}
+          data-inspector={inspectorOpen}
+        >
+          <StudioSidebar
+            scenes={state.document.scenes}
+            sceneId={scene.id}
+            onSceneChange={selectScene}
+            open={sidebarOpen}
+            onToggle={toggleSidebar}
+          />
+          <StudioSceneOverview
+            scene={scene}
+            pixelArt={state.document.settings.pixelArt}
+            assetMetadata={assetMetadata}
+            registerAssetPlacement={(handler) => {
+              assetPlacement.current = handler;
+            }}
+          />
+          <StudioInspector
+            scene={scene}
+            open={inspectorOpen}
+            onToggle={toggleInspector}
+          />
+        </div>
       </section>
       <div className="studio-bottom">
         <span>{state.document.scenes.length} Cảnh</span>

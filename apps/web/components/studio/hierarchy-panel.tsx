@@ -26,7 +26,16 @@ function HierarchySession({ scene }: { scene: Scene }) {
   const { state, dispatch } = useStudio();
   const { selection, selectObject } = useStudioSelection();
   const [expanded, setExpanded] = useState(
-    () => new Set(scene.layers.map((layer) => layer.id)),
+    () =>
+      new Set(
+        scene.layers
+          .filter(
+            (layer) =>
+              scene.objects.filter((object) => object.layerId === layer.id)
+                .length <= 30,
+          )
+          .map((layer) => layer.id),
+      ),
   );
   const [focused, setFocused] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -178,9 +187,7 @@ function HierarchySession({ scene }: { scene: Scene }) {
       dispatch({ type: "commit", mutations: [mutation] });
       setError("");
     } catch (error) {
-      setError(
-        studioValidationMessage(error),
-      );
+      setError(studioValidationMessage(error));
     }
   }
   return (

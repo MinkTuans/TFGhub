@@ -222,38 +222,44 @@ function ObjectInspector({
           </label>
           <button type="submit">Lưu đối tượng</button>
         </form>
-        <label>
-          Thêm thành phần
-          <select
-            value={types.includes(adding) ? adding : types[0]}
-            onChange={(event) => setAdding(event.target.value as typeof adding)}
-          >
-            {types.map((type) => (
-              <option key={type} value={type}>{studioLabel(type)}</option>
-            ))}
-          </select>
-        </label>
-        <button
-          type="button"
-          onClick={() =>
-            commit(() =>
-              addComponentCommand(
-                scene.id,
-                object.id,
-                types.includes(adding) ? adding : types[0],
-              ),
-            )
-          }
-        >
-          Thêm thành phần
-        </button>
         <button type="button" onClick={() => setDeleting(true)}>
           Xóa đối tượng
         </button>
       </fieldset>
       {error && <p role="alert">{error}</p>}
-      <details open>
+      <details>
         <summary>Thuộc tính nâng cao</summary>
+        <fieldset disabled={!editable}>
+          <label>
+            Thêm thành phần
+            <select
+              value={types.includes(adding) ? adding : types[0]}
+              onChange={(event) =>
+                setAdding(event.target.value as typeof adding)
+              }
+            >
+              {types.map((type) => (
+                <option key={type} value={type}>
+                  {studioLabel(type)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button
+            type="button"
+            onClick={() =>
+              commit(() =>
+                addComponentCommand(
+                  scene.id,
+                  object.id,
+                  types.includes(adding) ? adding : types[0],
+                ),
+              )
+            }
+          >
+            Thêm thành phần
+          </button>
+        </fieldset>
         {object.components.map((component) => (
           <ComponentEditor
             key={component.id}

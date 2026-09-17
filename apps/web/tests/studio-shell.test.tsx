@@ -157,6 +157,7 @@ async function shell(overrides: Partial<StudioProviderProps> = {}) {
     </StudioProvider>,
   );
   await act(async () => {});
+  fireEvent.click(screen.getByRole("button", { name: "Thiết kế" }));
   return {
     get studio() {
       return studio;
@@ -494,20 +495,16 @@ test("failed recovery is visible and its retry action reads recovery again", asy
   ).not.toBeInTheDocument();
 });
 
-test("the shell provides a read-only canvas without future editing controls or browser alerts", async () => {
+test("the shell preserves a mounted canvas across tasks without browser alerts", async () => {
   const alert = vi.spyOn(window, "alert").mockImplementation(() => {});
   await shell();
-  expect(
-    screen.queryByRole("button", {
-      name: /Chạy thử|Xuất bản|AI|Thêm đối tượng|Tài nguyên|Mã nguồn|Kiểm tra/,
-    }),
-  ).not.toBeInTheDocument();
-  expect(screen.getByRole("img", { name: "Cảnh: Khởi đầu" }).tagName).toBe(
-    "CANVAS",
-  );
-  expect(document.querySelector("iframe")).toBeNull();
-  expect(screen.getByText(/máy tính/)).toBeInTheDocument();
-  fireEvent.click(screen.getByRole("button", { name: "Cài đặt Xưởng sáng tạo" }));
+  const canvas = screen.getByRole("img", { name: "Cảnh: Khởi đầu" });
+  fireEvent.click(screen.getByRole("button", { name: "Tài nguyên" }));
+  expect(screen.getByRole("heading", { name: "Nhập ảnh / âm thanh" })).toBeVisible();
+  expect(canvas).toBeInTheDocument();
+  expect(canvas).not.toBeVisible();
+  fireEvent.click(screen.getByRole("button", { name: "Thiết kế" }));
+  expect(screen.getByRole("img", { name: "Cảnh: Khởi đầu" })).toBe(canvas);
   expect(alert).not.toHaveBeenCalled();
 });
 
@@ -595,3 +592,95 @@ test.each([
     ]);
   },
 );
+
+test("task navigation exposes assets, code, preview and help", async () => {
+ await shell();
+ for (const name of ["Bắt đầu", "Thiết kế", "Tài nguyên", "Code", "Chơi thử & xuất bản", "Hướng dẫn"]) expect(screen.getByRole("button", {name})).toBeVisible();
+ fireEvent.click(screen.getByRole("button", {name:"Code"}));
+ expect(screen.getByRole("button", {name:"Script mới"})).toBeVisible();
+ fireEvent.click(screen.getByRole("button", {name:"Chơi thử & xuất bản"}));
+ expect(screen.getByRole("button", {name:"Tạo bản chơi thử"})).toBeEnabled();
+ expect(screen.getByRole("button", {name:"Gửi duyệt"})).toBeDisabled();
+});
+
+test("code saves a canonical scene-attached script and remains undoable", async () => {
+  const h = await shell();
+  fireEvent.click(screen.getByRole("button", { name: "Code" }));
+  fireEvent.click(screen.getByRole("button", { name: "Script mới" }));
+  fireEvent.change(screen.getByRole("textbox", { name: "Tên script" }), { target: { value: "Chào đảo" } });
+  fireEvent.click(screen.getByRole("button", { name: "Lưu script vào dự án" }));
+  await waitFor(() => expect(h.studio.state.document.scripts).toHaveLength(1));
+  expect(h.studio.state.document.scripts[0]).toMatchObject({ name: "Chào đảo", capabilities: ["SHOW_DIALOGUE"], attachments: [{ type: "SCENE", sceneId: id(2) }] });
+  fireEvent.click(screen.getByRole("button", { name: "Hoàn tác" }));
+  expect(h.studio.state.document.scripts).toHaveLength(0);
+});
+
+test("JSON import rejects malformed data and preserves current project identity", async () => {
+  const h = await shell();
+  fireEvent.click(screen.getByRole("button", { name: "Bắt đầu" }));
+  const input = screen.getByLabelText("Nhập dự án JSON", { selector: "input" });
+  fireEvent.change(input, { target: { files: [{ size: 20, text: async () => '{"schemaVersion":2}' }] } });
+  expect(await screen.findByRole("alert")).toHaveTextContent("JSON không hợp lệ");
+  expect(h.studio.state.document).toEqual(project);
+  const imported = { ...project, projectId: id(98), scenes: project.scenes.map((scene) => ({ ...scene, name: "Cảnh nhập" })) };
+  fireEvent.change(input, { target: { files: [{ size: 2000, text: async () => JSON.stringify(imported) }] } });
+  await waitFor(() => expect(h.studio.state.document.scenes[0].name).toBe("Cảnh nhập"));
+  expect(h.studio.state.document.projectId).toBe(project.projectId);
+  fireEvent.click(screen.getByRole("button", { name: "Hoàn tác" }));
+  expect(h.studio.state.document).toEqual(project);
+});
+
+test("build only runs for a saved head and an edit immediately removes the sandboxed preview", async () => {
+  const { api } = await import("../lib/api-client");
+  const post = vi.spyOn(api, "post").mockResolvedValue({ ...game, artifactReady: true, artifactVersion: 1 });
+  const h = await shell();
+  fireEvent.click(screen.getByRole("button", { name: "Chơi thử & xuất bản" }));
+  fireEvent.click(screen.getByRole("button", { name: "Tạo bản chơi thử" }));
+  await waitFor(() => expect(screen.getByTitle("Chơi thử trò chơi")).toBeVisible());
+  expect(post).toHaveBeenCalledWith(`/games/${game.id}/build`, {});
+  expect(screen.getByTitle("Chơi thử trò chơi")).toHaveAttribute("sandbox", "allow-scripts allow-pointer-lock");
+  act(() => h.studio.dispatch({ type: "commit", mutations: [{ type: "scene.rename", sceneId: id(2), name: "Chưa lưu" }] }));
+  expect(screen.queryByTitle("Chơi thử trò chơi")).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Tạo bản chơi thử" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Gửi duyệt" })).toBeDisabled();
+});
+
+test("JS file import stays a draft until explicit canonical save", async () => {
+  const h = await shell();
+  fireEvent.click(screen.getByRole("button", { name: "Code" }));
+  fireEvent.change(screen.getByLabelText("Nhập JavaScript"), { target: { files: [{ name: "hello.js", size: 50, text: async () => 'api.showDialogue("Hello");' }] } });
+  expect(await screen.findByRole("textbox", { name: "Mã JavaScript" })).toHaveValue('api.showDialogue("Hello");');
+  expect(h.studio.state.document.scripts).toHaveLength(0);
+  fireEvent.click(screen.getByRole("checkbox", { name: "Hiện hội thoại" }));
+  fireEvent.click(screen.getByRole("button", { name: "Lưu script vào dự án" }));
+  expect(h.studio.state.document.scripts[0]).toMatchObject({ name: "hello.js", source: 'api.showDialogue("Hello");', capabilities: ["SHOW_DIALOGUE"] });
+});
+
+test("foreign JSON asset ownership failure preserves the original project", async () => {
+  const { api, ApiError } = await import("../lib/api-client");
+  vi.spyOn(api, "get").mockRejectedValue(new ApiError(403, "You do not own this asset"));
+  const h = await shell();
+  fireEvent.click(screen.getByRole("button", { name: "Bắt đầu" }));
+  fireEvent.change(screen.getByLabelText("Nhập dự án JSON", { selector: "input" }), { target: { files: [{ size: 2000, text: async () => JSON.stringify({ ...project, assetIds: [id(99)] }) }] } });
+  expect(await screen.findByRole("alert")).toHaveTextContent("Không thể nhập tài nguyên");
+  expect(h.studio.state.document).toEqual(project);
+});
+
+test("a collectible preset includes a trigger collider and can be undone atomically", async () => {
+ const h = await shell();
+ fireEvent.click(screen.getByRole("button", { name: "Vật phẩm" }));
+ expect(h.studio.state.document.scenes[0].objects[0].components).toEqual(expect.arrayContaining([expect.objectContaining({ type: "InventoryItem" }), expect.objectContaining({ type: "Collider", properties: expect.objectContaining({ isTrigger: true }) })]));
+ fireEvent.click(screen.getByRole("button", { name: "Hoàn tác" }));
+ expect(h.studio.state.document.scenes[0].objects).toHaveLength(0);
+});
+
+test("switching from dirty script prompts and cancel preserves source", async () => {
+ await shell();
+ fireEvent.click(screen.getByRole("button", { name: "Code" }));
+ fireEvent.click(screen.getByRole("button", { name: "Script mới" }));
+ fireEvent.change(screen.getByRole("textbox", { name: "Mã JavaScript" }), { target: { value: 'api.showDialogue("keep me");' } });
+ fireEvent.click(screen.getByRole("button", { name: "Script mới" }));
+ const dialog = screen.getByRole("dialog", { name: "Script có thay đổi chưa lưu" });
+ fireEvent.click(within(dialog).getByRole("button", { name: "Hủy" }));
+ expect(screen.getByRole("textbox", { name: "Mã JavaScript" })).toHaveValue('api.showDialogue("keep me");');
+});
