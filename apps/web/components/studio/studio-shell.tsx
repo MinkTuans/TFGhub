@@ -15,6 +15,7 @@ import { useStudioSelection } from "./studio-selection";
 import "./studio-shell.css";
 import { AssetManager } from "./assets/asset-manager";
 import { PixelStudioGuide } from "../pixel-studio-guide";
+import { VisualGameplayPanel } from "./visual-gameplay-panel";
 import {
   studioTasks,
   StudioStart,
@@ -106,14 +107,17 @@ export function StudioShell({ initialGame }: { initialGame: GameSummary }) {
         />
         <StudioAudioAssets assets={assets} />
       </section>
-      <div id="studio-task-3" hidden={task !== "Code"}>
+      <div id="studio-task-3" hidden={task !== "Gameplay"}>
+        {task === "Gameplay" && <VisualGameplayPanel />}
+      </div>
+      <div id="studio-task-4" hidden={task !== "Code"}>
         <StudioCode scene={scene} />
       </div>
-      <div id="studio-task-4" hidden={task !== "Chơi thử & xuất bản"}>
+      <div id="studio-task-5" hidden={task !== "Chơi thử & xuất bản"}>
         <StudioPlay initialGame={game} onGameChange={setGame} />
       </div>
       <div
-        id="studio-task-5"
+        id="studio-task-6"
         className="studio-task-panel"
         hidden={task !== "Hướng dẫn"}
       >

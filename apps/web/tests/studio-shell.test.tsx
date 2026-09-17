@@ -593,14 +593,42 @@ test.each([
   },
 );
 
-test("task navigation exposes assets, code, preview and help", async () => {
+test("task navigation exposes assets, visual gameplay, code, preview and help", async () => {
  await shell();
- for (const name of ["Bắt đầu", "Thiết kế", "Tài nguyên", "Code", "Chơi thử & xuất bản", "Hướng dẫn"]) expect(screen.getByRole("button", {name})).toBeVisible();
+ for (const name of ["Bắt đầu", "Thiết kế", "Tài nguyên", "Gameplay", "Code", "Chơi thử & xuất bản", "Hướng dẫn"]) expect(screen.getByRole("button", {name})).toBeVisible();
+ fireEvent.click(screen.getByRole("button", {name:"Gameplay"}));
+ expect(screen.getByRole("heading", {name:"Luật chơi trực quan"})).toBeVisible();
+ expect(screen.getByRole("button", {name:"Tạo luật"})).toBeVisible();
  fireEvent.click(screen.getByRole("button", {name:"Code"}));
  expect(screen.getByRole("button", {name:"Script mới"})).toBeVisible();
  fireEvent.click(screen.getByRole("button", {name:"Chơi thử & xuất bản"}));
  expect(screen.getByRole("button", {name:"Tạo bản chơi thử"})).toBeEnabled();
  expect(screen.getByRole("button", {name:"Gửi duyệt"})).toBeDisabled();
+});
+
+test("visual gameplay creates a canonical start rule and global variable", async () => {
+  const h = await shell();
+  fireEvent.click(screen.getByRole("button", { name: "Gameplay" }));
+  fireEvent.change(screen.getByRole("textbox", { name: "Tên luật" }), {
+    target: { value: "Thưởng điểm khi bắt đầu" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Tạo luật" }));
+  expect(h.studio.state.document.events).toHaveLength(1);
+  expect(h.studio.state.document.events[0]).toMatchObject({
+    name: "Thưởng điểm khi bắt đầu",
+    trigger: { type: "ON_START" },
+    steps: [{ type: "ADD_SCORE", amount: 10 }],
+  });
+  fireEvent.change(screen.getByRole("textbox", { name: "Tên biến" }), {
+    target: { value: "level" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Thêm biến" }));
+  expect(h.studio.state.document.variables.global).toHaveLength(1);
+  expect(h.studio.state.document.variables.global[0]).toMatchObject({
+    name: "level",
+    type: "NUMBER",
+    initialValue: 0,
+  });
 });
 
 test("code saves a canonical scene-attached script and remains undoable", async () => {

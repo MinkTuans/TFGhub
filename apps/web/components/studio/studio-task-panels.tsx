@@ -24,6 +24,7 @@ export const studioTasks = [
   "Bắt đầu",
   "Thiết kế",
   "Tài nguyên",
+  "Gameplay",
   "Code",
   "Chơi thử & xuất bản",
   "Hướng dẫn",
@@ -99,12 +100,18 @@ export function StudioStart({
             ],
             [
               "03",
+              "Gameplay",
+              "Tạo luật chơi",
+              "Dùng câu lệnh Khi… Thì… để tạo điểm số, hẹn giờ và điều kiện thắng mà không cần viết code.",
+            ],
+            [
+              "04",
               "Code",
               "Thêm hành vi",
               "Dùng JavaScript để hiện lời chào, đổi biến hoặc chuyển cảnh. Có ví dụ sẵn để bắt đầu.",
             ],
             [
-              "04",
+              "05",
               "Chơi thử & xuất bản",
               "Chơi, sửa, chia sẻ",
               "Tạo bản chơi thử từ phiên bản đã lưu, kiểm tra rồi gửi trò chơi để duyệt.",
