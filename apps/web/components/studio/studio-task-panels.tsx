@@ -239,8 +239,10 @@ export function StudioPresets({ scene }: { scene: Scene }) {
         [
           ["PLAYER", "Nhân vật"],
           ["ITEM", "Vật phẩm"],
+          ["CUSTOM", "Kẻ địch"],
           ["DECORATION", "Trang trí"],
           ["NPC", "Nhân vật trò chuyện"],
+          ["TILEMAP", "Bản đồ ô"],
         ] as const
       ).map(([objectType, name]) => (
         <button
@@ -250,7 +252,7 @@ export function StudioPresets({ scene }: { scene: Scene }) {
             if (layer) {
               const mutation = createObjectCommand(scene, {
                 objectType,
-                name,
+                name: objectType === "CUSTOM" ? "Kẻ địch" : name,
                 layerId: layer.id,
                 transform: { x: scene.width / 2, y: scene.height / 2 },
               });
@@ -272,6 +274,14 @@ export function StudioPresets({ scene }: { scene: Scene }) {
                     },
                   ),
                 );
+              if (objectType === "CUSTOM" && mutation.type === "object.create") {
+                const objectId = mutation.objects[0].object.id;
+                mutations.push(
+                  addComponentCommand(scene.id, objectId, "SpriteRenderer"),
+                  addComponentCommand(scene.id, objectId, "Collider"),
+                  addComponentCommand(scene.id, objectId, "Health"),
+                );
+              }
               commit(mutations);
             }
           }}

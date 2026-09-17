@@ -702,6 +702,21 @@ test("a collectible preset includes a trigger collider and can be undone atomica
  expect(h.studio.state.document.scenes[0].objects).toHaveLength(0);
 });
 
+test("an enemy preset creates a visible collidable health object atomically", async () => {
+  const h = await shell();
+  fireEvent.click(screen.getByRole("button", { name: "Kẻ địch" }));
+  expect(h.studio.state.document.scenes[0].objects[0]).toMatchObject({
+    name: "Kẻ địch",
+    components: expect.arrayContaining([
+      expect.objectContaining({ type: "SpriteRenderer" }),
+      expect.objectContaining({ type: "Collider" }),
+      expect.objectContaining({ type: "Health" }),
+    ]),
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Hoàn tác" }));
+  expect(h.studio.state.document.scenes[0].objects).toHaveLength(0);
+});
+
 test("switching from dirty script prompts and cancel preserves source", async () => {
  await shell();
  fireEvent.click(screen.getByRole("button", { name: "Code" }));
