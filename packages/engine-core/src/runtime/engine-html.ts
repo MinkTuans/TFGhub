@@ -136,6 +136,8 @@ function browserPlayer(
           url = assets[id];
         if (url) {
           const a = new Audio(url);
+          a.loop = Boolean(e.loop);
+          a.volume = Math.max(0, Math.min(1, Number(e.volume ?? 1)));
           audio.get(id)?.pause();
           audio.set(id, a);
           void a

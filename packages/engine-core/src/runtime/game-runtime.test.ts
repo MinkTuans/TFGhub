@@ -346,8 +346,10 @@ it("freezes external events and script commands while paused or finished and all
   r.emit("ON_KEY_PRESS", { key: "x" });
   expect(r.state.score).toBe(1);
 });
-it("diagnoses configured audio and direct interactable event routing", () => {
+it("starts configured autoplay audio and diagnoses direct interactable routing", () => {
   const f = fixture();
+  const audioAssetId = id();
+  f.project.assetIds.push(audioAssetId);
   f.player.components.push(
     {
       id: id(),
@@ -355,6 +357,7 @@ it("diagnoses configured audio and direct interactable event routing", () => {
       type: "AudioSource",
       properties: {
         ...(v2ComponentRegistry.AudioSource.defaults() as object),
+        assetId: audioAssetId,
         autoplay: true,
       },
     },
@@ -369,6 +372,11 @@ it("diagnoses configured audio and direct interactable event routing", () => {
     },
   );
   const r = createGameRuntime(f.project);
-  expect(r.state.diagnostics.join(" ")).toContain("AudioSource");
+  expect(r.state.effects).toContainEqual(expect.objectContaining({
+    type: "PLAY_AUDIO",
+    loop: false,
+    volume: 1,
+  }));
+  expect(r.state.diagnostics.join(" ")).not.toContain("AudioSource autoplay");
   expect(r.state.diagnostics.join(" ")).toContain("Interactable.eventId");
 });

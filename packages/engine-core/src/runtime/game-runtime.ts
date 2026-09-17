@@ -537,10 +537,20 @@ export function createGameRuntime(snapshot: EngineProjectV2) {
           )
         )
           diagnostic(`Unsupported component: ${c.type}`);
-        if (c.type === "AudioSource")
-          diagnostic(
-            "AudioSource autoplay/loop/volume unsupported; use PLAY_AUDIO or api.playAudio",
-          );
+        if (c.type === "AudioSource") {
+          const audio = c.properties as any;
+          if (audio.autoplay && audio.assetId)
+            effect({
+              type: "PLAY_AUDIO",
+              assetId: audio.assetId,
+              loop: audio.loop,
+              volume: audio.volume,
+            });
+          if (audio.triggerEventId || audio.fadeInMs || audio.fadeOutMs)
+            diagnostic(
+              "AudioSource event routing and fades are not supported",
+            );
+        }
         if (c.type === "Interactable" && (c.properties as any).eventId)
           diagnostic(
             "Interactable.eventId routing unsupported; use an ON_INTERACT event",
