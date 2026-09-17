@@ -1,3 +1,7 @@
+"use client";
+
+import { useMemo, useState } from "react";
+
 export const PIXEL_STUDIO_SCRIPT_EXAMPLE = `// Nội dung của hàm JavaScript; không dùng import hay export.
 api.showDialogue("Xin chào! Gom đủ 5 đom đóm rồi đến hải đăng.");`;
 
@@ -44,15 +48,64 @@ export const PIXEL_STUDIO_GUIDE = [
   ] },
 ] as const;
 
+const DOC_ARTICLES = [
+  ["bat-dau", "Bắt đầu", "Nền tảng", "Tạo một dự án từ mẫu Đảo Đom Đóm để có game chơi được ngay, hoặc chọn dự án trống. Đi theo thanh bước từ Tài nguyên, Thiết kế, Gameplay, Code đến Chơi thử."],
+  ["tong-quan", "Tổng quan Engine", "Nền tảng", "Dự án V2 là nguồn dữ liệu duy nhất cho cảnh, đối tượng, luật, biến và script. Studio tự lưu; bản chơi chỉ được dựng từ phiên bản máy chủ đã xác nhận."],
+  ["tao-project", "Tạo Project", "Nền tảng", "Đặt tên, chọn mẫu rồi tạo bản nháp. Mẫu Pixel Adventure có sẵn điều khiển, va chạm, vật phẩm, máu, điểm và điều kiện thắng/thua."],
+  ["tao-scene", "Tạo Scene", "Xây cảnh", "Cảnh là một màn chơi. Dùng danh sách cảnh để tạo, đổi tên, nhân bản, sắp xếp và chọn cảnh mở đầu; mỗi cảnh có kích thước, nền, lưới và các lớp riêng."],
+  ["import-asset", "Import Asset", "Tài nguyên", "Trong Tài nguyên, tải PNG, JPEG, WebP hoặc WAV tối đa 10 MiB. Đợi trạng thái hoàn tất trước khi đặt ảnh vào cảnh hoặc tham chiếu âm thanh."],
+  ["asset-manager", "Asset Manager", "Tài nguyên", "Tìm theo tên, lọc loại, xem thumbnail, đổi tên và xóa tệp không còn được tham chiếu. Tài nguyên thuộc riêng dự án và không được chuyển quyền bằng JSON."],
+  ["sprite", "Sprite", "Tài nguyên", "Đặt ảnh vào cảnh để tạo đối tượng có SpriteRenderer. Bật pixel art để dùng nearest-neighbor; chỉnh vị trí và kích thước trong Inspector."],
+  ["sprite-sheet", "Sprite Sheet", "Tài nguyên", "Engine lưu cấu hình khung trong Animator. Hiện Studio hỗ trợ dữ liệu Animator nhưng bản runtime chưa phát sprite sheet; dùng sprite tĩnh cho bản xuất hiện tại."],
+  ["animation", "Animation", "Tài nguyên", "Animator và PLAY_ANIMATION được kiểm tra trong schema. Runtime hiện báo chẩn đoán khi gặp chúng, vì vậy animation chưa nên dùng làm điều kiện gameplay bắt buộc."],
+  ["tilemap", "Tilemap", "Xây cảnh", "Canvas và bản dựng hiển thị các ô Tilemap theo grid. Thêm Tilemap từ loại đối tượng tương ứng, chọn tileset, kích thước ô và dữ liệu tile; collision vẫn cần Collider riêng."],
+  ["object", "Object", "Xây cảnh", "Đối tượng là vật trong cảnh: Player, Enemy, Item, NPC, UI hoặc trang trí. Chọn preset để có cấu hình hợp lệ, rồi chọn trên canvas hoặc hierarchy để sửa."],
+  ["component", "Component", "Xây cảnh", "Component thêm khả năng cho object. Transform bắt buộc; SpriteRenderer vẽ ảnh, Collider chặn/trigger, Movement điều khiển, Health lưu máu và InventoryItem tạo vật phẩm."],
+  ["collision", "Va chạm / Collision", "Gameplay", "Thêm Collider cho cả hai object. Collider đặc chặn chuyển động; isTrigger phát sự kiện mà không chặn. Runtime hỗ trợ hình chữ nhật và dùng khung bao cho hình tròn."],
+  ["controller", "Character Controller", "Gameplay", "Preset Player tạo Movement ở chế độ PLAYER. Đặt tốc độ, dùng WASD/phím mũi tên hoặc nút cảm ứng; tránh đặt nhân vật khởi đầu bên trong vật cản."],
+  ["camera", "Camera", "Xây cảnh", "Component Camera được lưu và kiểm tra duy nhất mỗi cảnh. Bản runtime hiện vừa khung toàn cảnh; camera follow nâng cao chưa ảnh hưởng bản xuất."],
+  ["input", "Input", "Gameplay", "Movement PLAYER nhận phím hướng/WASD. Visual Gameplay có ON_KEY_PRESS cho một phím cụ thể; repeat quyết định giữ phím có kích hoạt lặp hay không."],
+  ["event-system", "Event System", "Gameplay", "Mỗi luật gồm trigger, condition tùy chọn và chuỗi action. Mở Gameplay để tạo, bật/tắt hoặc xóa luật; mọi thao tác có undo/redo và tự lưu."],
+  ["visual-logic", "Visual Logic", "Gameplay", "Dùng Khi… Thì… cho luật không cần code. Hiện trình tạo nhanh hỗ trợ bắt đầu, hẹn giờ, nhấn phím, cộng điểm và hoàn thành; luật mẫu còn hỗ trợ va chạm, nhặt đồ và đổi máu."],
+  ["variables", "Variables", "Gameplay", "Tạo biến NUMBER, BOOLEAN hoặc STRING trong Gameplay. Biến global dùng chung; schema cũng hỗ trợ player và scene. Script đọc/ghi qua ID với quyền GET_VARIABLE/SET_VARIABLE."],
+  ["conditions", "Conditions", "Gameplay", "Runtime đánh giá so sánh biến, điểm, vật phẩm, vị trí, sự tồn tại và component. Các luật phức tạp có thể nhập qua JSON V2; luôn giữ bản sao trước khi chỉnh."],
+  ["timer", "Timer", "Gameplay", "Chọn trigger Hết thời gian chờ, nhập số giây và action. Luật một lần chạy sau delay; schema hỗ trợ repeat và interval cho luật lặp."],
+  ["audio", "Âm thanh", "Tài nguyên", "Tải WAV rồi dùng PLAY_AUDIO hoặc api.playAudio(assetId). Trình duyệt có thể yêu cầu một thao tác người dùng trước khi phát; AudioSource autoplay/loop chưa chạy trong runtime."],
+  ["ui", "UI trong game", "Xây cảnh", "UI object và SHOW_UI/HIDE_UI được runtime hỗ trợ. HUD điểm, máu và trạng thái thắng/thua của bản chơi được tạo tự động từ state runtime."],
+  ["npc", "NPC", "Gameplay", "Preset NPC tạo object có sprite/collider phù hợp. Dialogue có thể hiển thị node mở đầu; lựa chọn hội thoại nâng cao hiện được báo trong chẩn đoán."],
+  ["enemy", "Enemy", "Gameplay", "Preset Enemy có Collider và Health. AI Movement hiện chưa tự di chuyển trong runtime; dùng timer/MOVE_OBJECT hoặc script cho hành vi có thể kiểm soát."],
+  ["ai", "AI cơ bản", "Gameplay", "Dùng ON_TIMER kết hợp MOVE_OBJECT hoặc script để tạo tuần tra đơn giản. Runtime báo rõ Movement controls=AI vì điều hướng tự động chưa được triển khai."],
+  ["health", "Health / Damage", "Gameplay", "Thêm Health với current/maximum, rồi dùng CHANGE_HEALTH khi va chạm. Player về 0 chuyển sang thua và nút Chơi lại khôi phục snapshot ban đầu."],
+  ["inventory", "Inventory / Item", "Gameplay", "InventoryItem collectible kết hợp trigger Collider. Khi Player chạm, runtime thêm item, phát ON_COLLECT_ITEM và ẩn vật phẩm; ADD_ITEM/REMOVE_ITEM điều chỉnh số lượng."],
+  ["score", "Score", "Gameplay", "ADD_SCORE đổi điểm runtime. Dùng SCORE_COMPARE cho cửa thắng hoặc tạo luật nhanh cộng điểm; HUD hiển thị điểm hiện tại."],
+  ["scene-transition", "Scene Transition", "Gameplay", "CHANGE_SCENE chuyển sang scene ID hợp lệ, làm mới contact/timer và chạy ON_START/script của cảnh mới. Chọn entry scene để xác định điểm bắt đầu."],
+  ["script", "Script / Code", "Nâng cao", "Tạo hoặc nhập .js, sửa mã, chọn quyền và gắn vào scene/object/event. Script chạy trong Worker cô lập, tối đa 500 ms và 100 lệnh, không có DOM hay import/export."],
+  ["debug", "Debug / Console", "Kiểm thử", "Bản chơi hiển thị diagnostics cho component, action, script hoặc cấu hình runtime chưa hỗ trợ. Sửa nguồn, chờ Đã lưu, dựng lại rồi Restart để xác minh."],
+  ["play-mode", "Play Mode", "Kiểm thử", "Dựng bản chơi từ head đã lưu, sau đó Play/Pause/Restart trong sandbox. Kiểm tra đường thắng, thua, input bàn phím và cảm ứng trước khi gửi duyệt."],
+  ["export", "Export Game", "Xuất bản", "Xuất JSON để sao lưu cấu trúc. Tạo bản chơi thử để biên dịch artifact chạy trên web; điền metadata và gửi duyệt để xuất bản sau khi quản trị phê duyệt."],
+  ["troubleshooting", "Troubleshooting", "Kiểm thử", "Nếu ảnh không hiện, kiểm tra asset/layer/visibility. Nếu luật không chạy, kiểm tra enabled, ID và diagnostics. Nếu bản chơi cũ, chờ lưu rồi dựng lại."],
+  ["best-practices", "Best Practices", "Kiểm thử", "Đặt tên object/asset dễ hiểu, dùng preset trước, mỗi luật làm một việc, test sau từng thay đổi, giữ JSON backup và không dựa vào tính năng runtime đang có cảnh báo."],
+  ["tutorial-30", "Tạo game Pixel 2D đầu tiên trong 30 phút", "Tutorial", "Chọn Đảo Đom Đóm → nhập một PNG → đặt vào cảnh → thêm Player/Collider/Movement → thêm Enemy/Health → thêm Item → tạo luật điểm và thắng → lưu → dựng → Play → xem chẩn đoán → sửa → dựng lại → xuất JSON hoặc gửi duyệt."],
+] as const;
+
 export function PixelStudioGuide({ compact = false }: { compact?: boolean }) {
-  return <article className="pixel-studio-guide" style={{maxWidth:920,margin:'0 auto',padding:compact?16:24,lineHeight:1.7,overflowWrap:'anywhere'}}>
+  const [query, setQuery] = useState("");
+  const [activeId, setActiveId] = useState("bat-dau");
+  const filtered = useMemo(() => {
+    const needle = query.trim().toLocaleLowerCase("vi");
+    return needle ? DOC_ARTICLES.filter((article) => article.join(" ").toLocaleLowerCase("vi").includes(needle)) : DOC_ARTICLES;
+  }, [query]);
+  const activeIndex = Math.max(0, DOC_ARTICLES.findIndex((article) => article[0] === activeId));
+  const active = DOC_ARTICLES[activeIndex];
+  return <article className="pixel-studio-guide" style={{maxWidth:1100,margin:'0 auto',padding:compact?16:24,lineHeight:1.7,overflowWrap:'anywhere'}}>
     <p className="eyebrow">TFG Pixel Studio · Hướng dẫn thực hành</p>
     {compact ? <h2>Từ ý tưởng đến trò chơi đầu tiên</h2> : <h1>Tạo game pixel cùng TFG Studio</h1>}
-    <p>Bắt đầu với Đảo Đom Đóm, thay đổi một chi tiết và nhìn thấy kết quả trong bản chơi của chính bạn.</p>
-    <nav aria-label="Mục lục hướng dẫn"><ol>{PIXEL_STUDIO_GUIDE.map(section=><li key={section.id}><a href={`#pixel-guide-${section.id}`}>{section.title.replace(/^\d+\. /,'')}</a></li>)}</ol></nav>
-    {PIXEL_STUDIO_GUIDE.map(section=><section id={`pixel-guide-${section.id}`} key={section.id} style={{scrollMarginTop:80,marginTop:32}}>
-      <h2>{section.title}</h2>{section.paragraphs.map(text=><p key={text}>{text}</p>)}
-      {section.id==='code' && <pre style={{overflowX:'auto',padding:16,border:'1px solid currentColor',borderRadius:12,whiteSpace:'pre-wrap'}}><code>{PIXEL_STUDIO_SCRIPT_EXAMPLE}</code></pre>}
-    </section>)}
+    <p>Tra cứu đúng chức năng đang có trong engine, sau đó làm tutorial với chính workflow của Studio.</p>
+    <label style={{display:'grid',gap:6,margin:'16px 0'}}>Tìm trong tài liệu<input aria-label="Tìm trong tài liệu" value={query} onChange={(event)=>setQuery(event.target.value)} placeholder="Ví dụ: va chạm, script, xuất bản…" /></label>
+    <div className="pixel-doc-layout" style={{display:'grid',gridTemplateColumns:'minmax(220px,0.7fr) minmax(0,2fr)',gap:24}}>
+      <nav aria-label="Chủ đề tài liệu" style={{maxHeight:620,overflow:'auto'}}>{filtered.length ? [...new Set(filtered.map((item)=>item[2]))].map(category=><section key={category}><h3>{category}</h3><ul style={{listStyle:'none',padding:0}}>{filtered.filter((item)=>item[2]===category).map(article=><li key={article[0]}><button type="button" aria-pressed={activeId===article[0]} onClick={()=>setActiveId(article[0])} style={{width:'100%',textAlign:'left',padding:8}}>{article[1]}</button></li>)}</ul></section>) : <p>Không tìm thấy bài phù hợp.</p>}</nav>
+      <section id={`pixel-doc-${active[0]}`}><p className="eyebrow">{active[2]}</p><h2>{active[1]}</h2><p>{active[3]}</p>{active[0]==='script'&&<pre style={{overflowX:'auto',padding:16,border:'1px solid currentColor',borderRadius:12,whiteSpace:'pre-wrap'}}><code>{PIXEL_STUDIO_SCRIPT_EXAMPLE}</code></pre>}<div style={{display:'flex',justifyContent:'space-between',gap:12,marginTop:32}}><button type="button" disabled={activeIndex===0} onClick={()=>setActiveId(DOC_ARTICLES[activeIndex-1][0])}>Bài trước</button><button type="button" disabled={activeIndex===DOC_ARTICLES.length-1} onClick={()=>setActiveId(DOC_ARTICLES[activeIndex+1][0])}>Bài tiếp theo</button></div></section>
+    </div>
+    <details style={{marginTop:32}}><summary><strong>Tutorial chi tiết: Đảo Đom Đóm</strong></summary>{PIXEL_STUDIO_GUIDE.map(section=><section id={`pixel-guide-${section.id}`} key={section.id} style={{scrollMarginTop:80,marginTop:32}}><h2>{section.title}</h2>{section.paragraphs.map(text=><p key={text}>{text}</p>)}</section>)}</details>
   </article>;
 }
