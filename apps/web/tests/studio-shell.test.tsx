@@ -631,6 +631,24 @@ test("visual gameplay creates a canonical start rule and global variable", async
   });
 });
 
+test("visual gameplay wires collision damage to real object and health component IDs", async () => {
+  const h = await shell();
+  fireEvent.click(screen.getByRole("button", { name: "Nhân vật" }));
+  fireEvent.click(screen.getByRole("button", { name: "Kẻ địch" }));
+  const [player, enemy] = h.studio.state.document.scenes[0].objects;
+  const playerHealth = player.components.find((component) => component.type === "Health");
+  fireEvent.click(screen.getByRole("button", { name: "Gameplay" }));
+  fireEvent.change(screen.getByRole("combobox", { name: "Loại sự kiện" }), { target: { value: "COLLISION" } });
+  fireEvent.change(screen.getByRole("combobox", { name: "Đối tượng thứ nhất" }), { target: { value: player.id } });
+  fireEvent.change(screen.getByRole("combobox", { name: "Đối tượng thứ hai" }), { target: { value: enemy.id } });
+  fireEvent.change(screen.getByRole("combobox", { name: "Loại hành động" }), { target: { value: "DAMAGE" } });
+  fireEvent.click(screen.getByRole("button", { name: "Tạo luật" }));
+  expect(h.studio.state.document.events[0]).toMatchObject({
+    trigger: { type: "ON_COLLISION", firstObjectId: player.id, secondObjectId: enemy.id },
+    steps: [{ type: "CHANGE_HEALTH", objectId: player.id, componentId: playerHealth?.id, amount: -10 }],
+  });
+});
+
 test("code saves a canonical scene-attached script and remains undoable", async () => {
   const h = await shell();
   fireEvent.click(screen.getByRole("button", { name: "Code" }));

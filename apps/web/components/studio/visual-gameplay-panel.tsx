@@ -52,25 +52,43 @@ function describeSteps(event: Event) {
 export function VisualGameplayPanel() {
   const { state, editable, commit, error } = useGameplayCommit();
   const [name, setName] = useState("Luật mới");
-  const [trigger, setTrigger] = useState<"START" | "TIMER" | "KEY">("START");
-  const [action, setAction] = useState<"SCORE" | "WIN">("SCORE");
+  const [trigger, setTrigger] = useState<"START" | "TIMER" | "KEY" | "COLLISION" | "COLLECT" | "ENTER">("START");
+  const [action, setAction] = useState<"SCORE" | "WIN" | "DAMAGE" | "DESTROY">("SCORE");
   const [amount, setAmount] = useState(10);
   const [delay, setDelay] = useState(2);
   const [key, setKey] = useState("Space");
   const [variableName, setVariableName] = useState("scoreMultiplier");
   const [variableType, setVariableType] = useState<VariableType>("NUMBER");
+  const objects = state.document.scenes.flatMap((scene) => scene.objects);
+  const [firstObjectId, setFirstObjectId] = useState("");
+  const [secondObjectId, setSecondObjectId] = useState("");
+  const firstId = firstObjectId || objects[0]?.id || "";
+  const secondId = secondObjectId || objects[1]?.id || objects[0]?.id || "";
+  const healthTargets = objects.flatMap((object) => object.components.filter((component) => component.type === "Health").map((component) => ({ object, component })));
+  const [healthComponentId, setHealthComponentId] = useState("");
+  const healthTarget = healthTargets.find(({ component }) => component.id === healthComponentId) ?? healthTargets[0];
 
   function createRule() {
     const event: Event = {
       id: createStudioId(), version: 1, name: name.trim() || "Luật mới", enabled: true,
       order: state.document.events.length,
-      trigger: trigger === "TIMER"
+      trigger: trigger === "COLLISION"
+        ? { type: "ON_COLLISION", firstObjectId: firstId, secondObjectId: secondId }
+        : trigger === "COLLECT"
+          ? { type: "ON_COLLECT_ITEM", itemObjectId: firstId, collectorObjectId: secondId || null }
+          : trigger === "ENTER"
+            ? { type: "ON_ENTER_AREA", areaObjectId: firstId, enteringObjectId: secondId || null }
+            : trigger === "TIMER"
         ? { type: "ON_TIMER", delayMs: Math.max(0, delay * 1000), repeat: false, intervalMs: Math.max(1, delay * 1000) }
         : trigger === "KEY" ? { type: "ON_KEY_PRESS", key: key.trim() || "Space", repeat: false } : { type: "ON_START" },
       condition: null,
       steps: [action === "WIN"
         ? { id: createStudioId(), version: 1, type: "COMPLETE_GAME" }
-        : { id: createStudioId(), version: 1, type: "ADD_SCORE", amount }],
+        : action === "DAMAGE" && healthTarget
+          ? { id: createStudioId(), version: 1, type: "CHANGE_HEALTH", objectId: healthTarget.object.id, componentId: healthTarget.component.id, amount: -Math.abs(amount) }
+          : action === "DESTROY"
+            ? { id: createStudioId(), version: 1, type: "DESTROY_OBJECT", objectId: firstId }
+            : { id: createStudioId(), version: 1, type: "ADD_SCORE", amount }],
     };
     commit([{ type: "event.upsert", event }]);
   }
@@ -93,12 +111,14 @@ export function VisualGameplayPanel() {
       <form onSubmit={(formEvent) => { formEvent.preventDefault(); createRule(); }}>
         <h3>Tạo luật</h3>
         <label>Tên luật<input aria-label="Tên luật" value={name} onChange={(input) => setName(input.target.value)} /></label>
-        <label>Khi<select value={trigger} onChange={(input) => setTrigger(input.target.value as typeof trigger)}><option value="START">Màn chơi bắt đầu</option><option value="TIMER">Hết thời gian chờ</option><option value="KEY">Người chơi nhấn phím</option></select></label>
+        <label>Khi<select aria-label="Loại sự kiện" value={trigger} onChange={(input) => setTrigger(input.target.value as typeof trigger)}><option value="START">Màn chơi bắt đầu</option><option value="COLLISION">Hai đối tượng chạm nhau</option><option value="COLLECT">Nhặt vật phẩm</option><option value="ENTER">Đi vào vùng</option><option value="TIMER">Hết thời gian chờ</option><option value="KEY">Người chơi nhấn phím</option></select></label>
+        {(["COLLISION", "COLLECT", "ENTER"] as const).includes(trigger as "COLLISION" | "COLLECT" | "ENTER") && <><label>{trigger === "COLLECT" ? "Vật phẩm" : trigger === "ENTER" ? "Vùng" : "Đối tượng thứ nhất"}<select aria-label="Đối tượng thứ nhất" value={firstId} onChange={(input) => setFirstObjectId(input.target.value)}>{objects.map((object) => <option key={object.id} value={object.id}>{object.name}</option>)}</select></label><label>{trigger === "COLLECT" ? "Người nhặt" : trigger === "ENTER" ? "Đối tượng đi vào" : "Đối tượng thứ hai"}<select aria-label="Đối tượng thứ hai" value={secondId} onChange={(input) => setSecondObjectId(input.target.value)}>{objects.map((object) => <option key={object.id} value={object.id}>{object.name}</option>)}</select></label></>}
         {trigger === "TIMER" && <label>Số giây<input type="number" min="0" value={delay} onChange={(input) => setDelay(Number(input.target.value))} /></label>}
         {trigger === "KEY" && <label>Phím<input value={key} onChange={(input) => setKey(input.target.value)} /></label>}
-        <label>Thì<select value={action} onChange={(input) => setAction(input.target.value as typeof action)}><option value="SCORE">Cộng điểm</option><option value="WIN">Hoàn thành trò chơi</option></select></label>
-        {action === "SCORE" && <label>Số điểm<input type="number" value={amount} onChange={(input) => setAmount(Number(input.target.value))} /></label>}
-        <button type="submit" disabled={!editable}>Tạo luật</button>
+        <label>Thì<select aria-label="Loại hành động" value={action} onChange={(input) => setAction(input.target.value as typeof action)}><option value="SCORE">Cộng điểm</option><option value="DAMAGE">Trừ máu</option><option value="DESTROY">Xóa đối tượng thứ nhất</option><option value="WIN">Hoàn thành trò chơi</option></select></label>
+        {(action === "SCORE" || action === "DAMAGE") && <label>{action === "SCORE" ? "Số điểm" : "Sát thương"}<input type="number" value={amount} onChange={(input) => setAmount(Number(input.target.value))} /></label>}
+        {action === "DAMAGE" && <label>Đối tượng nhận sát thương<select aria-label="Đối tượng nhận sát thương" value={healthTarget?.component.id ?? ""} onChange={(input) => setHealthComponentId(input.target.value)}>{healthTargets.map(({ object, component }) => <option key={component.id} value={component.id}>{object.name}</option>)}</select></label>}
+        <button type="submit" disabled={!editable || ((trigger === "COLLISION" || trigger === "COLLECT" || trigger === "ENTER" || action === "DESTROY") && !firstId) || (trigger === "COLLISION" && !secondId) || (action === "DAMAGE" && !healthTarget)}>Tạo luật</button>
       </form>
       <div>
         <h3>Luật đang dùng ({state.document.events.length})</h3>
