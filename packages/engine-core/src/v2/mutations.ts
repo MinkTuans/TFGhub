@@ -2,6 +2,7 @@ import { z } from "zod";
 import { StableId } from "../stable-id.js";
 import { ScriptResourceV2 } from "./script-schema.js";
 import { EngineProjectV2 } from "./project-schema.js";
+import { GameEventV2 } from "./event-schema.js";
 import {
   ComponentInstanceV2,
   GameObjectV2,
@@ -41,6 +42,7 @@ const sceneChanges = definedChanges(
 );
 const sceneVariables =
   EngineProjectV2.innerType().shape.variables.shape.scene.valueSchema;
+const projectVariables = EngineProjectV2.innerType().shape.variables;
 
 export const PROJECT_MUTATION_BATCH_LIMIT = 100;
 // A canonical scene plus 99 additions, followed by deletion in command 100.
@@ -90,6 +92,17 @@ export const SceneMutation = z
 
 // Add command variants only alongside their reducer and authoring consumer.
 export const ProjectMutation = z.discriminatedUnion("type", [
+  z
+    .object({
+      type: z.literal("event.upsert"),
+      event: GameEventV2,
+      beforeEventId: StableId.nullable().optional(),
+    })
+    .strict(),
+  z.object({ type: z.literal("event.delete"), eventId: StableId }).strict(),
+  z
+    .object({ type: z.literal("project.variables"), variables: projectVariables })
+    .strict(),
   z.object({type: z.literal("script.upsert"), script: ScriptResourceV2, beforeScriptId: StableId.nullable().optional()}).strict(),
   z.object({type: z.literal("script.delete"), scriptId: StableId}).strict(),
   z.object({type: z.literal("project.settings"), settings: EngineProjectV2.innerType().shape.settings}).strict(),
@@ -568,6 +581,24 @@ function applyBatch(
   for (const command of commands) {
     if (withHistory) undo.unshift(structuredClone(inverse(next, command)));
     switch (command.type) {
+      case "event.upsert": {
+        const index = next.events.findIndex(
+          (event) => event.id === command.event.id,
+        );
+        if (index >= 0) next.events[index] = command.event;
+        else
+          insert(next.events, command.event, command.beforeEventId ?? null);
+        break;
+      }
+      case "event.delete":
+        target(next.events, command.eventId);
+        next.events = next.events.filter(
+          (event) => event.id !== command.eventId,
+        );
+        break;
+      case "project.variables":
+        next.variables = command.variables;
+        break;
       case "script.upsert": {
         const index = next.scripts.findIndex(script => script.id === command.script.id);
         if (index >= 0) next.scripts[index] = command.script;
@@ -861,6 +892,22 @@ function inverse(
   const scene =
     "sceneId" in command ? target(before.scenes, command.sceneId) : null;
   switch (command.type) {
+    case "event.upsert": {
+      const event = before.events.find(
+        (event) => event.id === command.event.id,
+      );
+      return event
+        ? { type: "event.upsert", event }
+        : { type: "event.delete", eventId: command.event.id };
+    }
+    case "event.delete":
+      return {
+        type: "event.upsert",
+        event: target(before.events, command.eventId),
+        beforeEventId: nextId(before.events, command.eventId),
+      };
+    case "project.variables":
+      return { type: "project.variables", variables: before.variables };
     case "script.upsert": {
       const script = before.scripts.find(script => script.id === command.script.id);
       return script ? {type: "script.upsert", script} : {type: "script.delete", scriptId: command.script.id};

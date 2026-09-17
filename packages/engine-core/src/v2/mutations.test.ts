@@ -2975,3 +2975,88 @@ describe("script and project authoring", () => {
     expect(() => engine.applyProjectMutations(original, [{type: "project.replace", project: {...replacement, projectId: id("0999")}}])).toThrow();
   });
 });
+
+describe("visual gameplay authoring", () => {
+  const gameplayEvent = () => ({
+    id: id("0910"),
+    version: 1 as const,
+    name: "Nhặt vật phẩm",
+    enabled: true,
+    order: 0,
+    trigger: { type: "ON_START" as const },
+    condition: null,
+    steps: [
+      {
+        id: id("0911"),
+        version: 1 as const,
+        type: "ADD_SCORE" as const,
+        amount: 10,
+      },
+    ],
+  });
+
+  it("creates, updates and deletes ordered events with exact undo", () => {
+    const original = project();
+    const first = gameplayEvent();
+    const created = engine.applyProjectMutationsWithHistory(original, [
+      { type: "event.upsert", event: first },
+    ]);
+    expect(created.document.events).toEqual([first]);
+    expect(engine.applyProjectMutations(created.document, created.undo)).toEqual(
+      original,
+    );
+
+    const updated = engine.applyProjectMutationsWithHistory(created.document, [
+      {
+        type: "event.upsert",
+        event: { ...first, name: "Đã sửa" },
+      },
+    ]);
+    expect(updated.document.events[0]?.name).toBe("Đã sửa");
+    expect(engine.applyProjectMutations(updated.document, updated.undo)).toEqual(
+      created.document,
+    );
+
+    const removed = engine.applyProjectMutationsWithHistory(created.document, [
+      { type: "event.delete", eventId: first.id },
+    ]);
+    expect(removed.document.events).toEqual([]);
+    expect(engine.applyProjectMutations(removed.document, removed.undo)).toEqual(
+      created.document,
+    );
+  });
+
+  it("replaces typed variable scopes with exact undo and final reference validation", () => {
+    const original = project();
+    const variables = {
+      global: [
+        {
+          id: id("0920"),
+          name: "Điểm",
+          type: "NUMBER" as const,
+          initialValue: 0,
+        },
+      ],
+      player: [],
+      scene: {},
+    };
+    const result = engine.applyProjectMutationsWithHistory(original, [
+      { type: "project.variables", variables },
+    ]);
+    expect(result.document.variables).toEqual(variables);
+    expect(engine.applyProjectMutations(result.document, result.undo)).toEqual(
+      original,
+    );
+    expect(() =>
+      engine.applyProjectMutations(original, [
+        {
+          type: "project.variables",
+          variables: {
+            ...variables,
+            global: [{ ...variables.global[0]!, initialValue: "sai kiểu" }],
+          },
+        },
+      ]),
+    ).toThrow();
+  });
+});
