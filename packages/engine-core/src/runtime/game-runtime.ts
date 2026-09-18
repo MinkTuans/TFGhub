@@ -532,7 +532,7 @@ export function createGameRuntime(snapshot: EngineProjectV2) {
     for (const o of scene().objects)
       for (const c of o.components) {
         if (
-          ["Animator", "Tilemap", "MiniGame", "Custom", "Trigger"].includes(
+          ["Animator", "MiniGame", "Custom", "Trigger"].includes(
             c.type,
           )
         )

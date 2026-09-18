@@ -14,7 +14,7 @@ import { apiErrorMessage } from "../../lib/api-error-message";
 import { createStudioId, useStudio } from "./studio-provider";
 import { prepareStudioCommit } from "./studio-history";
 import type { StudioMutation, StudioState } from "./studio-state";
-import { addComponentCommand, createObjectCommand } from "./object-commands";
+import { addComponentCommand, createObjectCommand, removeComponentCommand } from "./object-commands";
 import { studioValidationMessage } from "./component-editor";
 import { StudioConfirmation } from "./studio-confirmation";
 
@@ -276,6 +276,13 @@ export function StudioPresets({ scene }: { scene: Scene }) {
                 );
               if (objectType === "CUSTOM" && mutation.type === "object.create") {
                 const objectId = mutation.objects[0].object.id;
+                const custom = mutation.objects[0].object.components.find(
+                  (component) => component.type === "Custom",
+                );
+                if (custom)
+                  mutations.push(
+                    removeComponentCommand(scene.id, objectId, custom.id),
+                  );
                 mutations.push(
                   addComponentCommand(scene.id, objectId, "SpriteRenderer"),
                   addComponentCommand(scene.id, objectId, "Collider"),

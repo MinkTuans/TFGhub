@@ -11,6 +11,8 @@ it("embeds validated canonical data without executable HTML injection", () => {
   expect(html).toContain("\\u003c/script>");
   expect(html).toContain("new Worker(");
   expect(html).toContain("pointerdown");
+  expect(html).toContain('c.type === "Tilemap"');
+  expect(html).toContain("tileset.width / p.tileWidth");
   expect(() =>
     compileEngineHtml({ ...project, entrySceneId: "invalid" }, {}),
   ).toThrow();

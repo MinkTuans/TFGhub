@@ -380,6 +380,16 @@ function browserPlayer(
           ctx.fillStyle = "#fff";
           ctx.font = "16px sans-serif";
           ctx.fillText(p.label, 8, 22);
+        } else if (c.type === "Tilemap") {
+          const tileset = p.tilesetAssetId && images.get(p.tilesetAssetId);
+          if (tileset) {
+            const sourceColumns = Math.max(1, Math.floor(tileset.width / p.tileWidth));
+            for (const tile of p.tiles) {
+              const sx = (tile.tile % sourceColumns) * p.tileWidth;
+              const sy = Math.floor(tile.tile / sourceColumns) * p.tileHeight;
+              ctx.drawImage(tileset, sx, sy, p.tileWidth, p.tileHeight, tile.x * p.tileWidth, tile.y * p.tileHeight, p.tileWidth, p.tileHeight);
+            }
+          }
         }
       }
       ctx.restore();

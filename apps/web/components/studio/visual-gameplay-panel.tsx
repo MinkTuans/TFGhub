@@ -62,8 +62,32 @@ export function VisualGameplayPanel() {
   const objects = state.document.scenes.flatMap((scene) => scene.objects);
   const [firstObjectId, setFirstObjectId] = useState("");
   const [secondObjectId, setSecondObjectId] = useState("");
-  const firstId = firstObjectId || objects[0]?.id || "";
-  const secondId = secondObjectId || objects[1]?.id || objects[0]?.id || "";
+  const player = objects.find((object) => object.objectType === "PLAYER");
+  const collectible = objects.find((object) =>
+    object.components.some((component) => component.type === "InventoryItem"),
+  );
+  const area = objects.find((object) => object.objectType === "TRIGGER");
+  const otherHealthObject = objects.find(
+    (object) =>
+      object.id !== player?.id &&
+      object.components.some((component) => component.type === "Health"),
+  );
+  const suggestedFirstId =
+    trigger === "COLLECT"
+      ? collectible?.id
+      : trigger === "ENTER"
+        ? area?.id
+        : trigger === "COLLISION"
+          ? player?.id
+          : undefined;
+  const suggestedSecondId =
+    trigger === "COLLECT" || trigger === "ENTER"
+      ? player?.id
+      : trigger === "COLLISION"
+        ? otherHealthObject?.id ?? collectible?.id
+        : undefined;
+  const firstId = firstObjectId || suggestedFirstId || "";
+  const secondId = secondObjectId || suggestedSecondId || "";
   const healthTargets = objects.flatMap((object) => object.components.filter((component) => component.type === "Health").map((component) => ({ object, component })));
   const [healthComponentId, setHealthComponentId] = useState("");
   const healthTarget = healthTargets.find(({ component }) => component.id === healthComponentId) ?? healthTargets[0];

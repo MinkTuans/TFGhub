@@ -649,6 +649,23 @@ test("visual gameplay wires collision damage to real object and health component
   });
 });
 
+test("visual gameplay chooses Player and Item defaults for a collectible rule", async () => {
+  const h = await shell();
+  fireEvent.click(screen.getByRole("button", { name: "Nhân vật" }));
+  fireEvent.click(screen.getByRole("button", { name: "Vật phẩm" }));
+  const [player, item] = h.studio.state.document.scenes[0].objects;
+  fireEvent.click(screen.getByRole("button", { name: "Gameplay" }));
+  fireEvent.change(screen.getByRole("combobox", { name: "Loại sự kiện" }), {
+    target: { value: "COLLECT" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Tạo luật" }));
+  expect(h.studio.state.document.events[0].trigger).toEqual({
+    type: "ON_COLLECT_ITEM",
+    itemObjectId: item.id,
+    collectorObjectId: player.id,
+  });
+});
+
 test("code saves a canonical scene-attached script and remains undoable", async () => {
   const h = await shell();
   fireEvent.click(screen.getByRole("button", { name: "Code" }));
@@ -731,6 +748,11 @@ test("an enemy preset creates a visible collidable health object atomically", as
       expect.objectContaining({ type: "Health" }),
     ]),
   });
+  expect(
+    h.studio.state.document.scenes[0].objects[0].components.some(
+      (component) => component.type === "Custom",
+    ),
+  ).toBe(false);
   fireEvent.click(screen.getByRole("button", { name: "Hoàn tác" }));
   expect(h.studio.state.document.scenes[0].objects).toHaveLength(0);
 });
