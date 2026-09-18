@@ -12,6 +12,7 @@ import { ProfileForm } from "../components/profile-form";
 import { GameForm } from "../components/game-form";
 import { GameWorkspace } from "../components/game-workspace";
 import { GamePreview } from "../components/game-preview";
+import { UploadEditor } from "../components/upload-editor";
 import { LogoutButton } from "../components/logout-button";
 import {
   ModerationQueue,
@@ -213,6 +214,83 @@ test("draft creation submits the selected source type", async () => {
   expect(JSON.parse(fetch.mock.calls[0][1].body)).toMatchObject({
     sourceType: "UPLOAD",
   });
+});
+
+test("HTML5 upload explains the playable ZIP contract before a creator uploads", () => {
+  render(<UploadEditor gameId="game-1" onUploaded={vi.fn()} />);
+
+  expect(screen.getByText(/index\.html ở thư mục gốc/i)).toBeVisible();
+  expect(screen.getByText(/25 MiB/i)).toBeVisible();
+  expect(screen.getByText(/100 MiB sau khi giải nén/i)).toBeVisible();
+  expect(screen.getByText(/1\.000 mục/i)).toBeVisible();
+  expect(screen.getByText(/tệp ảnh, âm thanh và mã dùng đường dẫn tương đối/i)).toBeVisible();
+  expect(screen.getByText(/tải xong.*chơi thử.*gửi duyệt/i)).toBeVisible();
+});
+
+test("HTML5 upload reports the active transfer and hands a ready preview to the workspace", async () => {
+  let complete!: (response: Response) => void;
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(
+      () =>
+        new Promise<Response>((resolve) => {
+          complete = resolve;
+        }),
+    ),
+  );
+  const onUploaded = vi.fn();
+  render(<UploadEditor gameId="game-1" onUploaded={onUploaded} />);
+  const file = new File(["zip"], "ready-game.zip", {
+    type: "application/zip",
+  });
+  const input = screen.getByLabelText("Tệp ZIP HTML5");
+  Object.defineProperty(input, "files", { value: [file] });
+  fireEvent.submit(
+    screen.getByRole("button", { name: "Tải trò chơi lên" }).closest("form")!,
+  );
+
+  expect(await screen.findByRole("status")).toHaveTextContent(
+    "Đang tải ready-game.zip",
+  );
+  expect(screen.getByLabelText("Tiến trình tải trò chơi")).toBeVisible();
+
+  complete(
+    new Response(JSON.stringify(codeGame({ sourceType: "UPLOAD", projectData: null }))),
+  );
+  await waitFor(() =>
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Đã tải lên. Bản chơi thử đã sẵn sàng.",
+    ),
+  );
+  expect(onUploaded).toHaveBeenCalledWith(
+    expect.objectContaining({ id: "game-1", artifactReady: true }),
+  );
+});
+
+test("HTML5 upload explains the rejection and makes retry explicit", async () => {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({ message: "ZIP requires a root index.html" }),
+        { status: 400 },
+      ),
+    ),
+  );
+  render(<UploadEditor gameId="game-1" onUploaded={vi.fn()} />);
+  Object.defineProperty(screen.getByLabelText("Tệp ZIP HTML5"), "files", {
+    value: [new File(["zip"], "missing-entry.zip", { type: "application/zip" })],
+  });
+  fireEvent.submit(
+    screen.getByRole("button", { name: "Tải trò chơi lên" }).closest("form")!,
+  );
+
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "Tệp ZIP cần có index.html ở thư mục gốc.",
+  );
+  expect(
+    screen.getByRole("button", { name: "Thử lại tải trò chơi" }),
+  ).toBeEnabled();
 });
 
 test.each([
