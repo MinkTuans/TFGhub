@@ -59,6 +59,38 @@ function hasComponent(object: GameObject, type: string) {
   return object.components.some((component) => component.type === type);
 }
 
+function hasRuntimeBounds(object: GameObject) {
+  return hasComponent(object, "Collider") || hasComponent(object, "Trigger");
+}
+
+function isRuntimePlayer(object: GameObject) {
+  const movement = object.components.find(
+    (component) => component.type === "Movement",
+  );
+  return (
+    object.objectType === "PLAYER" &&
+    hasRuntimeBounds(object) &&
+    (movement?.properties as { controls?: unknown } | undefined)?.controls ===
+      "PLAYER"
+  );
+}
+
+function isRuntimeCollectible(object: GameObject) {
+  const item = object.components.find(
+    (component) => component.type === "InventoryItem",
+  );
+  return (
+    object.objectType === "ITEM" &&
+    hasRuntimeBounds(object) &&
+    (item?.properties as { collectible?: unknown } | undefined)
+      ?.collectible === true
+  );
+}
+
+function isRuntimeArea(object: GameObject) {
+  return object.objectType === "TRIGGER" && hasRuntimeBounds(object);
+}
+
 function triggerKind(event: Event): TriggerKind | null {
   if (event.trigger.type === "ON_START") return "START";
   if (event.trigger.type === "ON_TIMER") return "TIMER";
@@ -92,12 +124,16 @@ function isSupportedRule(event: Event) {
 
 function optionObjects(objects: GameObject[], trigger: TriggerKind, slot: "first" | "second") {
   if (trigger === "COLLECT")
-    return objects.filter((object) => slot === "first" ? object.objectType === "ITEM" : object.objectType === "PLAYER");
+    return objects.filter((object) => slot === "first" ? isRuntimeCollectible(object) : isRuntimePlayer(object));
   if (trigger === "ENTER")
-    return objects.filter((object) => slot === "first" ? object.objectType === "TRIGGER" : object.objectType === "PLAYER");
+    return objects.filter((object) => slot === "first" ? isRuntimeArea(object) : isRuntimePlayer(object));
   if (trigger === "COLLISION")
     return objects.filter((object) => hasComponent(object, "Collider"));
   return [];
+}
+
+function usesObjectTargets(trigger: TriggerKind) {
+  return trigger === "COLLECT" || trigger === "ENTER" || trigger === "COLLISION";
 }
 
 export function VisualGameplayPanel() {
@@ -113,6 +149,8 @@ export function VisualGameplayPanel() {
   const [steps, setSteps] = useState<EventStep[]>([{ id: createStudioId(), version: 1, type: "ADD_SCORE", amount: 10 }]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [validation, setValidation] = useState("");
+  const [requiresExplicitTargets, setRequiresExplicitTargets] = useState(false);
+  const [targetSceneId, setTargetSceneId] = useState(scene.id);
   const [amount, setAmount] = useState(10);
   const [delay, setDelay] = useState(2);
   const [key, setKey] = useState("Space");
@@ -126,10 +164,14 @@ export function VisualGameplayPanel() {
   const [secondObjectId, setSecondObjectId] = useState("");
   const firstOptions = useMemo(() => optionObjects(objects, trigger, "first"), [objects, trigger]);
   const secondOptions = useMemo(() => optionObjects(objects, trigger, "second"), [objects, trigger]);
-  const selectedFirstId = firstOptions.some((object) => object.id === firstObjectId) ? firstObjectId : "";
-  const firstId = selectedFirstId || firstOptions[0]?.id || "";
-  const selectedSecondId = secondOptions.some((object) => object.id === secondObjectId) ? secondObjectId : "";
-  const secondId = selectedSecondId || secondOptions.find((object) => object.id !== firstId)?.id || secondOptions[0]?.id || "";
+  const targetSceneCurrent = targetSceneId === scene.id;
+  const mustPickTargets = usesObjectTargets(trigger) && (requiresExplicitTargets || !targetSceneCurrent);
+  const selectedFirstId = targetSceneCurrent && firstOptions.some((object) => object.id === firstObjectId) ? firstObjectId : "";
+  const firstId = selectedFirstId || (mustPickTargets ? "" : firstOptions[0]?.id || "");
+  const selectedSecondId = targetSceneCurrent && secondOptions.some((object) => object.id === secondObjectId) ? secondObjectId : "";
+  const secondId = selectedSecondId || (mustPickTargets ? "" : secondOptions.find((object) => object.id !== firstId)?.id || secondOptions[0]?.id || "");
+  const firstSelectValue = mustPickTargets ? selectedFirstId : firstId;
+  const secondSelectValue = mustPickTargets ? selectedSecondId : secondId;
   const healthTargets = objects.flatMap((object) => object.components.filter((component) => component.type === "Health").map((component) => ({ object, component })));
   const [healthComponentId, setHealthComponentId] = useState("");
   const healthTarget = healthTargets.find(({ component }) => component.id === healthComponentId) ?? healthTargets[0];
@@ -149,6 +191,8 @@ export function VisualGameplayPanel() {
     setGoalScore(1);
     setFirstObjectId("");
     setSecondObjectId("");
+    setRequiresExplicitTargets(false);
+    setTargetSceneId(scene.id);
     setHealthComponentId("");
     setValidation("");
   }
@@ -176,6 +220,8 @@ export function VisualGameplayPanel() {
       event.trigger.type === "ON_ENTER_AREA" ? event.trigger.enteringObjectId ?? "" :
       event.trigger.type === "ON_COLLISION" ? event.trigger.secondObjectId : "",
     );
+    setRequiresExplicitTargets(false);
+    setTargetSceneId(scene.id);
     const damage = event.steps.find((step) => step.type === "CHANGE_HEALTH");
     setHealthComponentId(damage?.componentId ?? "");
     setNeedsScore(event.condition?.type === "SCORE_COMPARE");
@@ -208,9 +254,36 @@ export function VisualGameplayPanel() {
     }
   }
 
+  function changeTrigger(next: TriggerKind) {
+    const hadObjectTargets =
+      usesObjectTargets(trigger) && (!!firstObjectId || !!secondObjectId);
+    setTrigger(next);
+    setFirstObjectId("");
+    setSecondObjectId("");
+    setRequiresExplicitTargets(hadObjectTargets);
+    setTargetSceneId(scene.id);
+    setValidation("");
+  }
+
+  function selectFirstTarget(value: string) {
+    if (!targetSceneCurrent) setRequiresExplicitTargets(true);
+    setTargetSceneId(scene.id);
+    setFirstObjectId(value);
+    setValidation("");
+  }
+
+  function selectSecondTarget(value: string) {
+    if (!targetSceneCurrent) setRequiresExplicitTargets(true);
+    setTargetSceneId(scene.id);
+    setSecondObjectId(value);
+    setValidation("");
+  }
+
   function validationMessage() {
     if ((trigger === "COLLECT" || trigger === "ENTER" || trigger === "COLLISION") && !firstId)
       return trigger === "COLLECT" ? "Cần chọn vật phẩm trong cảnh hiện tại." : trigger === "ENTER" ? "Cần chọn vùng trong cảnh hiện tại." : "Cần chọn đối tượng va chạm trong cảnh hiện tại.";
+    if (trigger === "COLLECT" && !secondId) return "Cần chọn người nhặt trong cảnh hiện tại.";
+    if (trigger === "ENTER" && !secondId) return "Cần chọn đối tượng đi vào trong cảnh hiện tại.";
     if (trigger === "COLLISION" && !secondId) return "Cần chọn đối tượng va chạm thứ hai trong cảnh hiện tại.";
     if ((action === "DAMAGE" || steps.some((step) => step.type === "CHANGE_HEALTH")) && !healthTarget)
       return "Cần một đối tượng có Máu trong cảnh hiện tại.";
@@ -272,8 +345,8 @@ export function VisualGameplayPanel() {
       <form onSubmit={(formEvent) => { formEvent.preventDefault(); createRule(); }}>
         <h3>{editingId ? "Chỉnh luật" : "Tạo luật"}</h3>
         <label>Tên luật<input aria-label="Tên luật" value={name} onChange={(input) => setName(input.target.value)} /></label>
-        <label>Khi<select aria-label="Loại sự kiện" value={trigger} onChange={(input) => setTrigger(input.target.value as typeof trigger)}><option value="START">Màn chơi bắt đầu</option><option value="COLLISION">Hai đối tượng chạm nhau</option><option value="COLLECT">Nhặt vật phẩm</option><option value="ENTER">Đi vào vùng</option><option value="TIMER">Hết thời gian chờ</option><option value="KEY">Người chơi nhấn phím</option></select></label>
-        {(["COLLISION", "COLLECT", "ENTER"] as const).includes(trigger as "COLLISION" | "COLLECT" | "ENTER") && <><label>{trigger === "COLLECT" ? "Vật phẩm" : trigger === "ENTER" ? "Vùng" : "Đối tượng thứ nhất"}<select aria-label={trigger === "COLLECT" ? "Vật phẩm" : trigger === "ENTER" ? "Vùng" : "Đối tượng thứ nhất"} value={firstId} onChange={(input) => setFirstObjectId(input.target.value)}>{firstOptions.map((object) => <option key={object.id} value={object.id}>{object.name}</option>)}</select></label><label>{trigger === "COLLECT" ? "Người nhặt" : trigger === "ENTER" ? "Đối tượng đi vào" : "Đối tượng thứ hai"}<select aria-label={trigger === "COLLECT" ? "Người nhặt" : trigger === "ENTER" ? "Đối tượng đi vào" : "Đối tượng thứ hai"} value={secondId} onChange={(input) => setSecondObjectId(input.target.value)}>{secondOptions.map((object) => <option key={object.id} value={object.id}>{object.name}</option>)}</select></label></>}
+        <label>Khi<select aria-label="Loại sự kiện" value={trigger} onChange={(input) => changeTrigger(input.target.value as typeof trigger)}><option value="START">Màn chơi bắt đầu</option><option value="COLLISION">Hai đối tượng chạm nhau</option><option value="COLLECT">Nhặt vật phẩm</option><option value="ENTER">Đi vào vùng</option><option value="TIMER">Hết thời gian chờ</option><option value="KEY">Người chơi nhấn phím</option></select></label>
+        {(["COLLISION", "COLLECT", "ENTER"] as const).includes(trigger as "COLLISION" | "COLLECT" | "ENTER") && <><label>{trigger === "COLLECT" ? "Vật phẩm" : trigger === "ENTER" ? "Vùng" : "Đối tượng thứ nhất"}<select aria-label={trigger === "COLLECT" ? "Vật phẩm" : trigger === "ENTER" ? "Vùng" : "Đối tượng thứ nhất"} value={firstSelectValue} onChange={(input) => selectFirstTarget(input.target.value)}>{mustPickTargets && <option value="">Chọn đối tượng</option>}{firstOptions.map((object) => <option key={object.id} value={object.id}>{object.name}</option>)}</select></label><label>{trigger === "COLLECT" ? "Người nhặt" : trigger === "ENTER" ? "Đối tượng đi vào" : "Đối tượng thứ hai"}<select aria-label={trigger === "COLLECT" ? "Người nhặt" : trigger === "ENTER" ? "Đối tượng đi vào" : "Đối tượng thứ hai"} value={secondSelectValue} onChange={(input) => selectSecondTarget(input.target.value)}>{mustPickTargets && <option value="">Chọn đối tượng</option>}{secondOptions.map((object) => <option key={object.id} value={object.id}>{object.name}</option>)}</select></label></>}
         {trigger === "TIMER" && <label>Số giây<input type="number" min="0" value={delay} onChange={(input) => setDelay(Number(input.target.value))} /></label>}
         {trigger === "KEY" && <label>Phím<input value={key} onChange={(input) => setKey(input.target.value)} /></label>}
         <label>Thì<select aria-label="Loại hành động" value={action} onChange={(input) => setMainAction(input.target.value as ActionKind)}><option value="SCORE">Cộng điểm</option><option value="DAMAGE">Trừ máu</option><option value="DESTROY">Xóa đối tượng thứ nhất</option><option value="WIN">Hoàn thành trò chơi</option></select></label>

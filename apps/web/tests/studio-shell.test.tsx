@@ -795,6 +795,7 @@ test("visual gameplay edits existing coin rules with scene-scoped targets, order
   fireEvent.change(screen.getByRole("combobox", { name: "Âm thanh" }), { target: { value: id(80) } });
   fireEvent.change(screen.getByRole("combobox", { name: "Loại sự kiện" }), { target: { value: "ENTER" } });
   fireEvent.change(screen.getByRole("combobox", { name: "Vùng" }), { target: { value: exit.id } });
+  fireEvent.change(screen.getByRole("combobox", { name: "Đối tượng đi vào" }), { target: { value: player.id } });
   fireEvent.change(screen.getByRole("combobox", { name: "Loại hành động" }), { target: { value: "WIN" } });
   fireEvent.click(screen.getByRole("checkbox", { name: "Yêu cầu điểm tối thiểu" }));
   fireEvent.change(screen.getByRole("spinbutton", { name: "Điểm tối thiểu" }), { target: { value: "2" } });
@@ -856,6 +857,121 @@ test("visual gameplay rejects missing targets without mutating and keeps complex
     id: id(90),
     enabled: false,
     condition: { type: "ALL" },
+  });
+});
+
+test("visual gameplay requires practical player targets and runtime-eligible target objects", async () => {
+  const noPlayer = structuredClone(project);
+  const layer = noPlayer.scenes[0].layers[0].id;
+  noPlayer.scenes[0].objects = [
+    gameplayObject(110, "ITEM", "Xu có thể nhặt", layer, [
+      component("Transform", 111),
+      component("InventoryItem", 112, { collectible: true }),
+      component("Collider", 113, { isTrigger: true }),
+    ]),
+    gameplayObject(114, "TRIGGER", "Cổng ra", layer, [
+      component("Transform", 115),
+      component("Trigger", 116),
+      component("Collider", 117, { isTrigger: true }),
+    ]),
+  ];
+  const h = await shell({ initial: { revision: 0, document: noPlayer } });
+  fireEvent.click(screen.getByRole("button", { name: "Gameplay" }));
+  fireEvent.change(screen.getByRole("combobox", { name: "Loại sự kiện" }), { target: { value: "COLLECT" } });
+  fireEvent.click(screen.getByRole("button", { name: "Tạo luật" }));
+  expect(screen.getByRole("alert")).toHaveTextContent("Cần chọn người nhặt");
+  expect(h.studio.state.document.events).toHaveLength(0);
+  fireEvent.change(screen.getByRole("combobox", { name: "Loại sự kiện" }), { target: { value: "ENTER" } });
+  fireEvent.click(screen.getByRole("button", { name: "Tạo luật" }));
+  expect(screen.getByRole("alert")).toHaveTextContent("Cần chọn đối tượng đi vào");
+  expect(h.studio.state.document.events).toHaveLength(0);
+
+  const eligible = structuredClone(project);
+  const eligibleLayer = eligible.scenes[0].layers[0].id;
+  eligible.scenes[0].objects = [
+    gameplayObject(120, "PLAYER", "Người chơi", eligibleLayer, [
+      component("Transform", 121),
+      component("Movement", 122, { controls: "PLAYER" }),
+      component("Collider", 123),
+    ]),
+    gameplayObject(124, "ITEM", "Xu tắt collectible", eligibleLayer, [
+      component("Transform", 125),
+      component("InventoryItem", 126, { collectible: false }),
+      component("Collider", 127, { isTrigger: true }),
+    ]),
+    gameplayObject(128, "ITEM", "Xu thiếu collider", eligibleLayer, [
+      component("Transform", 129),
+      component("InventoryItem", 130, { collectible: true }),
+    ]),
+    gameplayObject(131, "ITEM", "Xu hợp lệ", eligibleLayer, [
+      component("Transform", 132),
+      component("InventoryItem", 133, { collectible: true }),
+      component("Collider", 134, { isTrigger: true }),
+    ]),
+    gameplayObject(135, "TRIGGER", "Vùng thiếu va chạm", eligibleLayer, [
+      component("Transform", 136),
+    ]),
+    gameplayObject(137, "TRIGGER", "Vùng hợp lệ", eligibleLayer, [
+      component("Transform", 138),
+      component("Trigger", 139),
+    ]),
+  ];
+  cleanup();
+  await shell({ initial: { revision: 0, document: eligible } });
+  fireEvent.click(screen.getByRole("button", { name: "Gameplay" }));
+  fireEvent.change(screen.getByRole("combobox", { name: "Loại sự kiện" }), { target: { value: "COLLECT" } });
+  expect(screen.queryByRole("option", { name: "Xu tắt collectible" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("option", { name: "Xu thiếu collider" })).not.toBeInTheDocument();
+  expect(screen.getByRole("option", { name: "Xu hợp lệ" })).toBeInTheDocument();
+  fireEvent.change(screen.getByRole("combobox", { name: "Loại sự kiện" }), { target: { value: "ENTER" } });
+  expect(screen.queryByRole("option", { name: "Vùng thiếu va chạm" })).not.toBeInTheDocument();
+  expect(screen.getByRole("option", { name: "Vùng hợp lệ" })).toBeInTheDocument();
+});
+
+test("visual gameplay clears stale target choices on trigger and active-scene changes", async () => {
+  const stale = structuredClone(project);
+  for (const [sceneIndex, scene] of stale.scenes.entries()) {
+    const layer = scene.layers[0].id;
+    scene.objects = [
+      gameplayObject(150 + sceneIndex * 20, "PLAYER", `Người chơi ${sceneIndex + 1}`, layer, [
+        component("Transform", 151 + sceneIndex * 20),
+        component("Movement", 152 + sceneIndex * 20, { controls: "PLAYER" }),
+        component("Collider", 153 + sceneIndex * 20),
+      ]),
+      gameplayObject(154 + sceneIndex * 20, "ITEM", `Xu ${sceneIndex + 1}`, layer, [
+        component("Transform", 155 + sceneIndex * 20),
+        component("InventoryItem", 156 + sceneIndex * 20, { collectible: true }),
+        component("Collider", 157 + sceneIndex * 20, { isTrigger: true }),
+      ]),
+      gameplayObject(158 + sceneIndex * 20, "TRIGGER", `Cổng ${sceneIndex + 1}`, layer, [
+        component("Transform", 159 + sceneIndex * 20),
+        component("Trigger", 160 + sceneIndex * 20),
+        component("Collider", 161 + sceneIndex * 20, { isTrigger: true }),
+      ]),
+    ];
+  }
+  const h = await shell({ initial: { revision: 0, document: stale } });
+  fireEvent.click(screen.getByRole("button", { name: "Gameplay" }));
+  fireEvent.change(screen.getByRole("combobox", { name: "Loại sự kiện" }), { target: { value: "COLLECT" } });
+  fireEvent.change(screen.getByRole("combobox", { name: "Vật phẩm" }), { target: { value: stale.scenes[0].objects[1].id } });
+  fireEvent.change(screen.getByRole("combobox", { name: "Người nhặt" }), { target: { value: stale.scenes[0].objects[0].id } });
+  fireEvent.change(screen.getByRole("combobox", { name: "Loại sự kiện" }), { target: { value: "ENTER" } });
+  fireEvent.click(screen.getByRole("button", { name: "Tạo luật" }));
+  expect(screen.getByRole("alert")).toHaveTextContent("Cần chọn vùng");
+  expect(h.studio.state.document.events).toHaveLength(0);
+  fireEvent.change(screen.getByRole("combobox", { name: "Vùng" }), { target: { value: stale.scenes[0].objects[2].id } });
+  fireEvent.change(screen.getByRole("combobox", { name: "Đối tượng đi vào" }), { target: { value: stale.scenes[0].objects[0].id } });
+  fireEvent.change(screen.getByRole("combobox", { name: "Cảnh hiện tại" }), { target: { value: stale.scenes[1].id } });
+  fireEvent.click(screen.getByRole("button", { name: "Tạo luật" }));
+  expect(screen.getByRole("alert")).toHaveTextContent("Cần chọn vùng");
+  expect(h.studio.state.document.events).toHaveLength(0);
+  fireEvent.change(screen.getByRole("combobox", { name: "Vùng" }), { target: { value: stale.scenes[1].objects[2].id } });
+  fireEvent.change(screen.getByRole("combobox", { name: "Đối tượng đi vào" }), { target: { value: stale.scenes[1].objects[0].id } });
+  fireEvent.click(screen.getByRole("button", { name: "Tạo luật" }));
+  expect(h.studio.state.document.events[0].trigger).toEqual({
+    type: "ON_ENTER_AREA",
+    areaObjectId: stale.scenes[1].objects[2].id,
+    enteringObjectId: stale.scenes[1].objects[0].id,
   });
 });
 

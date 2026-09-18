@@ -67,3 +67,33 @@ Known lint caveat:
 
 - The untracked plan document `docs/superpowers/plans/2026-09-18-lean-hybrid-game-maker-sol.md` was preserved and not staged.
 - No merge, push, or deployment was performed.
+
+## Fix Round 1
+
+Addressed three review findings:
+
+- Collect and enter rules now require the practical player target. Scenes with an eligible item/exit but no compatible player show visible validation and do not mutate.
+- Collect target filtering now matches runtime eligibility: same-scene `ITEM` objects must have `InventoryItem.collectible === true` and a runtime bounds component (`Collider` or `Trigger`). Enter target filtering now requires same-scene `TRIGGER` objects with runtime bounds.
+- Trigger and active-scene changes invalidate stale saved target IDs. The form now requires fresh selections before committing after those changes.
+
+Round 1 RED evidence:
+
+- Command: `pnpm --filter web test -- tests/studio-shell.test.tsx`
+- Result: failed as expected, `Tests 2 failed | 36 passed (38)`.
+- Expected failures:
+  - no alert/no-mutation guard when an item/exit existed without a compatible player;
+  - stale trigger/scene choices silently fell back and created an event instead of requiring fresh target choices.
+
+Round 1 GREEN evidence:
+
+- Command: `pnpm --filter web test -- tests/studio-shell.test.tsx`
+- Result: `Test Files 1 passed (1)`, `Tests 38 passed (38)`
+
+Round 1 verification:
+
+- `pnpm --filter web typecheck` passed.
+- `git diff --check` passed.
+- `pnpm --filter web lint` still fails only on the previously documented unrelated findings:
+  - `apps/web/components/studio/hierarchy-panel.tsx:198`
+  - `apps/web/components/studio/studio-task-panels.tsx:371`
+  - `apps/web/components/studio/studio-task-panels.tsx:624`
