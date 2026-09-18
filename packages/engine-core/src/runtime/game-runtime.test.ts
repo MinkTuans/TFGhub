@@ -243,6 +243,28 @@ it("waits inside sequences preserve ordering of the outer continuation", () => {
   expect(r.state.score).toBe(3);
   expect(r.state.status).toBe("won");
 });
+it("runs timer-authored supported actions once and respects pause/restart", () => {
+  const f = fixture();
+  f.project.events.push(
+    f.event(
+      { type: "ON_TIMER", delayMs: 100, repeat: false, intervalMs: 100 },
+      [{ type: "ADD_SCORE", amount: 7 }],
+    ),
+  );
+  const r = createGameRuntime(f.project);
+  r.setPaused(true);
+  for (let i = 0; i < 10; i++) r.tick(1 / 60);
+  expect(r.state.score).toBe(0);
+  r.setPaused(false);
+  for (let i = 0; i < 7; i++) r.tick(1 / 60);
+  expect(r.state.score).toBe(7);
+  for (let i = 0; i < 20; i++) r.tick(1 / 60);
+  expect(r.state.score).toBe(7);
+  r.restart();
+  expect(r.state.score).toBe(0);
+  for (let i = 0; i < 7; i++) r.tick(1 / 60);
+  expect(r.state.score).toBe(7);
+});
 it("diagnoses unsupported physical transforms and dialogue triggers explicitly", () => {
   const f = fixture();
   (f.player.components[0].properties as any).rotation = 30;

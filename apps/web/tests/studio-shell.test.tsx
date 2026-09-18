@@ -1,5 +1,6 @@
 import {
   act,
+  cleanup,
   fireEvent,
   render,
   screen,
@@ -22,6 +23,7 @@ import {
 } from "../components/studio/studio-provider";
 import { browserRecoveryStorage } from "../components/studio/studio-recovery";
 import { StudioConflictError } from "../components/studio/studio-state";
+import { studioComponentDefaults } from "../components/studio/studio-component-defaults";
 import { recordingContext } from "./canvas-context";
 
 vi.mock("../lib/session", () => ({ privateGet: vi.fn() }));
@@ -109,6 +111,41 @@ const read: EngineProjectReadResponse = {
     createdAt: game.createdAt,
   },
 };
+type TestComponent =
+  EngineProjectV2Type["scenes"][number]["objects"][number]["components"][number];
+function component(
+  type: TestComponent["type"],
+  suffix: number,
+  properties: Record<string, unknown> = {},
+): TestComponent {
+  return {
+    id: id(suffix),
+    version: 1,
+    type,
+    properties: { ...studioComponentDefaults(type), ...properties },
+  } as TestComponent;
+}
+function gameplayObject(
+  suffix: number,
+  objectType: EngineProjectV2Type["scenes"][number]["objects"][number]["objectType"],
+  name: string,
+  layerId: string,
+  components: EngineProjectV2Type["scenes"][number]["objects"][number]["components"],
+) {
+  return {
+    id: id(suffix),
+    name,
+    objectType,
+    parentId: null,
+    layerId,
+    enabled: true,
+    visible: true,
+    locked: false,
+    order: suffix,
+    renderOrder: suffix,
+    components,
+  };
+}
 function preparePage(
   source: GameSummary = game,
   response: EngineProjectReadResponse = read,
@@ -682,6 +719,143 @@ test("visual gameplay chooses Player and Item defaults for a collectible rule", 
     type: "ON_COLLECT_ITEM",
     itemObjectId: item.id,
     collectorObjectId: player.id,
+  });
+});
+
+test("visual gameplay edits existing coin rules with scene-scoped targets, ordered actions, score condition, undo redo and save reload", async () => {
+  const editable = structuredClone(project);
+  editable.assetIds = [id(80)];
+  const startLayer = editable.scenes[0].layers[0].id;
+  const harborLayer = editable.scenes[1].layers[0].id;
+  const decor = gameplayObject(30, "DECORATION", "Cây trang trí", startLayer, [
+    component("Transform", 31, { x: 0, y: 0, width: 32, height: 32, rotation: 0, scaleX: 1, scaleY: 1, pivot: { x: 0.5, y: 0.5 } }),
+    component("SpriteRenderer", 32),
+  ]);
+  const player = gameplayObject(33, "PLAYER", "Người chơi", startLayer, [
+    component("Transform", 34, { x: 10, y: 10, width: 32, height: 32, rotation: 0, scaleX: 1, scaleY: 1, pivot: { x: 0.5, y: 0.5 } }),
+    component("Movement", 35, { speed: 100, controls: "PLAYER" }),
+    component("Collider", 36, { shape: "RECTANGLE", width: 32, height: 32, offsetX: 0, offsetY: 0, isTrigger: false, collisionLayerId: null }),
+    component("Health", 37, { current: 3, maximum: 3 }),
+  ]);
+  const coin = gameplayObject(38, "ITEM", "Xu vàng", startLayer, [
+    component("Transform", 39, { x: 48, y: 10, width: 24, height: 24, rotation: 0, scaleX: 1, scaleY: 1, pivot: { x: 0.5, y: 0.5 } }),
+    component("InventoryItem", 40),
+    component("Collider", 41, { shape: "RECTANGLE", width: 24, height: 24, offsetX: 0, offsetY: 0, isTrigger: true, collisionLayerId: null }),
+  ]);
+  const exit = gameplayObject(42, "TRIGGER", "Cổng ra", startLayer, [
+    component("Transform", 43, { x: 100, y: 10, width: 32, height: 32, rotation: 0, scaleX: 1, scaleY: 1, pivot: { x: 0.5, y: 0.5 } }),
+    component("Trigger", 44),
+    component("Collider", 45, { shape: "RECTANGLE", width: 32, height: 32, offsetX: 0, offsetY: 0, isTrigger: true, collisionLayerId: null }),
+  ]);
+  const harborCoin = gameplayObject(46, "ITEM", "Xu ở cảnh khác", harborLayer, [
+    component("Transform", 47, { x: 20, y: 20, width: 24, height: 24, rotation: 0, scaleX: 1, scaleY: 1, pivot: { x: 0.5, y: 0.5 } }),
+    component("InventoryItem", 48),
+  ]);
+  editable.scenes[0].objects = [decor, player, coin, exit];
+  editable.scenes[1].objects = [harborCoin];
+  editable.events = [
+    {
+      id: id(60),
+      version: 1,
+      name: "Nhặt xu",
+      enabled: true,
+      order: 0,
+      trigger: { type: "ON_COLLECT_ITEM", itemObjectId: coin.id, collectorObjectId: player.id },
+      condition: null,
+      steps: [{ id: id(61), version: 1, type: "ADD_SCORE", amount: 1 }],
+    },
+  ];
+  let head = structuredClone(editable);
+  const savedBatches: unknown[] = [];
+  const h = await shell({
+    initial: { revision: 0, document: editable },
+    debounceMs: 0,
+    transport: async (_gameId, batch) => {
+      savedBatches.push(batch);
+      head = batch.mutations.reduce((document, mutation) => {
+        const events = document.events.map((event) =>
+          mutation.type === "event.upsert" && event.id === mutation.event.id
+            ? mutation.event
+            : event,
+        );
+        if (mutation.type === "event.upsert" && !events.some((event) => event.id === mutation.event.id))
+          events.push(mutation.event);
+        return { ...document, events };
+      }, head);
+      return { revision: batch.baseRevision + 1, document: head };
+    },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Gameplay" }));
+  fireEvent.click(screen.getByRole("button", { name: "Sửa Nhặt xu" }));
+  expect(screen.getByRole("combobox", { name: "Vật phẩm" })).toHaveValue(coin.id);
+  expect(screen.queryByRole("option", { name: "Xu ở cảnh khác" })).not.toBeInTheDocument();
+  fireEvent.change(screen.getByRole("spinbutton", { name: "Số điểm" }), { target: { value: "2" } });
+  fireEvent.change(screen.getByRole("combobox", { name: "Thêm hành động" }), { target: { value: "PLAY_AUDIO" } });
+  fireEvent.click(screen.getByRole("button", { name: "Thêm hành động" }));
+  fireEvent.change(screen.getByRole("combobox", { name: "Âm thanh" }), { target: { value: id(80) } });
+  fireEvent.change(screen.getByRole("combobox", { name: "Loại sự kiện" }), { target: { value: "ENTER" } });
+  fireEvent.change(screen.getByRole("combobox", { name: "Vùng" }), { target: { value: exit.id } });
+  fireEvent.change(screen.getByRole("combobox", { name: "Loại hành động" }), { target: { value: "WIN" } });
+  fireEvent.click(screen.getByRole("checkbox", { name: "Yêu cầu điểm tối thiểu" }));
+  fireEvent.change(screen.getByRole("spinbutton", { name: "Điểm tối thiểu" }), { target: { value: "2" } });
+  fireEvent.click(screen.getByRole("button", { name: "Cập nhật luật" }));
+  expect(h.studio.state.document.events).toHaveLength(1);
+  expect(h.studio.state.document.events[0]).toMatchObject({
+    id: id(60),
+    trigger: { type: "ON_ENTER_AREA", areaObjectId: exit.id, enteringObjectId: player.id },
+    condition: { type: "SCORE_COMPARE", operator: "GREATER_THAN_OR_EQUAL", value: 2 },
+    steps: [
+      { id: id(61), type: "ADD_SCORE", amount: 2 },
+      { type: "PLAY_AUDIO", assetId: id(80) },
+      { type: "COMPLETE_GAME" },
+    ],
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Hoàn tác" }));
+  expect(h.studio.state.document.events[0].trigger).toEqual({ type: "ON_COLLECT_ITEM", itemObjectId: coin.id, collectorObjectId: player.id });
+  fireEvent.click(screen.getByRole("button", { name: "Làm lại" }));
+  expect(h.studio.state.document.events[0].condition).toMatchObject({ type: "SCORE_COMPARE", value: 2 });
+  await waitFor(() => expect(head.events[0].condition).toMatchObject({ type: "SCORE_COMPARE", value: 2 }));
+  cleanup();
+  const reloaded = await shell({ initial: { revision: savedBatches.length, document: head } });
+  fireEvent.click(screen.getAllByRole("button", { name: "Gameplay" }).at(-1)!);
+  expect(reloaded.studio.state.document.events[0].trigger).toMatchObject({ type: "ON_ENTER_AREA", areaObjectId: exit.id });
+  expect(within(screen.getByRole("region", { name: "Gameplay trực quan" })).getByText(/cộng 2 điểm/)).toBeVisible();
+});
+
+test("visual gameplay rejects missing targets without mutating and keeps complex rules read-only", async () => {
+  const h = await shell();
+  fireEvent.click(screen.getByRole("button", { name: "Gameplay" }));
+  fireEvent.change(screen.getByRole("combobox", { name: "Loại sự kiện" }), { target: { value: "COLLECT" } });
+  fireEvent.click(screen.getByRole("button", { name: "Tạo luật" }));
+  expect(screen.getByRole("alert")).toHaveTextContent("Cần chọn vật phẩm");
+  expect(h.studio.state.document.events).toHaveLength(0);
+
+  const complex = structuredClone(project);
+  complex.events = [{
+    id: id(90),
+    version: 1,
+    name: "Luật phức tạp",
+    enabled: true,
+    order: 0,
+    trigger: { type: "ON_START" },
+    condition: {
+      id: id(91),
+      version: 1,
+      type: "ALL",
+      conditions: [{ id: id(92), version: 1, type: "SCORE_COMPARE", operator: "GREATER_THAN_OR_EQUAL", value: 1 }],
+    },
+    steps: [{ id: id(93), version: 1, type: "ADD_SCORE", amount: 1 }],
+  }];
+  cleanup();
+  const readonly = await shell({ initial: { revision: 0, document: complex } });
+  fireEvent.click(screen.getByRole("button", { name: "Gameplay" }));
+  expect(screen.getByText(/Chỉ đọc/)).toBeVisible();
+  expect(screen.queryByRole("button", { name: "Sửa Luật phức tạp" })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("checkbox", { name: "Bật" }));
+  expect(readonly.studio.state.document.events[0]).toMatchObject({
+    id: id(90),
+    enabled: false,
+    condition: { type: "ALL" },
   });
 });
 

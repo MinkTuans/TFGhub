@@ -3026,6 +3026,61 @@ describe("visual gameplay authoring", () => {
     );
   });
 
+  it("updates an existing visual rule with ordered actions and a score condition without changing stable IDs", () => {
+    const original = project();
+    const first = gameplayEvent();
+    const created = engine.applyProjectMutationsWithHistory(original, [
+      { type: "event.upsert", event: first },
+    ]);
+    const updatedEvent = {
+      ...first,
+      condition: {
+        id: id("0913"),
+        version: 1 as const,
+        type: "SCORE_COMPARE" as const,
+        operator: "GREATER_THAN_OR_EQUAL" as const,
+        value: 2,
+      },
+      steps: [
+        { ...first.steps[0]!, amount: 2 },
+        {
+          id: id("0912"),
+          version: 1 as const,
+          type: "PLAY_AUDIO" as const,
+          assetId: id("0020"),
+        },
+        {
+          id: id("0914"),
+          version: 1 as const,
+          type: "COMPLETE_GAME" as const,
+        },
+      ],
+    };
+    const withAsset = {
+      ...created.document,
+      assetIds: [...created.document.assetIds, id("0020")],
+    };
+    const updated = engine.applyProjectMutationsWithHistory(withAsset, [
+      { type: "event.upsert", event: updatedEvent },
+    ]);
+    expect(updated.document.events).toHaveLength(1);
+    expect(updated.document.events[0]).toMatchObject({
+      id: first.id,
+      condition: { id: id("0913"), type: "SCORE_COMPARE", value: 2 },
+      steps: [
+        { id: id("0911"), type: "ADD_SCORE", amount: 2 },
+        { id: id("0912"), type: "PLAY_AUDIO", assetId: id("0020") },
+        { id: id("0914"), type: "COMPLETE_GAME" },
+      ],
+    });
+    expect(engine.applyProjectMutations(updated.document, updated.undo)).toEqual(
+      withAsset,
+    );
+    expect(engine.applyProjectMutations(withAsset, updated.redo)).toEqual(
+      updated.document,
+    );
+  });
+
   it("replaces typed variable scopes with exact undo and final reference validation", () => {
     const original = project();
     const variables = {
