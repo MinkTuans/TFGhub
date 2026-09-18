@@ -47,7 +47,8 @@ test("a relative-asset ZIP previews after reload, is moderated before public pla
     buffer: relativeAssetZip,
   });
   await page.getByRole("button", { name: "Tải trò chơi lên" }).click();
-  await expect(page.getByRole("status")).toHaveText("Đã tải lên. Bản chơi thử đã sẵn sàng.");
+  const upload = page.getByRole("region", { name: "Tải trò chơi HTML5" });
+  await expect(upload.getByRole("status")).toHaveText("Đã tải lên. Bản chơi thử đã sẵn sàng.");
   const preview = page.getByTitle("Chơi thử trò chơi");
   await expect(preview.contentFrame().getByRole("heading", { name: "Relative asset ready" })).toBeVisible();
   await expect.poll(() =>

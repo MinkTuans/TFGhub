@@ -45,3 +45,21 @@ lean-upload.spec.ts`, which starts the isolated API/web harness. It could not
 execute the test body because this environment lacks Playwright Chromium:
 `browserType.launch: Executable doesn't exist at .../chromium_headless_shell-1243/...`.
 The harness was stopped after that failure; no browser success is claimed.
+
+## Fix round 1 — unique upload success locator
+
+Changed `apps/web/e2e/lean-upload.spec.ts` only. The post-upload success
+assertion now resolves `role=status` inside the labelled `Tải trò chơi HTML5`
+region, rather than across the page. This prevents strict-mode ambiguity with
+the workspace's existing review-state status.
+
+RED/GREEN record: before the change, inspection found two matching live regions
+(`Bản nháp` in the workspace and the upload success status), so Playwright
+strict mode would reject the page-wide locator. Browser RED/GREEN execution is
+not possible in this environment because Chromium is absent (the prior run
+failed before the test body with the recorded missing executable). The changed
+test is syntactically discovered by
+`pnpm --filter web exec playwright test --list e2e/lean-upload.spec.ts`; the
+same command reports one test. `pnpm --filter web exec eslint
+e2e/lean-upload.spec.ts` and `pnpm --filter web exec tsc --noEmit` completed
+without errors. No browser pass is claimed.
