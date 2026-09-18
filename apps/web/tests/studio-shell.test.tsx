@@ -606,6 +606,25 @@ test("task navigation exposes assets, visual gameplay, code, preview and help", 
  expect(screen.getByRole("button", {name:"Gửi duyệt"})).toBeDisabled();
 });
 
+test("blank project shortcuts add a real player, open image import and open the tutorial", async () => {
+  const h = await shell();
+  const navigation = within(screen.getByRole("navigation", { name: "Các bước sáng tạo" }));
+  fireEvent.click(navigation.getByRole("button", { name: "Bắt đầu" }));
+  const empty = screen.getByRole("region", { name: "Cảnh trống" });
+  expect(within(empty).getAllByRole("button")).toHaveLength(3);
+  fireEvent.click(within(empty).getByRole("button", { name: "Nhập ảnh" }));
+  expect(screen.getByLabelText("Tải tài nguyên lên")).toBeVisible();
+  fireEvent.click(navigation.getByRole("button", { name: "Bắt đầu" }));
+  fireEvent.click(screen.getByRole("button", { name: "Mở hướng dẫn" }));
+  expect(screen.getByRole("heading", { name: "Từ ý tưởng đến trò chơi đầu tiên" })).toBeVisible();
+  fireEvent.click(navigation.getByRole("button", { name: "Bắt đầu" }));
+  fireEvent.click(screen.getByRole("button", { name: "Thêm nhân vật" }));
+  expect(h.studio.state.document.scenes[0].objects).toHaveLength(1);
+  expect(h.studio.state.document.scenes[0].objects[0]).toMatchObject({ objectType: "PLAYER" });
+  fireEvent.click(navigation.getByRole("button", { name: "Bắt đầu" }));
+  expect(screen.queryByRole("region", { name: "Cảnh trống" })).not.toBeInTheDocument();
+});
+
 test("visual gameplay creates a canonical start rule and global variable", async () => {
   const h = await shell();
   fireEvent.click(screen.getByRole("button", { name: "Gameplay" }));

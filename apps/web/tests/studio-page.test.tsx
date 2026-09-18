@@ -15,6 +15,7 @@ test("one Create click posts a named pixel template once and replaces the route 
   const fetch = vi.fn(() => new Promise<Response>((resolve) => { finish = resolve; }));
   vi.stubGlobal("fetch", fetch);
   render(await NewGamePage());
+  fireEvent.click(screen.getByRole("button", { name: "Tạo game Pixel" }));
   expect(screen.queryAllByRole("combobox")).toHaveLength(0);
   const button = screen.getByRole("button", { name: "Tạo bản nháp" });
   fireEvent.click(button);
@@ -30,6 +31,7 @@ test("one Create click posts a named pixel template once and replaces the route 
 test("a failed draft creation shows an error and lets the creator retry", async () => {
   vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("{}", { status: 500 })));
   render(await NewGamePage());
+  fireEvent.click(screen.getByRole("button", { name: "Tạo game Pixel" }));
   fireEvent.click(screen.getByRole("button", { name: "Tạo bản nháp" }));
   expect(await screen.findByRole("alert")).toBeVisible();
   expect(screen.getByRole("button", { name: "Tạo bản nháp" })).toBeEnabled();
@@ -102,9 +104,39 @@ test("creator chooses a name and blank template explicitly", async () => {
   const fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({ game: { id: "blank" } })));
   vi.stubGlobal("fetch", fetch);
   render(await NewGamePage());
+  fireEvent.click(screen.getByRole("button", { name: "Tạo game Pixel" }));
   fireEvent.change(screen.getByRole("textbox", { name: "Tên trò chơi" }), { target: { value: "Vườn của An" } });
   fireEvent.click(screen.getByRole("radio", { name: /Dự án 2D trống/ }));
   fireEvent.click(screen.getByRole("button", { name: "Tạo bản nháp" }));
   await waitFor(() => expect(replace).toHaveBeenCalledWith("/studio/games/blank"));
   expect(fetch).toHaveBeenCalledWith(expect.stringMatching(/\/games\/engine-projects$/), expect.objectContaining({ body: JSON.stringify({ title: "Vườn của An", template: "BLANK" }) }));
+});
+
+test("creation starts with two choices and opens the existing upload form with legacy sources retained", async () => {
+  const fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({ id: "upload-game" })));
+  vi.stubGlobal("fetch", fetch);
+  render(await NewGamePage());
+  expect(screen.queryByRole("button", { name: "Tạo bản nháp" })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Tải game HTML5/ZIP" }));
+  expect(screen.getByLabelText("Cách tạo trò chơi")).toHaveValue("UPLOAD");
+  for (const name of ["Lập trình", "Cốt truyện", "Đi cảnh"]) {
+    expect(screen.getByRole("option", { name })).toBeInTheDocument();
+  }
+  fireEvent.change(screen.getByLabelText("Tên trò chơi"), { target: { value: "Game của tôi" } });
+  fireEvent.change(screen.getByLabelText("Đường dẫn"), { target: { value: "game-cua-toi" } });
+  fireEvent.click(screen.getByRole("button", { name: "Tạo bản nháp" }));
+  await waitFor(() => expect(replace).toHaveBeenCalledWith("/studio"));
+  expect(fetch).toHaveBeenCalledWith(expect.stringMatching(/\/games$/), expect.objectContaining({
+    method: "POST",
+    body: JSON.stringify({ title: "Game của tôi", slug: "game-cua-toi", description: "", accessMode: "GUEST_ALLOWED", sourceType: "UPLOAD", viewportWidth: 16, viewportHeight: 9 }),
+  }));
+});
+
+test("Pixel choice offers only the recommended playable template and blank scene", async () => {
+  render(await NewGamePage());
+  fireEvent.click(screen.getByRole("button", { name: "Tạo game Pixel" }));
+  expect(screen.getAllByRole("radio")).toHaveLength(2);
+  expect(screen.getByRole("radio", { name: /Khuyên dùng/ })).toBeChecked();
+  expect(screen.getByRole("radio", { name: /Dự án 2D trống/ })).not.toBeChecked();
+  expect(screen.queryByLabelText("Cách tạo trò chơi")).not.toBeInTheDocument();
 });

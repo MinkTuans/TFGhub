@@ -312,6 +312,7 @@ async function setup(page: Page) {
   });
   expect(registration.status()).toBe(201);
   await page.goto("/studio/games/new");
+  await page.getByRole("button", { name: "Tạo game Pixel" }).click();
   await page.getByRole("button", { name: "Tạo bản nháp" }).click();
   await expect(page.getByRole("main", { name: "Xưởng sáng tạo trò chơi" })).toBeVisible();
   await expect(

@@ -68,10 +68,15 @@ function useCanonicalCommit() {
 }
 export function StudioStart({
   onTask,
+  scene,
 }: {
   onTask: (task: StudioTask) => void;
+  scene: Scene;
 }) {
-  const { state } = useStudio();
+  const { state, editable, commit, error } = useCanonicalCommit();
+  const layer = [...scene.layers]
+    .sort((a, b) => b.order - a.order)
+    .find((layer) => layer.type === "WORLD" && layer.visible && !layer.locked);
   return (
     <section
       className="studio-task-panel studio-start"
@@ -83,6 +88,26 @@ export function StudioStart({
         Tạo một trò chơi theo từng bước. Mọi thay đổi trong dự án được lưu tự
         động; chờ trạng thái “Đã lưu” trước khi chơi thử.
       </p>
+      {scene.objects.length === 0 && (
+        <section className="studio-empty" aria-label="Cảnh trống">
+          <h3>Cảnh này đang trống</h3>
+          <p>Thêm nhân vật đầu tiên hoặc nhập hình ảnh để bắt đầu.</p>
+          <div className="studio-task-actions">
+            <button disabled={!editable || !layer} onClick={() => {
+              if (layer && commit([createObjectCommand(scene, {
+                objectType: "PLAYER",
+                name: "Nhân vật",
+                layerId: layer.id,
+                transform: { x: scene.width / 2, y: scene.height / 2 },
+              })])) onTask("Thiết kế");
+            }}>Thêm nhân vật</button>
+            <button onClick={() => onTask("Tài nguyên")}>Nhập ảnh</button>
+            <button onClick={() => onTask("Hướng dẫn")}>Mở hướng dẫn</button>
+          </div>
+          {!layer && <p>Tạo hoặc mở khóa một lớp Thế giới để thêm nhân vật.</p>}
+          {error && <p role="alert">{error}</p>}
+        </section>
+      )}
       <div className="studio-start-cards">
         {(
           [

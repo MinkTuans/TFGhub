@@ -85,7 +85,7 @@ export function StudioShell({ initialGame }: { initialGame: GameSummary }) {
         ))}
       </nav>
       <div id="studio-task-0" hidden={task !== "Bắt đầu"}>
-        {task === "Bắt đầu" && <StudioStart onTask={setTask} />}
+        {task === "Bắt đầu" && <StudioStart onTask={setTask} scene={scene} />}
       </div>
       <section
         id="studio-task-2"

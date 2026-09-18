@@ -19,6 +19,7 @@ async function createProject(page: Page) {
     },
   });
   await page.goto("/studio/games/new");
+  await page.getByRole("button", { name: "Tạo game Pixel" }).click();
   await page.getByRole("button", { name: "Tạo bản nháp" }).click();
   await expect(page.getByRole("main", { name: "Xưởng sáng tạo trò chơi" })).toBeVisible();
   return page.url().split("/").at(-1)!;

@@ -29,6 +29,7 @@ for (const width of [390, 768, 1024, 1440]) {
     await expect(page.getByRole("heading", { name: "Cài đặt hiển thị" })).toBeInViewport();
     await page.screenshot({ path: testInfo.outputPath(`manage-${width}.png`), fullPage: true });
     await page.goto("/studio/games/new");
+    await page.getByRole("button", { name: "Tạo game Pixel" }).click();
     await expect(page.getByRole("button", { name: "Tạo bản nháp", exact: true })).toBeEnabled();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await page.screenshot({ path: testInfo.outputPath(`create-${width}.png`), fullPage: true });
