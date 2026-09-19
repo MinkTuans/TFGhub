@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppModule } from '../src/app.module.js';
 import { configureApp } from '../src/configure-app.js';
 import { zipFixture } from './zip-fixture.js';
+import { createSyntheticWebEngineFixture } from './web-engine-fixtures.js';
 import { mkdtemp, chmod, readdir, rm, readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -462,6 +463,90 @@ asyncProbe('webSocket', () => new Promise((resolve, reject) => { const socket = 
       expect(await page.locator('iframe').getAttribute('sandbox')).toBe('allow-scripts allow-pointer-lock');
     } finally { await browser.close(); }
   }, 30000);
+
+  it.each([
+    ['unity', 'Build/synthetic.data', 'application/octet-stream'],
+    ['godot', 'synthetic.pck', 'application/octet-stream'],
+  ] as const)(
+    'delivers and runs the synthetic web engine %s fixture in the opaque sandbox',
+    async (kind, payloadPath, payloadMime) => {
+      const { developer, game } = await createGame();
+      const fixture = await createSyntheticWebEngineFixture(kind);
+      await developer
+        .post(`/games/${game.id}/upload`)
+        .attach('game', fixture.archive, `${kind}.zip`)
+        .expect(201);
+
+      for (const [path, requiredMime] of [
+        ['runtime.wasm', 'application/wasm'],
+        [payloadPath, payloadMime],
+      ]) {
+        const preview = await developer
+          .get(`/games/${game.id}/preview/${path}`)
+          .expect(302);
+        const capabilityPath = new URL(
+          preview.headers.location,
+          `http://api/games/${game.id}/preview/${path}`,
+        ).pathname;
+        await request(app.getHttpServer())
+          .get(capabilityPath)
+          .expect(200)
+          .expect((response) => {
+            expect(response.headers['content-type']).toContain(requiredMime);
+          });
+      }
+
+      await app.listen(0, '127.0.0.1');
+      const origin = await app.getUrl();
+      const browser = await chromium.launch({
+        executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH,
+      });
+      try {
+        const context = await browser.newContext();
+        await context.request.post(`${origin}/auth/login`, {
+          data: { email: 'owner@example.com', password: 'Password123!' },
+        });
+        const page = await context.newPage();
+        const requests: BrowserRequest[] = [];
+        page.on('request', (browserRequest) => requests.push(browserRequest));
+        await page.goto(origin);
+        await page.setContent(
+          `<iframe sandbox="allow-scripts allow-pointer-lock" src="${origin}/games/${game.id}/preview/index.html"></iframe>`,
+        );
+        const frame = page.frameLocator('iframe');
+        await frame
+          .locator('[data-testid="synthetic-ready"]')
+          .waitFor({ state: 'visible' });
+        await frame.locator('canvas').press('ArrowRight');
+        await frame.locator('canvas').click({ position: { x: 4, y: 4 } });
+        expect(
+          await frame.locator('canvas').evaluate((canvas) => canvas.width),
+        ).toBe(320);
+        expect(
+          await frame.locator('canvas').evaluate((canvas) =>
+            Array.from(
+              (canvas as HTMLCanvasElement)
+                .getContext('2d')!
+                .getImageData(5, 5, 1, 1).data,
+            ),
+          ),
+        ).toEqual([235, 87, 87, 255]);
+        const loaderRequest = requests.find((browserRequest) =>
+          browserRequest.url().endsWith('/loader.js'),
+        );
+        expect(loaderRequest).toBeDefined();
+        if (!loaderRequest) throw new Error('Synthetic loader request missing');
+        expect(loaderRequest.url()).toContain('/game-content/');
+        expect((await loaderRequest.allHeaders()).cookie).toBeUndefined();
+        expect(await page.locator('iframe').getAttribute('sandbox')).toBe(
+          'allow-scripts allow-pointer-lock',
+        );
+      } finally {
+        await browser.close();
+      }
+    },
+    30000,
+  );
 
   it('runs guest nested modules and a local font with Origin:null in Chromium without widening API CORS', async () => {
     const { developer, game } = await createGame();
