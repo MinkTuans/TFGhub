@@ -59,13 +59,14 @@ export function UploadEditor({
           />
         </label>
         <p className="hint">
-          Đặt index.html ở thư mục gốc của tệp ZIP. Tệp ZIP tối đa 25 MiB,
-          tối đa 100 MiB sau khi giải nén và 1.000 mục.
+          Đặt index.html ở thư mục gốc của tệp ZIP. Tệp ZIP tối đa 100 MiB,
+          tối đa 400 MiB sau khi giải nén và 2.000 mục.
         </p>
         <p className="hint">
           Đóng gói tệp ảnh, âm thanh và mã dùng đường dẫn tương đối trong cùng
           ZIP. Sau khi tải xong, mở Chơi thử rồi gửi duyệt khi game đã chạy.
         </p>
+        <p className="hint">Với Unity/Godot, xuất bản Web không nén, một luồng; không đưa tệp .gz, .br, .unityweb hoặc tệp native vào ZIP.</p>
         {pending && (
           <>
             <progress aria-label="Tiến trình tải trò chơi" />

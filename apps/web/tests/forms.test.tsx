@@ -220,9 +220,9 @@ test("HTML5 upload explains the playable ZIP contract before a creator uploads",
   render(<UploadEditor gameId="game-1" onUploaded={vi.fn()} />);
 
   expect(screen.getByText(/index\.html ở thư mục gốc/i)).toBeVisible();
-  expect(screen.getByText(/25 MiB/i)).toBeVisible();
-  expect(screen.getByText(/100 MiB sau khi giải nén/i)).toBeVisible();
-  expect(screen.getByText(/1\.000 mục/i)).toBeVisible();
+  expect(screen.getByText(/100 MiB/i)).toBeVisible();
+  expect(screen.getByText(/400 MiB sau khi giải nén/i)).toBeVisible();
+  expect(screen.getByText(/2\.000 mục/i)).toBeVisible();
   expect(screen.getByText(/tệp ảnh, âm thanh và mã dùng đường dẫn tương đối/i)).toBeVisible();
   expect(screen.getByText(/tải xong.*chơi thử.*gửi duyệt/i)).toBeVisible();
 });

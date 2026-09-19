@@ -75,11 +75,11 @@ const messages = new Map<string, string>([
     "ZIP requires a root index.html",
     "Tệp ZIP cần có index.html ở thư mục gốc.",
   ],
-  ["ZIP exceeds 25 MiB", "Tệp ZIP không được vượt quá 25 MiB."],
-  ["ZIP exceeds 1,000 entries", "Tệp ZIP không được chứa quá 1.000 mục."],
+  ["ZIP exceeds 100 MiB", "Tệp ZIP không được vượt quá 100 MiB."],
+  ["ZIP exceeds 2,000 entries", "Tệp ZIP không được chứa quá 2.000 mục."],
   [
-    "ZIP exceeds 100 MiB expanded",
-    "Dung lượng giải nén không được vượt quá 100 MiB.",
+    "ZIP exceeds 400 MiB expanded",
+    "Dung lượng giải nén không được vượt quá 400 MiB.",
   ],
   [
     "Unsafe or duplicate ZIP path",
@@ -92,6 +92,10 @@ const messages = new Map<string, string>([
   [
     "Encrypted entries are not supported",
     "Tệp ZIP có mục được mã hóa. Hãy bỏ mật khẩu và nén lại.",
+  ],
+  [
+    "Precompressed engine payloads are unsupported; export an uncompressed, single-threaded web build",
+    "Bản xuất engine đã nén sẵn không được hỗ trợ. Hãy xuất Web không nén, một luồng rồi nén ZIP.",
   ],
   [
     "ZIP contains a symbolic link or unsupported file type",
