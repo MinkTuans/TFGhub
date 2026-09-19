@@ -426,6 +426,43 @@ describe('Developer profile and game draft HTTP boundary', () => {
     }
   }, 20000);
 
+  it('characterizes project-owned web engine capabilities in the opaque sandbox', async () => {
+    const { developer, game } = await createGame();
+    const runtime = `
+const report = (name, value) => document.querySelector('#' + name).textContent = value;
+const asyncProbe = async (name, probe) => { try { await probe(); report(name, 'available'); } catch { report(name, 'blocked'); } };
+asyncProbe('wasm', () => WebAssembly.instantiate(new Uint8Array([0,97,115,109,1,0,0,0])));
+asyncProbe('blobUrl', async () => { const url = URL.createObjectURL(new Blob(['ok'])); await fetch(url); URL.revokeObjectURL(url); });
+asyncProbe('blobWorker', () => new Promise((resolve, reject) => { const url = URL.createObjectURL(new Blob(['postMessage("ok")'])); const worker = new Worker(url); worker.onmessage = () => { worker.terminate(); URL.revokeObjectURL(url); resolve(); }; worker.onerror = reject; }));
+asyncProbe('capabilityFetch', () => fetch('./probe.bin').then(response => { if (!response.ok) throw new Error(); }));
+asyncProbe('indexedDb', () => new Promise((resolve, reject) => { const request = indexedDB.open('capability-probe'); request.onsuccess = () => { request.result.close(); resolve(); }; request.onerror = request.onblocked = reject; }));
+asyncProbe('webSocket', () => new Promise((resolve, reject) => { const socket = new WebSocket('wss://example.invalid'); socket.onopen = () => { socket.close(); resolve(); }; socket.onerror = reject; }));`;
+    await developer.post(`/games/${game.id}/upload`).attach('game', zipFixture([
+      { name: 'index.html', content: '<div id="wasm"></div><div id="blobUrl"></div><div id="blobWorker"></div><div id="capabilityFetch"></div><div id="indexedDb"></div><div id="webSocket"></div><script src="runtime.js"></script>' },
+      { name: 'runtime.js', content: runtime },
+      { name: 'probe.bin', content: 'fixture' },
+    ]), 'capabilities.zip').expect(201);
+    await app.listen(0, '127.0.0.1');
+    const origin = await app.getUrl();
+    const browser = await chromium.launch({ executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH });
+    try {
+      const context = await browser.newContext();
+      await context.request.post(`${origin}/auth/login`, { data: { email: 'owner@example.com', password: 'Password123!' } });
+      const page = await context.newPage();
+      await page.goto(origin);
+      await page.setContent(`<iframe sandbox="allow-scripts allow-pointer-lock" src="${origin}/games/${game.id}/preview/index.html"></iframe>`);
+      const frame = page.frameLocator('iframe');
+      for (const capability of ['wasm', 'blobUrl', 'blobWorker', 'capabilityFetch', 'indexedDb', 'webSocket']) await frame.locator(`#${capability}`).filter({ hasText: /available|blocked/ }).waitFor();
+      await expect(frame.locator('#wasm').textContent()).resolves.toBe('available');
+      await expect(frame.locator('#blobUrl').textContent()).resolves.toBe('blocked');
+      await expect(frame.locator('#blobWorker').textContent()).resolves.toBe('available');
+      await expect(frame.locator('#capabilityFetch').textContent()).resolves.toBe('blocked');
+      await expect(frame.locator('#indexedDb').textContent()).resolves.toBe('blocked');
+      await expect(frame.locator('#webSocket').textContent()).resolves.toBe('blocked');
+      expect(await page.locator('iframe').getAttribute('sandbox')).toBe('allow-scripts allow-pointer-lock');
+    } finally { await browser.close(); }
+  }, 30000);
+
   it('runs guest nested modules and a local font with Origin:null in Chromium without widening API CORS', async () => {
     const { developer, game } = await createGame();
     const require = createRequire(import.meta.url);
