@@ -72,7 +72,19 @@ const mimeTypes: Record<string, string> = {
   '.woff': 'font/woff',
   '.woff2': 'font/woff2',
   '.ttf': 'font/ttf',
+  '.wasm': 'application/wasm',
+  '.data': 'application/octet-stream',
+  '.pck': 'application/octet-stream',
+  '.bin': 'application/octet-stream',
+  '.glb': 'model/gltf-binary',
+  '.gltf': 'model/gltf+json',
 };
+
+function isPrecompressedEnginePayload(path: string): boolean {
+  return ['.gz', '.br', '.unityweb'].some((suffix) =>
+    path.toLowerCase().endsWith(suffix),
+  );
+}
 
 function validPath(path: string): boolean {
   return (
@@ -191,6 +203,10 @@ async function readZip(archivePath: string, archiveBytes: number): Promise<Stage
               throw new Error('Directory entries must be empty');
           } else {
             const contentType = mimeTypes[extname(path).toLowerCase()];
+            if (isPrecompressedEnginePayload(path))
+              throw new Error(
+                'Precompressed engine payloads are unsupported; export an uncompressed, single-threaded web build',
+              );
             if (!contentType) throw new Error('Unsupported file extension');
             const stream = await new Promise<NodeJS.ReadableStream>(
               (resolveStream, rejectStream) => {

@@ -230,6 +230,86 @@ describe('GameContentService with real artifacts and ZIP streams', () => {
     }
   });
 
+  it('delivers validated web engine assets with their required MIME types', async () => {
+    const stale = await service.previewCapability(game.id, {
+      id: 'owner-1',
+      role: 'USER',
+    });
+    await service.upload(
+      game.id,
+      'owner-1',
+      zipFixture([
+        { name: 'index.html', content: '<h1>Engine</h1>' },
+        { name: 'game.wasm', content: Buffer.from([0, 97, 115, 109]) },
+        { name: 'game.data', content: Buffer.from([1, 2]) },
+        { name: 'game.pck', content: Buffer.from([3, 4]) },
+        { name: 'game.bin', content: Buffer.from([5, 6]) },
+        { name: 'scene.glb', content: Buffer.from([7, 8]) },
+        { name: 'scene.gltf', content: '{"asset":{"version":"2.0"}}' },
+      ]),
+    );
+
+    await expect(
+      previewFile(game.id, 'game.wasm', { id: 'owner-1', role: 'USER' }),
+    ).resolves.toMatchObject({
+      content: Buffer.from([0, 97, 115, 109]),
+      contentType: 'application/wasm',
+    });
+    await expect(
+      previewFile(game.id, 'game.data', { id: 'owner-1', role: 'USER' }),
+    ).resolves.toMatchObject({
+      content: Buffer.from([1, 2]),
+      contentType: 'application/octet-stream',
+    });
+    await expect(
+      previewFile(game.id, 'game.pck', { id: 'owner-1', role: 'USER' }),
+    ).resolves.toMatchObject({
+      content: Buffer.from([3, 4]),
+      contentType: 'application/octet-stream',
+    });
+    await expect(
+      previewFile(game.id, 'game.bin', { id: 'owner-1', role: 'USER' }),
+    ).resolves.toMatchObject({
+      content: Buffer.from([5, 6]),
+      contentType: 'application/octet-stream',
+    });
+    await expect(
+      previewFile(game.id, 'scene.glb', { id: 'owner-1', role: 'USER' }),
+    ).resolves.toMatchObject({
+      content: Buffer.from([7, 8]),
+      contentType: 'model/gltf-binary',
+    });
+    await expect(
+      previewFile(game.id, 'scene.gltf', { id: 'owner-1', role: 'USER' }),
+    ).resolves.toMatchObject({
+      content: Buffer.from('{"asset":{"version":"2.0"}}'),
+      contentType: 'model/gltf+json',
+    });
+    await expect(
+      service.capabilityFile(stale.token, 'game.wasm'),
+    ).rejects.toMatchObject({ status: 404 });
+  });
+
+  it.each(['game.wasm.gz', 'game.data.br', 'game.unityweb'])(
+    'rejects precompressed engine payload %s without replacing the current artifact',
+    async (name) => {
+      await expect(
+        service.upload(
+          game.id,
+          'owner-1',
+          zipFixture([{ name: 'index.html' }, { name }]),
+        ),
+      ).rejects.toMatchObject({
+        status: 400,
+        message:
+          'Precompressed engine payloads are unsupported; export an uncompressed, single-threaded web build',
+      });
+      expect((await playFile('demo', 'index.html')).content.toString()).toBe(
+        'original',
+      );
+    },
+  );
+
   it('accepts a ZIP whose compressed archive is exactly 100 MiB', async () => {
     const uploadRoot = await mkdtemp(join(tmpdir(), 'content-upload-'));
     const archivePath = join(uploadRoot, 'game.zip');
