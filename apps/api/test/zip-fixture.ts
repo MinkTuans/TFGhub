@@ -8,6 +8,7 @@ export function zipFixture(
     mode?: number;
     flags?: number;
     declaredSize?: number;
+    store?: boolean;
   }>,
 ): Buffer {
   const locals: Buffer[] = [];
@@ -16,7 +17,7 @@ export function zipFixture(
   for (const entry of entries) {
     const name = Buffer.from(entry.name);
     const content = Buffer.from(entry.content ?? 'hello');
-    const compressed = deflateRawSync(content);
+    const compressed = entry.store ? content : deflateRawSync(content);
     let crc = 0xffffffff;
     for (const byte of content) {
       crc ^= byte;
@@ -28,7 +29,7 @@ export function zipFixture(
     local.writeUInt32LE(0x04034b50);
     local.writeUInt16LE(20, 4);
     local.writeUInt16LE(entry.flags ?? 0, 6);
-    local.writeUInt16LE(8, 8);
+    local.writeUInt16LE(entry.store ? 0 : 8, 8);
     local.writeUInt32LE(crc, 14);
     local.writeUInt32LE(compressed.length, 18);
     local.writeUInt32LE(entry.declaredSize ?? content.length, 22);

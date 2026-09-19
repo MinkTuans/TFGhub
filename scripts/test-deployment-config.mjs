@@ -164,7 +164,7 @@ try {
     services.api.environment.GAME_STORAGE_ROOT,
     '/var/lib/indieforge/games',
   );
-  assert.equal(services.api.environment.GAME_UPLOAD_MAX_BYTES, '26214400');
+  assert.equal(services.api.environment.GAME_UPLOAD_MAX_BYTES, '104857600');
   assert.deepEqual(services.api.volumes, [
     {
       type: 'volume',

@@ -51,7 +51,7 @@ Game source types are `UPLOAD`, `CODE`, `STORY`, `PLATFORMER`, and `ENGINE`. Leg
 | GET | `/play/:slug/*` | Public approved game | Redirect to scoped public capability |
 | GET | `/game-content/:token/*` | Capability | Deliver restricted immutable artifact content |
 
-ZIP limits are 25 MiB compressed, 100 MiB expanded, and 1,000 entries. A root `index.html` is required. Unsafe paths, symbolic links, encrypted entries, duplicate paths, and unsupported content are rejected.
+ZIP limits are 100 MiB compressed, 400 MiB expanded, and 2,000 entries. A root `index.html` is required. Unsafe paths, symbolic links, encrypted entries, duplicate paths, and unsupported content are rejected.
 
 Upload exactly one multipart file named `game` whose filename ends in `.zip`; extra fields/files and missing input are rejected. Authentication and ownership are checked before multipart parsing. A successful upload returns the authoritative owner game summary with an incremented ready artifact version.
 

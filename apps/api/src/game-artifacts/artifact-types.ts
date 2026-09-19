@@ -4,6 +4,15 @@ export type ArtifactFile = {
   contentType: string;
 };
 
+/** A validated upload entry held on disk until atomic artifact publication. */
+export type StagedArtifactFile = {
+  path: string;
+  sourcePath: string;
+  contentType: string;
+};
+
+export type ArtifactInstallFile = ArtifactFile | StagedArtifactFile;
+
 export type StoredArtifactFile = {
   path: string;
   content: Buffer;

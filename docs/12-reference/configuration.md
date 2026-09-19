@@ -8,7 +8,7 @@
 | `WEB_ORIGIN` | API | Exact trusted browser origin and CORS origin |
 | `COOKIE_SECURE` | API | Secure-cookie override; keep true for HTTPS |
 | `GAME_STORAGE_ROOT` | API | Root for artifacts, covers, project assets, thumbnails |
-| `GAME_UPLOAD_MAX_BYTES` | API | Legacy ZIP upload bound; production uses 25 MiB |
+| `GAME_UPLOAD_MAX_BYTES` | API | Legacy ZIP upload bound; production uses 100 MiB |
 | `NEXT_PUBLIC_API_URL` | Web build/browser | Public API base, `/api` in production |
 | `API_INTERNAL_URL` | Web server | Private SSR API base |
 | `DEPLOY_ADDRESS` | Caddy | Hostname or address served by proxy |

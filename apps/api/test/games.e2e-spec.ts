@@ -2,6 +2,7 @@ import { type INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { chromium, type Request as BrowserRequest } from '@playwright/test';
+import { request as httpRequest } from 'node:http';
 import { createRequire } from 'node:module';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppModule } from '../src/app.module.js';
@@ -30,6 +31,7 @@ import {
 } from '../src/auth/auth.service.js';
 
 const testSecret = 'games-e2e-tests-only-a-long-explicit-signing-secret';
+const gameUploadDirectory = join(tmpdir(), 'indieforge-game-uploads');
 const dates = {
   createdAt: new Date('2026-09-05T12:00:00.000Z'),
   updatedAt: new Date('2026-09-05T12:00:00.000Z'),
@@ -48,6 +50,7 @@ describe('Developer profile and game draft HTTP boundary', () => {
     games = new Map();
     profiles = new Map();
     storageRoot = await mkdtemp(join(tmpdir(), 'games-http-'));
+    await rm(gameUploadDirectory, { recursive: true, force: true });
 
     const module = await Test.createTestingModule({ imports: [AppModule] })
       .overrideProvider(ArtifactStorage)
@@ -253,6 +256,7 @@ describe('Developer profile and game draft HTTP boundary', () => {
       await writable(storageRoot);
       await rm(storageRoot, { recursive: true, force: true });
     }
+    await rm(gameUploadDirectory, { recursive: true, force: true });
     vi.unstubAllEnvs();
   });
 
@@ -619,6 +623,64 @@ describe('Developer profile and game draft HTTP boundary', () => {
       .get('/play/demo-game/index.html')
       .set('Cookie', 'indieforge_access=invalid')
       .expect(401);
+  });
+
+  it('removes disk-backed multipart ZIP files after accepted and rejected uploads', async () => {
+    const { developer, game } = await createGame();
+    const archive = zipFixture([{ name: 'index.html' }]);
+
+    await developer
+      .post(`/games/${game.id}/upload`)
+      .attach('game', archive, 'game.zip')
+      .expect(201);
+    await developer
+      .post(`/games/${game.id}/upload`)
+      .attach('game', archive, 'not-a-zip.txt')
+      .expect(400);
+    await developer
+      .post(`/games/${game.id}/upload`)
+      .attach('game', Buffer.alloc(100 * 1024 * 1024 + 1), 'too-large.zip')
+      .expect(413);
+
+    await expect(readdir(gameUploadDirectory)).resolves.toEqual([]);
+  }, 30000);
+
+  it('cleans a cancelled authenticated multipart ZIP before its handler runs', async () => {
+    const registered = await request(app.getHttpServer())
+      .post('/auth/register')
+      .send({ email: 'cancel@example.com', password: 'Password123!' })
+      .expect(201);
+    const cookie = registered.headers['set-cookie']![0]!.split(';', 1)[0]!;
+    const created = await request(app.getHttpServer())
+      .post('/games')
+      .set('Cookie', cookie)
+      .send({ title: 'Cancelled upload', slug: 'cancelled-upload' })
+      .expect(201);
+    await app.listen(0, '127.0.0.1');
+    const url = new URL(await app.getUrl());
+
+    await new Promise<void>((resolve) => {
+      const upload = httpRequest({
+        hostname: url.hostname,
+        port: url.port,
+        method: 'POST',
+        path: `/games/${created.body.id}/upload`,
+        headers: {
+          Cookie: cookie,
+          Connection: 'close',
+          'Content-Type': 'multipart/form-data; boundary=cancel',
+          'Transfer-Encoding': 'chunked',
+        },
+      });
+      upload.on('error', () => {});
+      upload.on('close', resolve);
+      upload.write(
+        '--cancel\r\nContent-Disposition: form-data; name="game"; filename="game.zip"\r\nContent-Type: application/zip\r\n\r\n',
+      );
+      upload.write(Buffer.alloc(32768), () => upload.destroy());
+    });
+
+    await expect.poll(async () => readdir(gameUploadDirectory)).toEqual([]);
   });
 
   it('allows multipart only for the exact POST upload route and trusted origins', async () => {

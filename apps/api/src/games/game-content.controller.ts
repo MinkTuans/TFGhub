@@ -16,6 +16,9 @@ import {
   type ExecutionContext,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import type { Request, Response } from 'express';
 import { CurrentUser } from '../auth/current-user.decorator.js';
 import type { AuthenticatedUser } from '../auth/auth.service.js';
@@ -29,6 +32,8 @@ import {
   GameContentService,
   MAX_UPLOAD_BYTES,
 } from './game-content.service.js';
+
+const gameUploadDirectory = join(tmpdir(), 'indieforge-game-uploads');
 
 @Injectable()
 export class GameOwnerGuard implements CanActivate {
@@ -144,18 +149,26 @@ export class GameContentController {
   @UseGuards(JwtAuthGuard, GameOwnerGuard)
   @UseInterceptors(
     FileInterceptor('game', {
+      // Keep the compressed ZIP out of the API heap before staged extraction.
+      dest: gameUploadDirectory,
       // Busboy emits partsLimit when the count reaches the limit (including one valid part).
       limits: { fileSize: MAX_UPLOAD_BYTES, files: 1, fields: 0, parts: 2 },
     }),
   )
-  upload(
+  async upload(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
-    @UploadedFile() file?: { originalname: string; buffer: Buffer },
+    @UploadedFile() file?: { originalname: string; path: string },
   ) {
-    if (!file || !file.originalname.toLowerCase().endsWith('.zip'))
+    if (!file)
       throw new BadRequestException('Provide one .zip file in the game field');
-    return this.content.upload(id, user.id, file.buffer);
+    try {
+      if (!file.originalname.toLowerCase().endsWith('.zip'))
+        throw new BadRequestException('Provide one .zip file in the game field');
+      return await this.content.uploadFromPath(id, user.id, file.path);
+    } finally {
+      await rm(file.path, { force: true });
+    }
   }
 
   @Get('games/:id/preview/{*path}')

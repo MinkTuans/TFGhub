@@ -11,13 +11,22 @@ import {
 import { EngineBuildService } from './engine-build.service.js';
 import { GameProjectInput } from '@indieforge/contracts';
 import { JwtService } from '@nestjs/jwt';
-import { extname } from 'node:path';
-import { fromBuffer, type Entry, type ZipFile } from 'yauzl';
+import { createWriteStream } from 'node:fs';
+import { mkdtemp, rm, stat, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { dirname, extname, join } from 'node:path';
+import { Transform } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
+import { open as openZip, type Entry, type ZipFile } from 'yauzl';
 import {
   ArtifactStorage,
   ArtifactVersionExistsError,
 } from '../game-artifacts/artifact-storage.js';
-import type { ArtifactFile } from '../game-artifacts/artifact-types.js';
+import type {
+  ArtifactFile,
+  ArtifactInstallFile,
+  StagedArtifactFile,
+} from '../game-artifacts/artifact-types.js';
 import { compileCode } from '../game-artifacts/code-compiler.js';
 import { compileStory } from '../game-artifacts/story-compiler.js';
 import { compilePlatformer } from '../game-artifacts/platformer-compiler.js';
@@ -28,7 +37,7 @@ import {
   type WorkspaceUpdate,
 } from './games.service.js';
 
-const fixedUploadBytes = 25 * 1024 * 1024;
+const fixedUploadBytes = 100 * 1024 * 1024;
 
 export function uploadLimitFromEnvironment(value: string | undefined): number {
   if (value !== undefined && value !== String(fixedUploadBytes)) {
@@ -40,8 +49,8 @@ export function uploadLimitFromEnvironment(value: string | undefined): number {
 export const MAX_UPLOAD_BYTES = uploadLimitFromEnvironment(
   process.env.GAME_UPLOAD_MAX_BYTES,
 );
-const MAX_EXPANDED_BYTES = 100 * 1024 * 1024;
-const MAX_ENTRIES = 1000;
+const MAX_EXPANDED_BYTES = 400 * 1024 * 1024;
+const MAX_ENTRIES = 2000;
 
 const mimeTypes: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
@@ -95,13 +104,39 @@ const resetReview = {
 
 type Viewer = { id: string; role: 'USER' | 'MODERATOR' | 'ADMIN' };
 
-async function readZip(buffer: Buffer): Promise<ArtifactFile[]> {
-  if (buffer.length > MAX_UPLOAD_BYTES)
-    throw new BadRequestException('ZIP exceeds 25 MiB');
+type ExpandedByteCounter = { bytes: number };
+
+/** Counts actual decompressed bytes while preserving stream backpressure. */
+export function streamWithExpandedLimit(
+  counter: ExpandedByteCounter = { bytes: 0 },
+): Transform {
+  return new Transform({
+    transform(chunk: Uint8Array, _encoding, callback) {
+      counter.bytes += chunk.byteLength;
+      if (counter.bytes > MAX_EXPANDED_BYTES) {
+        callback(new Error('ZIP exceeds 400 MiB expanded'));
+        return;
+      }
+      callback(null, chunk);
+    },
+  });
+}
+
+type StagedZip = {
+  files: StagedArtifactFile[];
+  cleanup: () => Promise<void>;
+};
+
+async function readZip(archivePath: string, archiveBytes: number): Promise<StagedZip> {
+  if (archiveBytes > MAX_UPLOAD_BYTES)
+    throw new BadRequestException('ZIP exceeds 100 MiB');
+  const stagingDirectory = await mkdtemp(
+    join(dirname(archivePath), '.indieforge-zip-'),
+  );
   try {
     const zip = await new Promise<ZipFile>((resolve, reject) => {
-      fromBuffer(
-        buffer,
+      openZip(
+        archivePath,
         { lazyEntries: true, strictFileNames: true, validateEntrySizes: true },
         (error, value) => {
           if (error) reject(error);
@@ -109,11 +144,11 @@ async function readZip(buffer: Buffer): Promise<ArtifactFile[]> {
         },
       );
     });
-    return await new Promise<ArtifactFile[]>((resolve, reject) => {
-      const files: ArtifactFile[] = [];
+    const files = await new Promise<StagedArtifactFile[]>((resolve, reject) => {
+      const files: StagedArtifactFile[] = [];
       const names = new Set<string>();
       let count = 0;
-      let bytes = 0;
+      const expanded = { bytes: 0 };
       let failed = false;
       const fail = (error: unknown) => {
         if (failed) return;
@@ -131,7 +166,7 @@ async function readZip(buffer: Buffer): Promise<ArtifactFile[]> {
       zip.on('entry', (entry: Entry) => {
         void (async () => {
           if (++count > MAX_ENTRIES)
-            throw new Error('ZIP exceeds 1,000 entries');
+            throw new Error('ZIP exceeds 2,000 entries');
           const directory = entry.fileName.endsWith('/');
           const path = directory ? entry.fileName.slice(0, -1) : entry.fileName;
           const mode = (entry.externalFileAttributes >>> 16) & 0o170000;
@@ -165,23 +200,29 @@ async function readZip(buffer: Buffer): Promise<ArtifactFile[]> {
                 });
               },
             );
-            const chunks: Buffer[] = [];
-            // Enforce the actual inflated byte total, never trust central-directory sizes.
-            for await (const chunk of stream) {
-              const data = Buffer.from(chunk as Uint8Array);
-              bytes += data.length;
-              if (bytes > MAX_EXPANDED_BYTES)
-                throw new Error('ZIP exceeds 100 MiB expanded');
-              chunks.push(data);
-            }
-            files.push({ path, contentType, content: Buffer.concat(chunks) });
+            stream.once('error', fail);
+            const sourcePath = join(stagingDirectory, path);
+            const { mkdir } = await import('node:fs/promises');
+            await mkdir(dirname(sourcePath), { recursive: true });
+            // Enforce actual inflated bytes while writing directly to disk.
+            await pipeline(
+              stream,
+              streamWithExpandedLimit(expanded),
+              createWriteStream(sourcePath, { flags: 'wx', mode: 0o600 }),
+            );
+            files.push({ path, contentType, sourcePath });
           }
           if (!failed) zip.readEntry();
         })().catch(fail);
       });
       zip.readEntry();
     });
+    return {
+      files,
+      cleanup: () => rm(stagingDirectory, { recursive: true, force: true }),
+    };
   } catch (error) {
+    await rm(stagingDirectory, { recursive: true, force: true });
     throw new BadRequestException(
       error instanceof Error ? error.message : 'Invalid ZIP archive',
     );
@@ -288,15 +329,48 @@ export class GameContentService {
   async upload(gameId: string, userId: string, archive: Buffer) {
     return this.serialized(gameId, async () => {
       const game = await this.owned(gameId, userId);
-      if (game.sourceType !== 'UPLOAD')
-        throw new BadRequestException('This game does not accept ZIP uploads');
-      return this.install(game, await readZip(archive));
+      const uploadDirectory = await mkdtemp(join(tmpdir(), 'indieforge-upload-'));
+      const archivePath = join(uploadDirectory, 'game.zip');
+      try {
+        await writeFile(archivePath, archive, { flag: 'wx', mode: 0o600 });
+        return await this.uploadArchive(game, archivePath, archive.length);
+      } finally {
+        await rm(uploadDirectory, { recursive: true, force: true });
+      }
     });
+  }
+
+  async uploadFromPath(gameId: string, userId: string, archivePath: string) {
+    return this.serialized(gameId, async () => {
+      const game = await this.owned(gameId, userId);
+      let archiveBytes: number;
+      try {
+        archiveBytes = (await stat(archivePath)).size;
+      } catch {
+        throw new BadRequestException('Invalid ZIP archive');
+      }
+      return this.uploadArchive(game, archivePath, archiveBytes);
+    });
+  }
+
+  private async uploadArchive(
+    game: StoredGame,
+    archivePath: string,
+    archiveBytes: number,
+  ) {
+    if (game.sourceType !== 'UPLOAD')
+      throw new BadRequestException('This game does not accept ZIP uploads');
+    const staged = await readZip(archivePath, archiveBytes);
+    try {
+      return await this.install(game, staged.files);
+    } finally {
+      await staged.cleanup();
+    }
   }
 
   private async install(
     game: StoredGame,
-    files: ArtifactFile[],
+    files: ArtifactInstallFile[],
     dimensions: Pick<
       WorkspaceUpdate,
       'viewportWidth' | 'viewportHeight' | 'engineBuild'

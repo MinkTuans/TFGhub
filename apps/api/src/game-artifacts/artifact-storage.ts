@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import {
   chmod,
+  copyFile,
+  constants,
   mkdir,
   lstat,
   readFile,
@@ -12,13 +14,24 @@ import {
 import { tmpdir } from 'node:os';
 import { dirname, join, relative, resolve, sep } from 'node:path';
 import { Injectable } from '@nestjs/common';
-import type { ArtifactFile, StoredArtifactFile } from './artifact-types.js';
+import type {
+  ArtifactInstallFile,
+  ArtifactFile,
+  StoredArtifactFile,
+} from './artifact-types.js';
 
 const manifestName = '.indieforge-artifact.json';
 
 type ArtifactManifest = {
   files: Array<Pick<ArtifactFile, 'path' | 'contentType'>>;
 };
+
+function isStagedFile(file: ArtifactInstallFile): file is Extract<
+  ArtifactInstallFile,
+  { sourcePath: string }
+> {
+  return 'sourcePath' in file;
+}
 
 export class ArtifactVersionExistsError extends Error {}
 
@@ -104,7 +117,7 @@ export class ArtifactStorage {
   async install(
     gameId: string,
     version: number,
-    files: ArtifactFile[],
+    files: ArtifactInstallFile[],
   ): Promise<void> {
     if (!Number.isSafeInteger(version) || version < 0) {
       throw new Error('Artifact version must be a non-negative integer');
@@ -137,7 +150,11 @@ export class ArtifactStorage {
           resolve(stagingDirectory, file.path),
         );
         await mkdir(dirname(filePath), { recursive: true });
-        await writeFile(filePath, file.content, { flag: 'wx' });
+        if (isStagedFile(file)) {
+          await copyFile(file.sourcePath, filePath, constants.COPYFILE_EXCL);
+        } else {
+          await writeFile(filePath, file.content, { flag: 'wx' });
+        }
       }
 
       const manifest: ArtifactManifest = {

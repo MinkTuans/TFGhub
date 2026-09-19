@@ -1,4 +1,4 @@
-import { mkdtemp, readdir, rm, chmod, stat } from 'node:fs/promises';
+import { mkdtemp, readdir, rm, chmod, stat, writeFile } from 'node:fs/promises';
 import { JwtService } from '@nestjs/jwt';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -6,8 +6,11 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { ArtifactStorage } from '../game-artifacts/artifact-storage.js';
 import {
   GameContentService,
+  streamWithExpandedLimit,
   uploadLimitFromEnvironment,
 } from './game-content.service.js';
+import { Readable, Writable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
 import type {
   GamesRepository,
   StoredGame,
@@ -203,6 +206,86 @@ describe('GameContentService with real artifacts and ZIP streams', () => {
     ).toBe('original');
   });
 
+  it('streams a disk-backed ZIP through staged artifact installation', async () => {
+    const uploadRoot = await mkdtemp(join(tmpdir(), 'content-upload-'));
+    const archivePath = join(uploadRoot, 'game.zip');
+    try {
+      await writeFile(
+        archivePath,
+        zipFixture([
+          { name: 'index.html', content: '<h1>Staged</h1>' },
+          { name: 'assets/game.js', content: 'window.ready = true' },
+        ]),
+      );
+
+      await expect(
+        service.uploadFromPath(game.id, 'owner-1', archivePath),
+      ).resolves.toMatchObject({ artifactVersion: 2 });
+      expect(
+        (await storage.read(game.id, 2, 'assets/game.js')).content.toString(),
+      ).toBe('window.ready = true');
+      expect(await readdir(uploadRoot)).toEqual(['game.zip']);
+    } finally {
+      await rm(uploadRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('accepts a ZIP whose compressed archive is exactly 100 MiB', async () => {
+    const uploadRoot = await mkdtemp(join(tmpdir(), 'content-upload-'));
+    const archivePath = join(uploadRoot, 'game.zip');
+    const maximumArchiveBytes = 100 * 1024 * 1024;
+    // A one-entry stored ZIP has 118 bytes of headers for this filename.
+    const archive = zipFixture([
+      {
+        name: 'index.html',
+        store: true,
+        content: Buffer.alloc(maximumArchiveBytes - 118),
+      },
+    ]);
+    try {
+      await writeFile(archivePath, archive);
+      expect((await stat(archivePath)).size).toBe(maximumArchiveBytes);
+
+      await expect(
+        service.uploadFromPath(game.id, 'owner-1', archivePath),
+      ).resolves.toMatchObject({ artifactVersion: 2 });
+      expect(await readdir(uploadRoot)).toEqual(['game.zip']);
+    } finally {
+      await rm(uploadRoot, { recursive: true, force: true });
+    }
+  }, 30000);
+
+  it('cleans staged extraction after malformed ZIP and storage failures', async () => {
+    const uploadRoot = await mkdtemp(join(tmpdir(), 'content-upload-'));
+    const archivePath = join(uploadRoot, 'game.zip');
+    try {
+      await writeFile(
+        archivePath,
+        zipFixture([
+          { name: 'index.html', content: Buffer.alloc(1024), declaredSize: 1 },
+        ]),
+      );
+      await expect(
+        service.uploadFromPath(game.id, 'owner-1', archivePath),
+      ).rejects.toMatchObject({ status: 400 });
+      expect(await readdir(uploadRoot)).toEqual(['game.zip']);
+
+      await writeFile(archivePath, zipFixture([{ name: 'index.html' }]));
+      storage.install = async () => {
+        throw new Error('storage offline');
+      };
+      await expect(
+        service.uploadFromPath(game.id, 'owner-1', archivePath),
+      ).rejects.toMatchObject({ status: 503 });
+      expect(await readdir(uploadRoot)).toEqual(['game.zip']);
+      expect((await playFile('demo', 'index.html')).content.toString()).toBe(
+        'original',
+      );
+    } finally {
+      await rm(uploadRoot, { recursive: true, force: true });
+    }
+  });
+
   it.each([
     '../escape.js',
     '/absolute.js',
@@ -250,7 +333,7 @@ describe('GameContentService with real artifacts and ZIP streams', () => {
         { name: 'asset.js' },
       ],
       [{ name: 'index.html', content: Buffer.alloc(1024), declaredSize: 1 }],
-      Array.from({ length: 1001 }, (_, i) => ({
+      Array.from({ length: 2001 }, (_, i) => ({
         name: i ? `a${i}.js` : 'index.html',
       })),
     ].map((entries) => ({ entries })),
@@ -265,19 +348,45 @@ describe('GameContentService with real artifacts and ZIP streams', () => {
     },
   );
 
-  it('rejects compressed and actual expanded byte limits before installation', async () => {
+  it('rejects a compressed archive over 100 MiB before installation', async () => {
     await expect(
-      service.upload(game.id, 'owner-1', Buffer.alloc(25 * 1024 * 1024 + 1)),
-    ).rejects.toMatchObject({ status: 400 });
-    const archive = zipFixture([
-      { name: 'index.html', content: Buffer.alloc(100 * 1024 * 1024 + 1) },
-    ]);
-    await expect(
-      service.upload(game.id, 'owner-1', archive),
+      service.upload(game.id, 'owner-1', Buffer.alloc(100 * 1024 * 1024 + 1)),
     ).rejects.toMatchObject({ status: 400 });
     expect(game.artifactVersion).toBe(1);
     expect(await readdir(join(root, game.id))).toEqual(['1']);
-  }, 15000);
+  });
+
+  it('accepts 2,000 archive entries', async () => {
+    const entries = Array.from({ length: 2000 }, (_, index) => ({
+      name: index === 0 ? 'index.html' : `assets/${index}.js`,
+    }));
+
+    await expect(
+      service.upload(game.id, 'owner-1', zipFixture(entries)),
+    ).resolves.toMatchObject({ artifactVersion: 2 });
+    expect(
+      (await storage.read(game.id, 2, 'assets/1999.js')).content.toString(),
+    ).toBe('hello');
+  });
+
+  it('accepts exactly 400 MiB and rejects more expanded bytes while streaming', async () => {
+    const chunk = Buffer.alloc(64 * 1024);
+    const sink = new Writable({ write(_chunk, _encoding, done) { done(); } });
+    await expect(
+      pipeline(
+        Readable.from(Array.from({ length: 6400 }, () => chunk)),
+        streamWithExpandedLimit(),
+        sink,
+      ),
+    ).resolves.toBeUndefined();
+    await expect(
+      pipeline(
+        Readable.from([...Array.from({ length: 6400 }, () => chunk), Buffer.alloc(1)]),
+        streamWithExpandedLimit(),
+        new Writable({ write(_chunk, _encoding, done) { done(); } }),
+      ),
+    ).rejects.toThrow('ZIP exceeds 400 MiB expanded');
+  });
 
   it('validates source matching, saves private project data, and builds its saved source', async () => {
     await expect(
@@ -655,10 +764,10 @@ describe('GameContentService with real artifacts and ZIP streams', () => {
 
 describe('production upload limit configuration', () => {
   it('accepts only the documented fixed production upload limit', () => {
-    expect(uploadLimitFromEnvironment(undefined)).toBe(25 * 1024 * 1024);
-    expect(uploadLimitFromEnvironment('26214400')).toBe(25 * 1024 * 1024);
-    expect(() => uploadLimitFromEnvironment('26214401')).toThrow(
-      'GAME_UPLOAD_MAX_BYTES must be 26214400',
+    expect(uploadLimitFromEnvironment(undefined)).toBe(100 * 1024 * 1024);
+    expect(uploadLimitFromEnvironment('104857600')).toBe(100 * 1024 * 1024);
+    expect(() => uploadLimitFromEnvironment('104857601')).toThrow(
+      'GAME_UPLOAD_MAX_BYTES must be 104857600',
     );
   });
 });

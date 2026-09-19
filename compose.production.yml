@@ -41,7 +41,7 @@ services:
       WEB_ORIGIN: ${SITE_ORIGIN:?set SITE_ORIGIN}
       COOKIE_SECURE: ${COOKIE_SECURE:-true}
       GAME_STORAGE_ROOT: /var/lib/indieforge/games
-      GAME_UPLOAD_MAX_BYTES: "26214400"
+      GAME_UPLOAD_MAX_BYTES: "104857600"
     volumes:
       - game_storage:/var/lib/indieforge/games
     healthcheck:

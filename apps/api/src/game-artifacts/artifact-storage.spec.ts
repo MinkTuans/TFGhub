@@ -85,6 +85,23 @@ describe('ArtifactStorage', () => {
     expect(await readdir(join(storageRoot, 'game-1'))).toEqual(['2']);
   });
 
+  it('atomically publishes files copied from upload staging without buffering them', async () => {
+    const stagedFile = join(storageRoot, 'upload-staging.html');
+    await writeFile(stagedFile, '<h1>Staged</h1>');
+
+    await storage.install('game-1', 1, [
+      {
+        path: 'index.html',
+        sourcePath: stagedFile,
+        contentType: 'text/html',
+      },
+    ]);
+
+    await expect(
+      readFile(join(storageRoot, 'game-1', '1', 'index.html'), 'utf8'),
+    ).resolves.toBe('<h1>Staged</h1>');
+  });
+
   it('does not leave a partially published version after a staged write fails', async () => {
     await expect(
       storage.install('game-1', 3, [
