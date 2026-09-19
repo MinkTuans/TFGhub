@@ -27,3 +27,41 @@ Unity WebGL and Godot Web compatibility are **unverified**. The current allowlis
 ## Follow-up evidence required
 
 For each engine: exact version, export settings, fixture hash and license provenance; an actual upload → owner preview → reload → moderation → public play run; browser rendering plus keyboard and touch input; sandbox/CSP compatibility; package size, first playable frame and upload peak-memory measurement.
+
+## Capability contract characterization
+
+On 2026-09-19, project-owned HTML/JavaScript and the eight-byte WebAssembly
+header fixture were uploaded through the ordinary owner ZIP flow, delivered by
+an immutable capability URL, and run in Google Chrome (`/usr/bin/google-chrome`)
+inside the exact opaque iframe sandbox. The regression is committed as
+`37e0e6b` and runs with:
+
+```sh
+PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/google-chrome \
+  pnpm --filter api exec vitest run --config vitest.config.e2e.ts \
+  test/games.e2e-spec.ts -t 'characterizes project-owned web engine capabilities'
+```
+
+| Capability | Result | Policy reason |
+| --- | --- | --- |
+| WASM instantiate | Available | Local WebAssembly construction requires no connection. |
+| Blob Worker | Available | `worker-src blob:` explicitly permits the worker URL. |
+| Blob URL fetched with `fetch()` | Blocked | `connect-src 'none'` governs the request. |
+| Capability-relative fetch/XHR | Blocked | `connect-src 'none'` blocks the capability URL request. |
+| IndexedDB | Blocked | The opaque sandbox does not provide supported persistent storage. |
+| WebSocket | Blocked | `connect-src 'none'` blocks socket connection. |
+
+The test also asserts the iframe remains
+`sandbox="allow-scripts allow-pointer-lock"`; `allow-same-origin` is not
+introduced. No CSP directive was changed. The fixture is a policy probe, not a
+Unity/Godot substitute, so neither engine is compatible or supported on this
+evidence.
+
+## CSP decision gate
+
+No named runtime with licensed fixture provenance has requested a blocked
+capability. Therefore no CSP-change plan exists and no policy exception is
+authorized. If such a runtime arrives, its separate plan must name one
+directive, exact capability URL scope, browser proof and regressions preventing
+external origins and same-origin sandbox access; broad `connect-src` values are
+prohibited.
