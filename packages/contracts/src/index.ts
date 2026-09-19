@@ -80,4 +80,4 @@ export * from "./admin-management.js";
 
 export * from "./game-engagement.js";
 
-export { createPixelAdventure, BUILTIN_PIXEL_SPRITES, compileEngineHtml } from "@indieforge/engine-core";
+export { createPixelAdventure, BUILTIN_PIXEL_SPRITES } from "@indieforge/engine-core";
