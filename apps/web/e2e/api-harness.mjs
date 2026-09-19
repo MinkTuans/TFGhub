@@ -23,6 +23,8 @@ const { PublicGamesRepository } =
   await import("../../api/dist/games/public-games.service.js");
 const { ArtifactStorage } =
   await import("../../api/dist/game-artifacts/artifact-storage.js");
+const { ENGAGEMENT_DATABASE } =
+  await import("../../api/dist/engagement/engagement.service.js");
 // Never reuse application storage or artifacts from a previous browser run.
 const storageRoot = await mkdtemp(join(tmpdir(), "tfg-browser-"));
 process.env.GAME_STORAGE_ROOT = storageRoot;
@@ -103,6 +105,64 @@ const publicRows = (where) =>
       owner: { profile: profiles.get(game.ownerId) ?? null },
     }))
     .sort((a, b) => b.createdAt - a.createdAt || b.id.localeCompare(a.id));
+const engagementDatabase = {
+  game: {
+    async findUnique({ where }) {
+      return [...games.values()].find((game) => game.slug === where.slug) ?? null;
+    },
+    async findUniqueOrThrow({ where }) {
+      const game = games.get(where.id);
+      if (!game) throw new Error("Game not found");
+      return { scoresEnabled: false };
+    },
+  },
+  gamePlay: {
+    async aggregate() {
+      return { _count: 0, _avg: { activeSeconds: null } };
+    },
+    async findFirst() {
+      return null;
+    },
+    async create({ data }) {
+      return { id: data.id };
+    },
+  },
+  gamePlayRequest: {
+    async findUnique() {
+      return null;
+    },
+    async create() {
+      return null;
+    },
+  },
+  gameRating: {
+    async aggregate() {
+      return { _count: 0, _avg: { rating: null } };
+    },
+    async groupBy() {
+      return [];
+    },
+  },
+  gameComment: {
+    async findMany() {
+      return [];
+    },
+    async count() {
+      return 0;
+    },
+  },
+  gameScore: {
+    async aggregate() {
+      return { _max: { score: null } };
+    },
+  },
+  async $queryRaw() {
+    return [{ count: 0n }];
+  },
+  async $transaction(callback) {
+    return callback(engagementDatabase);
+  },
+};
 const testingModule = await Test.createTestingModule({ imports: [AppModule] })
   .overrideProvider(AuthUsersRepository)
   .useValue({
@@ -283,6 +343,8 @@ const testingModule = await Test.createTestingModule({ imports: [AppModule] })
       return publicRows(where)[0] ?? null;
     },
   })
+  .overrideProvider(ENGAGEMENT_DATABASE)
+  .useValue(engagementDatabase)
   .compile();
 await testingModule.get(ArtifactStorage).install("seed-game", 1, [{
   path: "index.html",
