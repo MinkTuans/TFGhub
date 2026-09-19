@@ -66,6 +66,47 @@ directive, exact capability URL scope, browser proof and regressions preventing
 external origins and same-origin sandbox access; broad `connect-src` values are
 prohibited.
 
+## Synthetic fixture verification — 2026-09-19
+
+Synthetic Compatibility: verified by self-validating fixtures.
+Real Engine Compatibility: NOT VERIFIED.
+
+The synthetic fixtures are deterministic, self-inspecting archives: their
+tests validate the generated ZIP structure, required paths, MIME contracts,
+entry and archive SHA-256 values, and tamper detection. The focused API browser
+coverage uploads each project-owned Unity-shaped and Godot-shaped fixture via
+the normal flow, verifies artifact MIME delivery and the opaque iframe sandbox,
+and observes fixture readiness plus keyboard and pointer rendering. The web
+browser journey covers owner upload and preview, reload, moderation approval,
+and anonymous public play for both synthetic labels. These are fixtures and
+not real Unity WebGL or Godot exports; they provide no real-engine claim.
+
+Verification rerun in this worktree:
+
+```sh
+pnpm --filter api exec vitest run test/web-engine-fixtures.spec.ts src/games/game-content.service.spec.ts
+# 2 test files passed; 55 tests passed
+
+PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/google-chrome \
+  pnpm --filter api exec vitest run --config vitest.config.e2e.ts \
+  test/games.e2e-spec.ts -t 'synthetic web engine|characterizes project-owned web engine capabilities'
+# 1 test file passed; 3 tests passed, 27 skipped
+
+PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/google-chrome \
+  pnpm --filter web exec playwright test e2e/lean-upload.spec.ts
+# exited 0; terminal output contained only Next web-server NO_COLOR/FORCE_COLOR warnings
+
+pnpm --filter api typecheck
+# exited 0
+
+pnpm --filter web typecheck
+# exited 0; Next route types generated successfully
+```
+
+The existing real-engine boundary remains unchanged: no licensed real engine
+export, engine version/settings, or engine-specific browser evidence was
+provided. The Task 5 fixture audit above remains blocked on those inputs.
+
 ## Task 5 fixture audit — blocked
 
 Audit date: 2026-09-19. This environment has Docker 29.1.3, Node 22.23.2,
