@@ -65,6 +65,7 @@ const games = new Map([
       projectData: null,
       artifactVersion: 1,
       artifactReady: true,
+      scoresEnabled: false,
       coverVersion: 0,
       coverContentType: null,
       viewportWidth: 16,
@@ -113,7 +114,7 @@ const engagementDatabase = {
     async findUniqueOrThrow({ where }) {
       const game = games.get(where.id);
       if (!game) throw new Error("Game not found");
-      return { scoresEnabled: false };
+      return { scoresEnabled: game.scoresEnabled };
     },
   },
   gamePlay: {
@@ -204,6 +205,7 @@ const testingModule = await Test.createTestingModule({ imports: [AppModule] })
         projectData: null,
         artifactVersion: 0,
         artifactReady: false,
+        scoresEnabled: false,
         coverVersion: 0,
         coverContentType: null,
         viewportWidth: input.viewportWidth ?? 16,
