@@ -1,5 +1,14 @@
 export { LoginInput, RegisterInput } from './auth.js';
 export {
+  WebEngineCapability,
+  WebEngineCapabilityContract,
+  validateWebEngineCapabilityContract,
+} from './web-engine-capabilities.js';
+export type {
+  WebEngineCapability as WebEngineCapabilityType,
+  WebEngineCapabilityContract as WebEngineCapabilityContractType,
+} from './web-engine-capabilities.js';
+export {
   AssetCategory,
   AssetImportMetadata,
   GameAssetKind,
