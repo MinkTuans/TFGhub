@@ -132,6 +132,14 @@ test("creation starts with two choices and opens the existing upload form with l
   }));
 });
 
+test("creation presents web upload before the unchanged Pixel entry", async () => {
+  render(await NewGamePage());
+  expect(screen.getAllByRole("heading", { level: 2 }).map((node) => node.textContent)).toEqual([
+    "Tải game HTML5/ZIP",
+    "Tạo game Pixel",
+  ]);
+});
+
 test("Pixel choice offers only the recommended playable template and blank scene", async () => {
   render(await NewGamePage());
   fireEvent.click(screen.getByRole("button", { name: "Tạo game Pixel" }));
