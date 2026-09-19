@@ -65,3 +65,26 @@ authorized. If such a runtime arrives, its separate plan must name one
 directive, exact capability URL scope, browser proof and regressions preventing
 external origins and same-origin sandbox access; broad `connect-src` values are
 prohibited.
+
+## Task 5 fixture audit — blocked
+
+Audit date: 2026-09-19. This environment has Docker 29.1.3, Node 22.23.2,
+pnpm 10.0.0, Python 3.12.3 and Google Chrome 152.0.7977.82. It has no
+`unity`, `Unity`, `UnityHub`, `godot` or `godot4` executable. Repository search
+found no Unity project, `project.godot`, Web export, `.pck`, `.data`,
+`.unityweb`, or non-dependency `.wasm` fixture. No engine download or policy
+change was attempted.
+
+Task 5 is blocked, rather than partially passing, because a real engine export
+cannot be manufactured from the project-owned capability probe. To resume, a
+fixture provider must supply a licensed Unity WebGL and/or Godot Web export
+with: the unchanged exported file tree; exact engine version; target and export
+settings; source/license provenance; and SHA-256 for every file. A manifest may
+use `unknown` only with an explanation; it must not invent metadata.
+
+The requested fixture will first be validated against ZIP structure, size,
+extension, MIME and compression policy. Any `.unityweb`, `.gz` or `.br` file is
+an expected validation failure under the current policy and a compatibility gap,
+not authorization to alter the fixture or whitelist the suffix. Only after an
+accepted fixture exists can the actual upload → preview → reload → moderation →
+public-play browser journey, keyboard/touch checks and network audit be run.
