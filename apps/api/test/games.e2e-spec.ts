@@ -517,7 +517,17 @@ asyncProbe('webSocket', () => new Promise((resolve, reject) => { const socket = 
         await frame
           .locator('[data-testid="synthetic-ready"]')
           .waitFor({ state: 'visible' });
-        await frame.locator('canvas').press('ArrowRight');
+        await page.locator('iframe').focus();
+        await page.keyboard.press('ArrowRight');
+        expect(
+          await frame.locator('canvas').evaluate((canvas) =>
+            Array.from(
+              (canvas as HTMLCanvasElement)
+                .getContext('2d')!
+                .getImageData(5, 5, 1, 1).data,
+            ),
+          ),
+        ).toEqual([242, 201, 76, 255]);
         await frame.locator('canvas').click({ position: { x: 4, y: 4 } });
         expect(
           await frame.locator('canvas').evaluate((canvas) => canvas.width),
