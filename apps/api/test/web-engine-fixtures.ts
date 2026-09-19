@@ -71,6 +71,12 @@ async function buildOnce(
   kind: SyntheticEngineKind,
 ): Promise<SyntheticWebEngineFixture> {
   const sourceEntries = entriesFor(kind);
+  const manifestEntries = sourceEntries.map(({ path, content }) => ({
+    path,
+    mimeType: mimeByPath[path],
+    size: content.length,
+    sha256: sha256(content),
+  }));
   const archive = zipFixture(
     sourceEntries.map(({ path, content }) => ({ name: path, content })),
   );
@@ -78,12 +84,7 @@ async function buildOnce(
     fixtureType: 'synthetic',
     engineVersion: 'synthetic',
     label: labelFor(kind),
-    entries: sourceEntries.map(({ path, content }) => ({
-      path,
-      mimeType: mimeByPath[path],
-      size: content.length,
-      sha256: sha256(content),
-    })),
+    entries: manifestEntries,
     zipSha256: sha256(archive),
   };
   return { archive, manifest };

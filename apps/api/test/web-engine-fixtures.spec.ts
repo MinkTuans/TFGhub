@@ -47,6 +47,23 @@ describe('synthetic web-engine fixtures', () => {
     ).rejects.toThrow();
   });
 
+  it.each(kinds)(
+    'rejects a tampered %s archive after its ZIP digest is refreshed',
+    async (kind) => {
+      const fixture = await createSyntheticWebEngineFixture(kind);
+      const archive = Buffer.from(fixture.archive);
+      archive[archive.length - 1] ^= 0xff;
+
+      await expect(
+        validateSyntheticWebEngineFixture({
+          ...fixture,
+          archive,
+          manifest: { ...fixture.manifest, zipSha256: sha256(archive) },
+        }),
+      ).rejects.toThrow();
+    },
+  );
+
   it.each(kinds)('rejects a tampered %s manifest digest', async (kind) => {
     const fixture = await createSyntheticWebEngineFixture(kind);
 
@@ -57,4 +74,42 @@ describe('synthetic web-engine fixtures', () => {
       }),
     ).rejects.toThrow();
   });
+
+  it.each(kinds)(
+    'rejects tampered %s manifest entry integrity fields',
+    async (kind) => {
+      const fixture = await createSyntheticWebEngineFixture(kind);
+      const entries = fixture.manifest.entries.map((entry, index) =>
+        index === 0 ? { ...entry, sha256: '0'.repeat(64) } : entry,
+      );
+      await expect(
+        validateSyntheticWebEngineFixture({
+          ...fixture,
+          manifest: { ...fixture.manifest, entries },
+        }),
+      ).rejects.toThrow();
+
+      const renamed = fixture.manifest.entries.map((entry, index) =>
+        index === 0 ? { ...entry, path: 'tampered.html' } : entry,
+      );
+      await expect(
+        validateSyntheticWebEngineFixture({
+          ...fixture,
+          manifest: { ...fixture.manifest, entries: renamed },
+        }),
+      ).rejects.toThrow();
+
+      const mimeChanged = fixture.manifest.entries.map((entry, index) =>
+        index === 0
+          ? { ...entry, mimeType: 'application/octet-stream' }
+          : entry,
+      );
+      await expect(
+        validateSyntheticWebEngineFixture({
+          ...fixture,
+          manifest: { ...fixture.manifest, entries: mimeChanged },
+        }),
+      ).rejects.toThrow();
+    },
+  );
 });

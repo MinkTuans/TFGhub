@@ -25,3 +25,15 @@
 - No production, API, schema, CSP, sandbox, network, or allowlist files were changed.
 - The repository-wide API TypeScript check currently reports unrelated pre-existing errors in other tests; the fixture files produced no reported type errors before those existing failures.
 - The pre-existing untracked `docs/superpowers/plans/2026-09-18-lean-hybrid-game-maker-sol.md` was not staged.
+
+## Review fixes
+
+- Reordered `buildOnce` so source entry sizes and SHA-256 values are computed before deterministic ZIP creation; ZIP hashing and manifest assembly follow packaging.
+- Added archive tampering coverage that refreshes the manifest ZIP digest, forcing ZIP reopening/inspection rather than stopping at the archive digest guard.
+- Added manifest integrity coverage for per-entry SHA-256, path, and MIME mutations.
+
+Fix verification:
+
+- `pnpm --filter api exec vitest run test/web-engine-fixtures.spec.ts`: 1 file, 10 tests passed.
+- `pnpm --filter api exec prettier --check test/web-engine-fixtures.ts test/web-engine-fixtures.spec.ts`: passed.
+- `pnpm --filter api exec oxlint test/web-engine-fixtures.ts test/web-engine-fixtures.spec.ts`: passed.
