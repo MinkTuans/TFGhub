@@ -11,7 +11,12 @@ function setup() {
     sourceType: 'ENGINE',
     gameUpdatedAt: updatedAt,
     project: {
-      headRevision: { id: 'revision', document: project, contentHash: 'hash' },
+      headRevision: {
+        id: 'revision',
+        document: project,
+        revisionNumber: 4,
+        contentHash: 'hash',
+      },
     },
   };
   const projects = { findGameProject: vi.fn(async () => record) };
@@ -53,6 +58,8 @@ describe('ENGINE immutable artifact preparation', () => {
     );
     expect(result.files[0].path).toBe('index.html');
     expect(result.files[0].content).toContain('<canvas');
+    expect(result.files[0].content).toContain(`assets/${assetId}.png`);
+    expect(result.revisionNumber).toBe(4);
     expect(result.files[1]).toMatchObject({
       path: `assets/${assetId}.png`,
       content: Buffer.from('owned-image'),
