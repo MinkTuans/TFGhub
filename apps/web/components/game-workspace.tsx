@@ -140,7 +140,11 @@ export function GameWorkspace({ initialGame }: { initialGame: GameSummary }) {
       </section>
       <div className="workspace-editor" id="game-editor" tabIndex={-1}>
         {game.sourceType === "UPLOAD" && (
-          <UploadEditor gameId={game.id} onUploaded={setGame} />
+          <UploadEditor
+            gameId={game.id}
+            artifactVersion={game.artifactVersion}
+            onUploaded={setGame}
+          />
         )}
         {game.sourceType === "CODE" && (
           <CodeGameEditor

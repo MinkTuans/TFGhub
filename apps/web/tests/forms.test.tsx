@@ -13,6 +13,8 @@ import { GameForm } from "../components/game-form";
 import { GameWorkspace } from "../components/game-workspace";
 import { GamePreview } from "../components/game-preview";
 import { UploadEditor } from "../components/upload-editor";
+import { ApiError } from "../lib/api-client";
+import { uploadGame } from "../lib/game-upload";
 import { LogoutButton } from "../components/logout-button";
 import {
   ModerationQueue,
@@ -24,9 +26,11 @@ import type { GameSummary } from "@indieforge/contracts";
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace: vi.fn(), refresh: vi.fn() }),
 }));
+vi.mock("../lib/game-upload", () => ({ uploadGame: vi.fn() }));
 afterEach(() => {
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
+  vi.mocked(uploadGame).mockReset();
 });
 
 function codeGame(overrides: Partial<GameSummary> = {}): GameSummary {
@@ -228,15 +232,12 @@ test("HTML5 upload explains the playable ZIP contract before a creator uploads",
 });
 
 test("HTML5 upload reports the active transfer and hands a ready preview to the workspace", async () => {
-  let complete!: (response: Response) => void;
-  vi.stubGlobal(
-    "fetch",
-    vi.fn(
-      () =>
-        new Promise<Response>((resolve) => {
-          complete = resolve;
-        }),
-    ),
+  let complete!: (game: GameSummary) => void;
+  vi.mocked(uploadGame).mockImplementation(
+    () =>
+      new Promise<GameSummary>((resolve) => {
+        complete = resolve;
+      }),
   );
   const onUploaded = vi.fn();
   render(<UploadEditor gameId="game-1" onUploaded={onUploaded} />);
@@ -254,9 +255,7 @@ test("HTML5 upload reports the active transfer and hands a ready preview to the 
   );
   expect(screen.getByLabelText("Tiến trình tải trò chơi")).toBeVisible();
 
-  complete(
-    new Response(JSON.stringify(codeGame({ sourceType: "UPLOAD", projectData: null }))),
-  );
+  complete(codeGame({ sourceType: "UPLOAD", projectData: null }));
   await waitFor(() =>
     expect(screen.getByRole("status")).toHaveTextContent(
       "Đã tải lên. Bản chơi thử đã sẵn sàng.",
@@ -268,14 +267,8 @@ test("HTML5 upload reports the active transfer and hands a ready preview to the 
 });
 
 test("HTML5 upload explains the rejection and makes retry explicit", async () => {
-  vi.stubGlobal(
-    "fetch",
-    vi.fn().mockResolvedValue(
-      new Response(
-        JSON.stringify({ message: "ZIP requires a root index.html" }),
-        { status: 400 },
-      ),
-    ),
+  vi.mocked(uploadGame).mockRejectedValue(
+    new ApiError(400, "ZIP requires a root index.html"),
   );
   render(<UploadEditor gameId="game-1" onUploaded={vi.fn()} />);
   Object.defineProperty(screen.getByLabelText("Tệp ZIP HTML5"), "files", {
