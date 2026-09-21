@@ -147,16 +147,23 @@ test("renders SSR game details, two ads and related games with the existing publ
   expect(screen.getByText("A tiny adventure")).toBeVisible();
 });
 
-test("keeps the public game frame free of controls and moves supporting content below it", async () => {
+test("keeps the public game frame free of controls", async () => {
   vi.mocked(api.get).mockImplementation(async (path) => path.startsWith("/games/") ? game : path.startsWith("/discover") ? { games: [game, { ...game, slug: "sky", title: "Sky" }], nextCursor: null } : engagementRead(path));
   render(await GamePage({ params: Promise.resolve({ slug: "tiny-quest" }) }));
 
   const player = screen.getByRole("region", { name: "Chơi Tiny Quest" });
   expect(player.querySelector(".game-player__stage button")).not.toBeInTheDocument();
 
-  const below = screen.getByRole("region", { name: "Nội dung phía dưới trò chơi" });
-  expect(below).toContainElement(screen.getByLabelText("Quảng cáo phía trên", { exact: true }));
-  expect(below).toContainElement(screen.getByRole("heading", { name: "Trò chơi liên quan" }));
+});
+
+test("keeps ads and related games beside the public player on wide layouts", async () => {
+  vi.mocked(api.get).mockImplementation(async (path) => path.startsWith("/games/") ? game : path.startsWith("/discover") ? { games: [game, { ...game, slug: "sky", title: "Sky" }], nextCursor: null } : engagementRead(path));
+  render(await GamePage({ params: Promise.resolve({ slug: "tiny-quest" }) }));
+
+  const layout = document.querySelector(".game-page__layout")!;
+  expect(layout).toContainElement(screen.getByLabelText("Quảng cáo phía trên", { exact: true }));
+  expect(layout).toContainElement(screen.getByRole("region", { name: "Chơi Tiny Quest" }));
+  expect(layout).toContainElement(screen.getByRole("heading", { name: "Trò chơi liên quan" }));
 });
 
 test("keeps the SSR player available when related discovery fails", async () => {

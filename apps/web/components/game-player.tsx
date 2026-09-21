@@ -181,7 +181,7 @@ function PlayerSession({
 
   return (
     <section ref={playerRef} className="game-player" aria-label={`Chơi ${title}`}>
-      <div ref={stageRef} className="game-player__stage">
+      <div ref={stageRef} className="game-player__stage" style={{ "--player-ratio": ratio } as CSSProperties}>
         <div
           className="game-player__fit"
           style={{
