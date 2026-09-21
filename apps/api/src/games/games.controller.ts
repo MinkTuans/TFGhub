@@ -2,7 +2,9 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
   Get,
+  HttpCode,
   Param,
   Patch,
   Post,
@@ -59,5 +61,16 @@ export class GamesController {
   @Post(':id/submit')
   submit(@CurrentUser() user: AuthenticatedUser, @Param('id') gameId: string) {
     return this.games.submitOwned(gameId, user.id);
+  }
+
+  @Post(':id/hide')
+  hide(@CurrentUser() user: AuthenticatedUser, @Param('id') gameId: string) {
+    return this.games.hideOwned(gameId, user.id);
+  }
+
+  @Delete(':id')
+  @HttpCode(204)
+  async delete(@CurrentUser() user: AuthenticatedUser, @Param('id') gameId: string) {
+    await this.games.deleteOwned(gameId, user.id);
   }
 }

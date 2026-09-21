@@ -2,12 +2,16 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, expect, test, vi } from "vitest";
 import { AdminUsers } from "../components/admin-management/admin-users";
 import { AdminGames } from "../components/admin-management/admin-games";
+import { adminSections } from "../components/admin-management/admin-navigation";
 import { api, ApiError } from "../lib/api-client";
 vi.mock("next/navigation", () => ({ usePathname: () => "/admin/users" }));
 vi.mock("../lib/api-client", async (original) => ({ ...await original<typeof import("../lib/api-client")>(), api: { get: vi.fn(), post: vi.fn(), patch: vi.fn(), delete: vi.fn() } }));
 const user = { id: "u", email: "user@example.test", displayName: "Người thử", role: "USER" as const, isActive: true, version: 1, createdAt: "2026-09-16T00:00:00.000Z", updatedAt: "2026-09-16T00:00:00.000Z", gameCount: 0 };
 const game = { id: "g", ownerId: "u", ownerEmail: user.email, ownerName: user.displayName, submittedAt: null, buildCount: 0, releaseCount: 0, title: "Game thử", slug: "game-thu", description: "", accessMode: "GUEST_ALLOWED" as const, visibility: "DRAFT" as const, moderationState: "CLEAR" as const, reviewState: "DRAFT" as const, sourceType: "CODE" as const, artifactReady: false, artifactVersion: 0, createdAt: user.createdAt, updatedAt: user.updatedAt };
 beforeEach(() => { vi.resetAllMocks(); vi.mocked(api.get).mockImplementation(async (path) => path.includes("/users/") ? user : path.includes("/games/") ? game : { items: [], total: 0 }); });
+test("admin navigation keeps moderation inside the admin workspace", () => {
+ expect(adminSections.find((section) => section.title === "Kiểm duyệt")).toMatchObject({ href: "/admin/moderation" });
+});
 test("users filter and paginate ten results", async () => {
  render(<AdminUsers initialUsers={{ items: [user], total: 11 }} currentUserId="admin" />);
  fireEvent.click(screen.getByRole("button", { name: "Trang sau" }));

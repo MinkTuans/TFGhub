@@ -164,4 +164,17 @@ describe('CoverStorage', () => {
     expect(await readdir(join(storageRoot, 'covers', 'game-1'))).toEqual(['1']);
     await expect(storage.read('game-1', 1)).resolves.toEqual(cover);
   });
+
+  it('removes every immutable cover version for one validated game id', async () => {
+    await storage.install('game-1', 1, cover);
+    await storage.install('game-1', 2, {
+      content: Buffer.from([0x89, 0x50, 0x4e, 0x47]),
+      contentType: 'image/png',
+    });
+
+    await storage.removeGame('game-1');
+
+    await expect(storage.read('game-1', 1)).rejects.toThrow();
+    await expect(storage.removeGame('../game-1')).rejects.toThrow('Invalid game id');
+  });
 });

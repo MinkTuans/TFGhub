@@ -228,6 +228,28 @@ describe('Developer profile and game draft HTTP boundary', () => {
           games.set(id, updated);
           return updated;
         },
+        async hideOwned(id: string, ownerId: string, expectedUpdatedAt: Date) {
+          const game = games.get(id);
+          if (!game || game.ownerId !== ownerId || game.updatedAt.getTime() !== expectedUpdatedAt.getTime() ||
+              !['PENDING', 'APPROVED'].includes(game.reviewState)) return null;
+          const updated: StoredGame = {
+            ...game,
+            visibility: 'DRAFT',
+            reviewState: 'DRAFT',
+            reviewNote: null,
+            submittedAt: null,
+            reviewedAt: null,
+            updatedAt: new Date(),
+          };
+          games.set(id, updated);
+          return updated;
+        },
+        async deleteOwned(id: string, ownerId: string) {
+          const game = games.get(id);
+          if (!game || game.ownerId !== ownerId || game.visibility !== 'DRAFT') return false;
+          games.delete(id);
+          return true;
+        },
       })
       .overrideProvider(DeveloperProfilesRepository)
       .useValue({
@@ -284,6 +306,24 @@ describe('Developer profile and game draft HTTP boundary', () => {
       .post('/games')
       .send({ title: 'Demo game', slug: 'demo-game' })
       .expect(401);
+  });
+
+  it('lets only the owner hide a published game and permanently delete its draft', async () => {
+    const { developer, game } = await createGame();
+    Object.assign(games.get(game.id)!, {
+      visibility: 'PUBLIC',
+      reviewState: 'APPROVED',
+    });
+    const other = await agent('other@example.com');
+
+    await request(app.getHttpServer()).post(`/games/${game.id}/hide`).expect(401);
+    await other.post(`/games/${game.id}/hide`).expect(403);
+    await developer.post(`/games/${game.id}/hide`).expect(201).expect(({ body }) => {
+      expect(body).toMatchObject({ id: game.id, visibility: 'DRAFT', reviewState: 'DRAFT' });
+    });
+    await other.delete(`/games/${game.id}`).expect(403);
+    await developer.delete(`/games/${game.id}`).expect(204);
+    expect(games.has(game.id)).toBe(false);
   });
 
   it('uploads owner covers and serves draft and approved covers with correct access and headers', async () => {

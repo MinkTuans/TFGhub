@@ -249,4 +249,27 @@ export class CoverStorage {
     await unsealDirectory(versionDirectory);
     await rm(versionDirectory, { recursive: true });
   }
+
+  /** Permanently removes all cover revisions after the owning game row is deleted. */
+  async removeGame(gameId: string): Promise<void> {
+    if (!/^[a-zA-Z0-9_-]+$/.test(gameId))
+      throw new Error('Invalid game id');
+    const gameDirectory = within(
+      this.coverRoot,
+      resolve(this.coverRoot, gameId),
+    );
+    try {
+      await rejectRootSymbolicLink(this.coverRoot);
+      await rejectSymbolicLinks(this.coverRoot, gameDirectory);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return;
+      throw error;
+    }
+
+    await chmod(gameDirectory, 0o755);
+    for (const entry of await readdir(gameDirectory, { withFileTypes: true })) {
+      if (!entry.isSymbolicLink()) await unsealDirectory(join(gameDirectory, entry.name));
+    }
+    await rm(gameDirectory, { recursive: true, force: true });
+  }
 }

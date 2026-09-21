@@ -13,6 +13,7 @@ import { UpdateGameInput, type GameSummary } from "@indieforge/contracts";
 import { api } from "../../lib/api-client";
 import { apiErrorMessage } from "../../lib/api-error-message";
 import { useStudio } from "./studio-provider";
+import { GameLifecycleActions } from "../game-lifecycle-actions";
 
 /** Tooltips appear on keyboard focus as well as pointer hover; Escape dismisses them. */
 export function StudioButton({
@@ -232,6 +233,11 @@ export function StudioTopbar({
         >
           Cài đặt
         </StudioButton>
+        <GameLifecycleActions game={game} onGameChange={(updated) => {
+          setGame(updated);
+          onGameChange?.(updated);
+          setTitle(updated.title);
+        }} />
       </div>
     </header>
   );

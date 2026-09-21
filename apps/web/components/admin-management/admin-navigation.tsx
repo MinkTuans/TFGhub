@@ -5,7 +5,7 @@ import styles from "./management.module.css";
 export const adminSections = [
   { href: "/admin/users", title: "Người dùng", description: "Quản lý tài khoản, vai trò và quyền truy cập." },
   { href: "/admin/games", title: "Game", description: "Theo dõi game của mọi tác giả và quản lý hiển thị." },
-  { href: "/moderation", title: "Kiểm duyệt", description: "Xem xét các game đang chờ duyệt." },
+  { href: "/admin/moderation", title: "Kiểm duyệt", description: "Xem xét các game đang chờ duyệt." },
   { href: "/admin/library", title: "Tài liệu", description: "Tra cứu và cập nhật tài liệu website." },
 ];
 export function AdminNavigation() {

@@ -217,4 +217,14 @@ describe('ArtifactStorage', () => {
       contentType: 'text/html',
     });
   });
+
+  it('removes every immutable artifact version for one validated game id', async () => {
+    await storage.install('game-1', 1, [{ path: 'index.html', content: 'one', contentType: 'text/html' }]);
+    await storage.install('game-1', 2, [{ path: 'index.html', content: 'two', contentType: 'text/html' }]);
+
+    await storage.removeGame('game-1');
+
+    await expect(storage.read('game-1', 1, 'index.html')).rejects.toThrow();
+    await expect(storage.removeGame('../game-1')).rejects.toThrow();
+  });
 });

@@ -6,7 +6,7 @@ import styles from "../../components/admin-management/management.module.css";
 const sections = [
   ["/admin/users", "Người dùng", "Quản lý tài khoản, vai trò và quyền truy cập."],
   ["/admin/games", "Game", "Theo dõi game của mọi tác giả và quản lý hiển thị."],
-  ["/moderation", "Kiểm duyệt", "Xem xét các game đang chờ duyệt."],
+  ["/admin/moderation", "Kiểm duyệt", "Xem xét các game đang chờ duyệt."],
   ["/admin/library", "Tài liệu", "Tra cứu và cập nhật tài liệu website."],
 ];
 export default async function AdminPage() {

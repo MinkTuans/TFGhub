@@ -3,6 +3,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { GamesService, type GamesRepository } from './games.service.js';
 import { EngineProjectV2 } from '@indieforge/engine-core';
 import { createHash } from 'node:crypto';
+import { ArtifactStorage } from '../game-artifacts/artifact-storage.js';
+import { CoverStorage } from '../game-covers/cover-storage.js';
 
 const storedGame = {
   id: 'game-1',
@@ -30,6 +32,10 @@ const storedGame = {
 };
 
 function fixture() {
+  const hideOwned = vi.fn().mockResolvedValue(storedGame);
+  const deleteOwned = vi.fn().mockResolvedValue(true);
+  const artifacts = { removeGame: vi.fn().mockResolvedValue(undefined) };
+  const covers = { removeGame: vi.fn().mockResolvedValue(undefined) };
   const games: GamesRepository = {
     createEngineProject: vi.fn(async (input) => ({
       game: {
@@ -63,8 +69,19 @@ function fixture() {
     reject: vi.fn().mockResolvedValue(storedGame),
     findBySlug: vi.fn().mockResolvedValue(storedGame),
     updateWorkspace: vi.fn().mockResolvedValue(storedGame),
+    hideOwned,
+    deleteOwned,
   };
-  return { service: new GamesService(games), games };
+  return {
+    service: new GamesService(
+      games,
+      artifacts as unknown as ArtifactStorage,
+      covers as unknown as CoverStorage,
+    ),
+    games,
+    artifacts,
+    covers,
+  };
 }
 
 describe('GamesService', () => {
@@ -364,6 +381,63 @@ describe('GamesService', () => {
       ConflictException,
     );
     expect(games.submit).not.toHaveBeenCalled();
+  });
+
+  it('hides an owned public game by returning it to a draft', async () => {
+    const { service, games } = fixture();
+    vi.mocked(games.findUnique).mockResolvedValue({
+      ...storedGame,
+      visibility: 'PUBLIC',
+      reviewState: 'APPROVED',
+    });
+    vi.mocked(games.hideOwned).mockResolvedValue({
+      ...storedGame,
+      visibility: 'DRAFT',
+      reviewState: 'DRAFT',
+    });
+
+    await expect(service.hideOwned('game-1', 'owner-1')).resolves.toMatchObject({
+      visibility: 'DRAFT',
+      reviewState: 'DRAFT',
+    });
+    expect(games.hideOwned).toHaveBeenCalledWith(
+      'game-1',
+      'owner-1',
+      storedGame.updatedAt,
+    );
+  });
+
+  it('does not write a game that is already a draft when hiding it', async () => {
+    const { service, games } = fixture();
+
+    await expect(service.hideOwned('game-1', 'owner-1')).resolves.toMatchObject({
+      id: 'game-1',
+      visibility: 'DRAFT',
+    });
+    expect(games.hideOwned).not.toHaveBeenCalled();
+  });
+
+  it('permanently deletes only an owned draft then attempts both file cleanups', async () => {
+    const { service, games, artifacts, covers } = fixture();
+
+    await expect(service.deleteOwned('game-1', 'owner-1')).resolves.toBeUndefined();
+    expect(games.deleteOwned).toHaveBeenCalledWith('game-1', 'owner-1');
+    expect(artifacts.removeGame).toHaveBeenCalledWith('game-1');
+    expect(covers.removeGame).toHaveBeenCalledWith('game-1');
+  });
+
+  it('rejects permanent deletion of a non-draft game before deleting its row', async () => {
+    const { service, games } = fixture();
+    vi.mocked(games.findUnique).mockResolvedValue({
+      ...storedGame,
+      visibility: 'PUBLIC',
+      reviewState: 'APPROVED',
+    });
+
+    await expect(service.deleteOwned('game-1', 'owner-1')).rejects.toThrow(
+      ConflictException,
+    );
+    expect(games.deleteOwned).not.toHaveBeenCalled();
   });
 
   it('maps only a duplicate slug violation to conflict', async () => {

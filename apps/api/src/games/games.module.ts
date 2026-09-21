@@ -334,6 +334,33 @@ const publicGameSelect = {
               ? tx.game.findUnique({ where: { id }, select: gameSummarySelect })
               : null;
           }),
+        hideOwned: (id, ownerId, expectedUpdatedAt) =>
+          database.$transaction(async (tx) => {
+            const result = await tx.game.updateMany({
+              where: {
+                id,
+                ownerId,
+                updatedAt: expectedUpdatedAt,
+                reviewState: { in: ['PENDING', 'APPROVED'] },
+              },
+              data: {
+                visibility: 'DRAFT',
+                reviewState: 'DRAFT',
+                reviewNote: null,
+                submittedAt: null,
+                reviewedAt: null,
+              },
+            });
+            return result.count === 1
+              ? tx.game.findUnique({ where: { id }, select: gameSummarySelect })
+              : null;
+          }),
+        deleteOwned: async (id, ownerId) =>
+          (
+            await database.game.deleteMany({
+              where: { id, ownerId, visibility: 'DRAFT' },
+            })
+          ).count === 1,
       }),
     },
     {

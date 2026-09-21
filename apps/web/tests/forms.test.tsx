@@ -23,14 +23,17 @@ import {
 import type { GameSummary } from "@indieforge/contracts";
 
 // Navigation needs a Next router; the form, validation and HTTP client stay real.
+const { replace, refresh } = vi.hoisted(() => ({ replace: vi.fn(), refresh: vi.fn() }));
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ replace: vi.fn(), refresh: vi.fn() }),
+  useRouter: () => ({ replace, refresh }),
 }));
 vi.mock("../lib/game-upload", () => ({ uploadGame: vi.fn() }));
 afterEach(() => {
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
   vi.mocked(uploadGame).mockReset();
+  replace.mockReset();
+  refresh.mockReset();
 });
 
 function codeGame(overrides: Partial<GameSummary> = {}): GameSummary {
@@ -366,6 +369,22 @@ test("logout reports a network failure and permits another attempt", async () =>
     "Không thể đăng xuất. Vui lòng thử lại.",
   );
   expect(screen.getByRole("button", { name: "Đăng xuất" })).toBeEnabled();
+});
+
+test("a draft game requires compact confirmation before it is permanently deleted", async () => {
+  const fetch = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
+  vi.stubGlobal("fetch", fetch);
+  render(<GameWorkspace initialGame={codeGame()} />);
+
+  fireEvent.click(screen.getByRole("button", { name: "Xóa vĩnh viễn" }));
+  expect(screen.getByRole("dialog", { name: "Xóa vĩnh viễn trò chơi?" })).toBeVisible();
+  fireEvent.click(screen.getByRole("button", { name: "Xác nhận xóa" }));
+
+  await waitFor(() => expect(fetch).toHaveBeenCalledWith(
+    expect.stringMatching(/\/games\/game-1$/),
+    expect.objectContaining({ method: "DELETE" }),
+  ));
+  await waitFor(() => expect(replace).toHaveBeenCalledWith("/studio"));
 });
 
 test("moderation keeps every active review disabled when two cards are actioned", () => {

@@ -218,6 +218,21 @@ export class ArtifactStorage {
     await rm(directory, { recursive: true });
   }
 
+  /** Permanently removes all artifact revisions after the owning game row is deleted. */
+  async removeGame(gameId: string): Promise<void> {
+    if (!/^[a-zA-Z0-9_-]+$/.test(gameId))
+      throw new Error('Invalid game id');
+    const directory = within(this.root, resolve(this.root, gameId));
+    try {
+      await rejectSymbolicLinks(this.root, directory);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return;
+      throw error;
+    }
+    await unsealStagingTree(directory);
+    await rm(directory, { recursive: true, force: true });
+  }
+
   async read(
     gameId: string,
     version: number,

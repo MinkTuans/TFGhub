@@ -3,6 +3,7 @@ import {
   ForbiddenException,
   Inject,
   Injectable,
+  Logger,
 } from '@nestjs/common';
 import type {
   GameSummary,
@@ -17,6 +18,8 @@ import { EngineProjectV2, createPixelAdventure } from '@indieforge/engine-core';
 import { createHash, randomUUID } from 'node:crypto';
 import { canonicalize } from '../engine-projects/canonicalize.js';
 import type { StoredEngineRevision } from '../engine-projects/engine-projects.repository.js';
+import { ArtifactStorage } from '../game-artifacts/artifact-storage.js';
+import { CoverStorage } from '../game-covers/cover-storage.js';
 
 type CreateGameInput = {
   title: string;
@@ -154,6 +157,12 @@ export abstract class GamesRepository {
     expectedUpdatedAt: Date,
     input: MetadataUpdate,
   ): Promise<StoredGame | null>;
+  abstract hideOwned(
+    id: string,
+    ownerId: string,
+    expectedUpdatedAt: Date,
+  ): Promise<StoredGame | null>;
+  abstract deleteOwned(id: string, ownerId: string): Promise<boolean>;
 }
 
 export function gameSummary(game: StoredGame): GameSummary {
@@ -220,8 +229,12 @@ export function moderationGameSummary(
 
 @Injectable()
 export class GamesService {
+  private readonly logger = new Logger(GamesService.name);
+
   constructor(
     @Inject(GamesRepository) private readonly games: GamesRepository,
+    @Inject(ArtifactStorage) private readonly artifacts: ArtifactStorage,
+    @Inject(CoverStorage) private readonly covers: CoverStorage,
   ) {}
 
   async createEngineProject(
@@ -401,5 +414,45 @@ export class GamesService {
     const submitted = await this.games.submit(gameId);
     if (!submitted) throw new ConflictException('Game cannot be submitted');
     return gameSummary(submitted);
+  }
+
+  async hideOwned(gameId: string, userId: string): Promise<GameSummary> {
+    const game = await this.games.findUnique(gameId);
+    if (!game || game.ownerId !== userId) {
+      throw new ForbiddenException('You do not own this game');
+    }
+    if (game.reviewState === 'DRAFT') return gameSummary(game);
+    if (!['PENDING', 'APPROVED'].includes(game.reviewState)) {
+      throw new ConflictException('Game cannot be hidden in its current state');
+    }
+    const hidden = await this.games.hideOwned(gameId, userId, game.updatedAt);
+    if (!hidden) throw new ConflictException('Game changed; reload the workspace');
+    return gameSummary(hidden);
+  }
+
+  async deleteOwned(gameId: string, userId: string): Promise<void> {
+    const game = await this.games.findUnique(gameId);
+    if (!game || game.ownerId !== userId) {
+      throw new ForbiddenException('You do not own this game');
+    }
+    if (game.visibility !== 'DRAFT') {
+      throw new ConflictException('Hide the game before permanently deleting it');
+    }
+    if (!(await this.games.deleteOwned(gameId, userId))) {
+      throw new ConflictException('Game changed; reload the workspace');
+    }
+
+    const cleanup = await Promise.allSettled([
+      this.artifacts.removeGame(gameId),
+      this.covers.removeGame(gameId),
+    ]);
+    for (const result of cleanup) {
+      if (result.status === 'rejected') {
+        this.logger.error(
+          `Game ${gameId} was deleted but storage cleanup failed`,
+          result.reason instanceof Error ? result.reason.stack : undefined,
+        );
+      }
+    }
   }
 }

@@ -10,6 +10,7 @@ import { PlatformerGameEditor } from "./platformer-game-editor";
 import { StoryGameEditor } from "./story-game-editor";
 import { UploadEditor } from "./upload-editor";
 import { CoverUploader } from "./cover-uploader";
+import { GameLifecycleActions } from "./game-lifecycle-actions";
 
 function reviewLabel(game: GameSummary): string {
   switch (game.reviewState) {
@@ -189,6 +190,7 @@ export function GameWorkspace({ initialGame }: { initialGame: GameSummary }) {
           {pending ? "Đang gửi…" : "Gửi duyệt"}
         </button>
       </section>
+      <GameLifecycleActions game={game} onGameChange={setGame} />
     </div>
   );
 }

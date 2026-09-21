@@ -585,6 +585,8 @@ footer { padding: 2.5rem 0; border-top: 1px solid var(--border); font-size: 0.87
 .moderation-card__decision .actions { margin-top: 1rem; }
 @media (max-width: 768px) { .moderation-page .moderation-card { grid-template-columns: 1fr; } }
 .moderation-card h3 + .hint { margin: .5rem 0 1rem; }
+.game-lifecycle { display: flex; align-items: center; flex-wrap: wrap; gap: .75rem; }
+.game-lifecycle .danger { color: var(--danger); border-color: currentColor; }
 
 /* Community and private creator analytics share the active theme tokens. */
 .game-engagement { width: min(100%, 80rem); margin: 2rem auto; display: grid; gap: 1.5rem; }

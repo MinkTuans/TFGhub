@@ -26,7 +26,7 @@ export function LogoutButton() {
   return (
     <>
       <button
-        className="nav-button button-ghost"
+        className="nav-button"
         disabled={pending}
         lang="vi"
         onClick={logout}
