@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>Flappy Bird</title>
+  <style>
+    * { box-sizing: border-box; } html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #6fd4ff; }
+    body { display: grid; place-items: center; font-family: system-ui, sans-serif; touch-action: manipulation; }
+    canvas { width: 100%; height: 100%; display: block; }
+  </style>
+</head>
+<body>
+  <canvas aria-label="Flappy Bird"></canvas>
+  <script>
+    (() => {
+      const canvas = document.querySelector('canvas');
+      const context = canvas.getContext('2d');
+      const width = 480, height = 720, ground = 94, pipeWidth = 76, gap = 176;
+      let bird, pipes, score, state, last, spawn;
+
+      function reset() {
+        bird = { x: 132, y: height / 2, velocity: 0, rotation: 0 };
+        pipes = []; score = 0; state = 'ready'; spawn = 0;
+      }
+      function flap() {
+        if (state === 'over') reset();
+        if (state === 'ready') state = 'playing';
+        bird.velocity = -410;
+      }
+      function reportScore() {
+        window.parent.postMessage({ type: 'tfg:score', score }, '*');
+      }
+      function hitPipe(pipe) {
+        const insideX = bird.x + 18 > pipe.x && bird.x - 18 < pipe.x + pipeWidth;
+        return insideX && (bird.y - 16 < pipe.top || bird.y + 16 > pipe.top + gap);
+      }
+      function update(seconds) {
+        if (state !== 'playing') return;
+        bird.velocity += 1120 * seconds;
+        bird.y += bird.velocity * seconds;
+        bird.rotation = Math.max(-.55, Math.min(1.2, bird.velocity / 520));
+        spawn -= seconds;
+        if (spawn <= 0) {
+          const top = 110 + Math.random() * 250;
+          pipes.push({ x: width + 24, top, counted: false }); spawn = 1.45;
+        }
+        for (const pipe of pipes) {
+          pipe.x -= 156 * seconds;
+          if (!pipe.counted && pipe.x + pipeWidth < bird.x) { pipe.counted = true; score++; reportScore(); }
+        }
+        pipes = pipes.filter(pipe => pipe.x + pipeWidth > -10);
+        if (bird.y + 16 >= height - ground || bird.y - 16 <= 0 || pipes.some(hitPipe)) state = 'over';
+      }
+      function rounded(x, y, w, h, radius) {
+        context.beginPath(); context.roundRect(x, y, w, h, radius); context.fill();
+      }
+      function pipe(x, y, h, capAtBottom) {
+        context.fillStyle = '#2dbd49'; rounded(x, y, pipeWidth, h, 9);
+        context.fillStyle = '#68e86d'; rounded(x + 7, y + 5, 12, Math.max(0, h - 10), 5);
+        context.fillStyle = '#218c36';
+        rounded(x - 6, capAtBottom ? y + h - 22 : y, pipeWidth + 12, 22, 5);
+      }
+      function label(text, y, size = 34) {
+        context.font = `900 ${size}px system-ui`; context.textAlign = 'center';
+        context.lineWidth = 7; context.strokeStyle = 'rgba(13,48,78,.38)'; context.strokeText(text, width / 2, y);
+        context.fillStyle = '#fff'; context.fillText(text, width / 2, y);
+      }
+      function draw() {
+        const scale = Math.min(canvas.clientWidth / width, canvas.clientHeight / height);
+        const ratio = window.devicePixelRatio || 1;
+        canvas.width = Math.max(1, Math.round(canvas.clientWidth * ratio));
+        canvas.height = Math.max(1, Math.round(canvas.clientHeight * ratio));
+        context.setTransform(ratio * scale, 0, 0, ratio * scale, (canvas.clientWidth - width * scale) * ratio / 2, (canvas.clientHeight - height * scale) * ratio / 2);
+        context.clearRect(0, 0, width, height);
+        const sky = context.createLinearGradient(0, 0, 0, height); sky.addColorStop(0, '#62d7ff'); sky.addColorStop(1, '#d0f6ff'); context.fillStyle = sky; context.fillRect(0, 0, width, height);
+        context.fillStyle = 'rgba(255,255,255,.75)'; for (const cloud of [[70,112],[310,190],[150,280]]) { context.beginPath(); context.arc(cloud[0], cloud[1], 26, 0, Math.PI * 2); context.arc(cloud[0]+28, cloud[1]-8, 34, 0, Math.PI * 2); context.arc(cloud[0]+62, cloud[1]+2, 23, 0, Math.PI * 2); context.fill(); }
+        for (const item of pipes) { pipe(item.x, 0, item.top, true); pipe(item.x, item.top + gap, height - ground - item.top - gap, false); }
+        context.fillStyle = '#d5e95f'; context.fillRect(0, height - ground, width, ground); context.fillStyle = '#8dc73f'; context.fillRect(0, height - ground, width, 13);
+        context.save(); context.translate(bird.x, bird.y); context.rotate(bird.rotation);
+        context.fillStyle = '#ffd83d'; context.beginPath(); context.ellipse(0, 0, 22, 17, 0, 0, Math.PI * 2); context.fill();
+        context.fillStyle = '#fff'; context.beginPath(); context.arc(9, -7, 8, 0, Math.PI * 2); context.fill(); context.fillStyle = '#252a35'; context.beginPath(); context.arc(12, -7, 3, 0, Math.PI * 2); context.fill();
+        context.fillStyle = '#f17d25'; context.beginPath(); context.moveTo(20, 2); context.lineTo(39, 8); context.lineTo(20, 13); context.closePath(); context.fill(); context.restore();
+        label(String(score), 78, 48);
+        if (state === 'ready') { label('FLAPPY BIRD', 235, 35); label('Chạm hoặc nhấn Space để bay', 285, 19); }
+        if (state === 'over') { context.fillStyle = 'rgba(6,25,42,.62)'; context.fillRect(0, 0, width, height - ground); label('Game Over', 285, 42); label(`Điểm: ${score}`, 335, 26); label('Chạm để Restart', 390, 20); }
+      }
+      function loop(time) { const seconds = Math.min(.04, (time - last) / 1000 || 0); last = time; update(seconds); draw(); requestAnimationFrame(loop); }
+      window.addEventListener('keydown', event => { if (event.code === 'Space' || event.code === 'ArrowUp') { event.preventDefault(); flap(); } });
+      canvas.addEventListener('pointerdown', flap);
+      reset(); requestAnimationFrame(loop);
+    })();
+  </script>
+</body>
+</html>

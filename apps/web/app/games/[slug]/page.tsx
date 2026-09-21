@@ -35,10 +35,6 @@ export default async function GamePage({
         </div>
       </header>
       <div className="game-page__layout" id="play-game">
-        <aside className="game-page__ads" aria-label="Quảng cáo">
-          <AdSlot slot="gameLeftTop" label="Quảng cáo phía trên" />
-          <AdSlot slot="gameLeftBottom" label="Quảng cáo phía dưới" />
-        </aside>
         {game.artifactReady && game.artifactVersion > 0 ? (
           <GamePlayer
             title={game.title}
@@ -53,8 +49,14 @@ export default async function GamePage({
             <p>Trò chơi chưa sẵn sàng để chơi.</p>
           </section>
         )}
-        <RelatedGames games={related?.games ?? []} currentSlug={game.slug} />
       </div>
+      <section className="game-page__supporting" aria-label="Nội dung phía dưới trò chơi">
+        <aside className="game-page__ads" aria-label="Quảng cáo">
+          <AdSlot slot="gameLeftTop" label="Quảng cáo phía trên" />
+          <AdSlot slot="gameLeftBottom" label="Quảng cáo phía dưới" />
+        </aside>
+        <RelatedGames games={related?.games ?? []} currentSlug={game.slug} />
+      </section>
       <article className="game-page__details game-details">
         <div className="game-details__about">
           <div className="game-details__cover"><GameCover game={game} /></div>

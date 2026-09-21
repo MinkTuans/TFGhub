@@ -181,13 +181,6 @@ function PlayerSession({
 
   return (
     <section ref={playerRef} className="game-player" aria-label={`Chơi ${title}`}>
-      <div className="game-player__toolbar">
-        <h1>{title}</h1>
-        <button type="button" onClick={toggleFullscreen}>
-          {fullscreen ? "Thoát toàn màn hình" : "Mở toàn màn hình"}
-        </button>
-      </div>
-      {error && <p className="game-player__error" role="status">{error}</p>}
       <div ref={stageRef} className="game-player__stage">
         <div
           className="game-player__fit"
@@ -198,13 +191,21 @@ function PlayerSession({
           } as CSSProperties}
         >
           {launched ? <iframe ref={frameRef} onLoad={() => { void frameLoaded(); }} title={`Chơi ${title}`} src={src} sandbox="allow-scripts allow-pointer-lock" /> : (
-            <div style={{ display: "grid", placeContent: "center", height: "100%", minHeight: 160, padding: "1rem", textAlign: "center" }}>
-              <button type="button" onClick={() => setLaunched(true)}>Bắt đầu chơi</button>
-              <p className="hint" style={{ margin: ".75rem 0 0", lineHeight: 1.5 }}>Lượt chơi được ghi nhận khi bạn mở game.</p>
-            </div>
+            <div className="game-player__waiting" aria-hidden="true" />
           )}
         </div>
       </div>
+      <div className="game-player__toolbar">
+        <h1>{title}</h1>
+        <div className="game-player__actions">
+          {!launched && <button type="button" onClick={() => setLaunched(true)}>Bắt đầu chơi</button>}
+          <button type="button" onClick={toggleFullscreen}>
+            {fullscreen ? "Thoát toàn màn hình" : "Mở toàn màn hình"}
+          </button>
+        </div>
+      </div>
+      {!launched && <p className="game-player__hint hint">Lượt chơi được ghi nhận khi bạn mở game.</p>}
+      {error && <p className="game-player__error" role="status">{error}</p>}
     </section>
   );
 }
