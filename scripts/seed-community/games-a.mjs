@@ -22,7 +22,7 @@ function runtime(play) {
 function game(key, title, genre, instructions, palette, css, play) {
   return { key, title, genre, instructions, project: {
     sourceType: 'CODE',
-    html: `<main><header><div><div class="eyebrow">TFG · ${genre}</div><h1>${title}</h1></div><button id="restart" aria-label="Chơi lại">↻ Chơi lại</button></header><p>${instructions}</p><div class="stats"><div class="stat">Điểm <strong id="score">0</strong></div><div class="stat">Kỷ lục của bạn <strong id="best">—</strong></div><div class="stat" id="meter"></div></div><section id="board" aria-label="Bàn chơi" data-state="playing"></section><div id="status" role="status" aria-live="polite"></div></main>`,
+    html: `<main><div class="stats"><div class="stat">Điểm <strong id="score">0</strong></div><div class="stat">Kỷ lục của bạn <strong id="best">—</strong></div><div class="stat" id="meter"></div></div><section id="board" aria-label="Bàn chơi" data-state="playing"></section><div id="status" role="status" aria-live="polite"></div><button id="restart" aria-label="Chơi lại">↻ Chơi lại</button></main>`,
     css: `:root{${palette}}${baseCss}${css}`,
     javascript: `(${runtime.toString()})(${play.toString()});`,
   } };

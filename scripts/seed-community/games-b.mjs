@@ -21,7 +21,7 @@ function bridge() {
 function game(key, title, genre, instructions, markup, palette, css, play, scoreSamples, durationSeconds) {
   return { key, title, genre, instructions, scoreSamples, durationSeconds, project: {
     sourceType: 'CODE',
-    html: `<main><div class="eyebrow">${genre}</div><h1>${title}</h1><p>${instructions}</p><div class="stats"><span>Điểm: <b id="score">0</b></span><span>Kỷ lục cá nhân: <b id="best">—</b></span></div>${markup}<p id="status" role="status" aria-live="polite"></p><button id="restart" type="button">Chơi lại</button></main>`,
+    html: `<main><div class="stats"><span>Điểm: <b id="score">0</b></span><span>Kỷ lục cá nhân: <b id="best">—</b></span></div>${markup}<p id="status" role="status" aria-live="polite"></p><button id="restart" type="button">Chơi lại</button></main>`,
     css: `:root{${palette}}${baseCss}${css}`,
     javascript: `(() => { const ui = (${bridge.toString()})(); (${play.toString()})(ui); })();`,
   } };
