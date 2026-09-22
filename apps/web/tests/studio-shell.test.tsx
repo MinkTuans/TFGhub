@@ -25,6 +25,7 @@ import { browserRecoveryStorage } from "../components/studio/studio-recovery";
 import { StudioConflictError } from "../components/studio/studio-state";
 import { studioComponentDefaults } from "../components/studio/studio-component-defaults";
 import { recordingContext } from "./canvas-context";
+import { StudioShell } from "../components/studio/studio-shell";
 
 vi.mock("../lib/session", () => ({ privateGet: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
@@ -641,6 +642,34 @@ test("task navigation exposes assets, visual gameplay, code, preview and help", 
  fireEvent.click(screen.getByRole("button", {name:"Chơi thử & xuất bản"}));
  expect(screen.getByRole("button", {name:"Tạo bản chơi thử"})).toBeEnabled();
  expect(screen.getByRole("button", {name:"Gửi duyệt"})).toBeDisabled();
+});
+
+test("a persisted ready Pixel artifact can be submitted after reopening Studio", async () => {
+  render(
+    <StudioProvider
+      identity={{ userId: "owner", gameId: game.id, projectId: project.projectId }}
+      initial={{ document: project, revision: 0 }}
+      storage={{ read: async () => null, write: async () => {} }}
+      debounceMs={60_000}
+    >
+      <StudioShell initialGame={{ ...game, artifactVersion: 1, artifactReady: true }} />
+    </StudioProvider>,
+  );
+  await act(async () => {});
+
+  fireEvent.click(screen.getByRole("button", { name: "Chơi thử & xuất bản" }));
+
+  expect(screen.getByRole("button", { name: "Gửi duyệt" })).toBeEnabled();
+});
+
+test("Pixel Studio explains why submission is locked without a ready artifact", async () => {
+  await shell();
+  fireEvent.click(screen.getByRole("button", { name: "Chơi thử & xuất bản" }));
+
+  expect(screen.getByRole("button", { name: "Gửi duyệt" })).toBeDisabled();
+  expect(
+    screen.getByText("Tạo bản chơi thử từ phiên bản đã lưu trước khi gửi duyệt."),
+  ).toBeVisible();
 });
 
 test("blank project shortcuts add a real player, open image import and open the tutorial", async () => {

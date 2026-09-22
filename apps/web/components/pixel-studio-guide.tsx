@@ -34,7 +34,7 @@ export const PIXEL_STUDIO_GUIDE = [
   ] },
   { id: 'xuat-ban', title: '6. Chơi thử, dựng và gửi duyệt', paragraphs: [
     'Trong Chơi thử & xuất bản, chờ lưu hoàn tất rồi bấm Tạo bản chơi thử để dựng từ phiên bản hiện tại. Chơi thử đường thắng, đường thua và Chơi lại; kiểm tra ảnh vừa nhập, lời chào đã sửa, điều khiển phím và cảm ứng.',
-    'Dựng bản chơi khác với lưu bản thiết kế. Mỗi lần sửa và lưu làm bản dựng cũ hết hiệu lực cho lần xuất bản tiếp theo. Nếu dự án đổi trong lúc dựng, đợi lưu xong rồi dựng lại. Chỉ gửi duyệt bản dựng khớp nội dung hiện tại.',
+    'Dựng bản chơi khác với lưu bản thiết kế. Mỗi lần sửa và lưu làm bản dựng cũ hết hiệu lực cho lần xuất bản tiếp theo. Nếu dự án đổi trong lúc dựng, đợi lưu xong rồi dựng lại. Chỉ gửi duyệt bản dựng khớp nội dung hiện tại. Nếu nút Gửi duyệt bị khóa, đọc lý do ngay bên dưới nút để biết cần lưu, dựng lại, lưu thông tin công khai hoặc chờ duyệt.',
     'Điền tên, mô tả, hướng dẫn và thông tin công khai trong biểu mẫu, rồi gửi duyệt. Gửi duyệt chưa có nghĩa là trò chơi đã công khai; quản trị viên phải phê duyệt. Nếu bị trả lại, đọc lý do, sửa và lưu, dựng lại rồi gửi lại. Giữ quyền sử dụng đối với hình ảnh và âm thanh bạn nhập.',
   ] },
   { id: 'dien-thoai', title: '7. Làm việc trên điện thoại', paragraphs: [

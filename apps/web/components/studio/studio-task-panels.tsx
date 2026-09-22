@@ -627,8 +627,24 @@ export function StudioPlay({
   const saved = isStudioSaved(state);
   const currentBuild =
     saved &&
-    built?.revision === state.acknowledged.revision &&
-    built?.version === state.version;
+    ((built?.revision === state.acknowledged.revision &&
+      built?.version === state.version) ||
+      (game.artifactReady && game.artifactVersion > 0));
+  const previewArtifact = built?.artifact ?? game.artifactVersion;
+  const submissionBlocker =
+    !saved
+      ? "Chờ dự án lưu hoàn tất trước khi gửi duyệt."
+      : !currentBuild
+        ? "Tạo bản chơi thử từ phiên bản đã lưu trước khi gửi duyệt."
+        : pending
+          ? "Đang xử lý yêu cầu hiện tại."
+          : game.reviewState === "PENDING"
+            ? "Trò chơi đang chờ duyệt."
+            : game.reviewState === "APPROVED"
+              ? "Trò chơi đã được duyệt. Sửa, lưu và tạo bản chơi thử mới để gửi lại."
+              : description !== game.description || accessMode !== game.accessMode
+                ? "Lưu thông tin công khai trước khi gửi duyệt."
+                : null;
   async function perform(action: "build" | "metadata" | "submit") {
     if (
       flight.current ||
@@ -736,7 +752,7 @@ export function StudioPlay({
         <iframe
           key={restart}
           title="Chơi thử trò chơi"
-          src={`${resolvePublicApiBaseUrl()}/games/${encodeURIComponent(game.id)}/preview/?v=${built.artifact}&restart=${restart}`}
+          src={`${resolvePublicApiBaseUrl()}/games/${encodeURIComponent(game.id)}/preview/?v=${previewArtifact}&restart=${restart}`}
           sandbox="allow-scripts allow-pointer-lock"
         />
       )}
@@ -774,19 +790,13 @@ export function StudioPlay({
           Lưu thông tin công khai
         </button>
         <button
-          disabled={
-            !currentBuild ||
-            pending ||
-            game.reviewState === "PENDING" ||
-            description !== game.description ||
-            accessMode !== game.accessMode
-          }
+          disabled={submissionBlocker !== null}
           onClick={() => void perform("submit")}
         >
           Gửi duyệt
         </button>
       </div>
-      {game.reviewState === "PENDING" && <p>Đang chờ duyệt.</p>}
+      {submissionBlocker && <p role="status">{submissionBlocker}</p>}
       {game.reviewNote && <p>Ghi chú kiểm duyệt: {game.reviewNote}</p>}
       {error && <p role="alert">{error}</p>}
       {message && <p role="status">{message}</p>}

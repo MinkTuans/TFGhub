@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { GameAssetSummary, GameSummary } from "@indieforge/contracts";
 import { useStudio } from "./studio-provider";
 import { StudioTopbar } from "./studio-topbar";
@@ -37,6 +37,19 @@ export function StudioShell({ initialGame }: { initialGame: GameSummary }) {
   const [assets, setAssets] = useState<GameAssetSummary[]>([]);
   const settingsRef = useRef<HTMLButtonElement>(null);
   const assetPlacement = useRef<((payload: string) => void) | null>(null);
+  const artifactRevision = useRef<number | null>(null);
+  useEffect(() => {
+    if (!state.ready) return;
+    if (artifactRevision.current === null) {
+      artifactRevision.current = state.acknowledged.revision;
+      return;
+    }
+    if (artifactRevision.current === state.acknowledged.revision) return;
+    artifactRevision.current = state.acknowledged.revision;
+    setGame((current) =>
+      current.artifactReady ? { ...current, artifactReady: false } : current,
+    );
+  }, [state.acknowledged.revision, state.ready]);
   const assetMetadata = useMemo(
     () =>
       assets.map((asset) => ({
