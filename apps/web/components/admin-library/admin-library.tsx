@@ -154,7 +154,7 @@ export function AdminLibrary({ initialCategories, initialDocuments, initialDocum
   }
   const currentCategory = categories.find((item) => item.id === categoryId);
   return <div className={styles.library} aria-busy={pending}>
-    <header className={styles.heading}><div><p className="eyebrow">KHÔNG GIAN QUẢN TRỊ</p><h1>Thư viện website</h1><p>Thông tin dự án, hướng dẫn và kiến thức vận hành — cùng một nơi.</p></div><button disabled={pending || !categories.length} onClick={() => editDocument(null)}>Viết tài liệu</button></header>
+    <header className={styles.heading}><div><h1>Thư viện website</h1><p>Thông tin dự án, hướng dẫn và kiến thức vận hành — cùng một nơi.</p></div><button disabled={pending || !categories.length} onClick={() => editDocument(null)}>Viết tài liệu</button></header>
     {error && <div className={styles.error} role="alert">{error}{conflict && <button disabled={pending} onClick={reload}>Tải lại bản mới nhất</button>}</div>}
     {notice && <p className={styles.notice} role="status">{notice}</p>}
     <div className={styles.workspace}>

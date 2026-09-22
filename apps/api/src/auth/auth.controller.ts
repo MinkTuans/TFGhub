@@ -41,7 +41,6 @@ export class AuthController {
     const session = await this.auth.register(input.data);
     response.cookie(ACCESS_COOKIE, session.accessToken, {
       ...cookieOptions(),
-      maxAge: 15 * 60 * 1000,
     });
     return session.user;
   }
@@ -57,7 +56,6 @@ export class AuthController {
     const session = await this.auth.login(input.data);
     response.cookie(ACCESS_COOKIE, session.accessToken, {
       ...cookieOptions(),
-      maxAge: 15 * 60 * 1000,
     });
     return session.user;
   }

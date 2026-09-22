@@ -1,5 +1,5 @@
-.library { --library-accent: #d7b66f; width: min(100%, 1440px); margin: 0 auto; padding: 2.5rem clamp(.75rem, 3vw, 2.5rem) 4rem; color: var(--text); }
-.heading { display: flex; align-items: center; justify-content: space-between; gap: 1.5rem; margin-bottom: 2rem; }
+.library { --library-accent: #d7b66f; width: 100%; color: var(--text); }
+.heading { display: flex; align-items: center; justify-content: space-between; gap: 1.5rem; margin-block: 1rem; }
 .heading h1 { font-size: clamp(1.8rem, 3vw, 2.75rem); margin: .4rem 0 .6rem; letter-spacing: -.035em; }
 .heading p { color: var(--muted); max-width: 48rem; }
 .heading > button { flex-shrink: 0; }
@@ -57,7 +57,7 @@
 .error button { display: block; margin-top: .75rem; }
 .notice { color: var(--success); }
 .empty { color: var(--muted); font-size: .9rem; line-height: 1.7; }
-.markdown { min-width: 0; max-width: 100%; font-size: .92rem; line-height: 1.85; overflow-wrap: anywhere; }
+.markdown { min-width: 0; max-width: 100%; font-size: .875rem; line-height: 1.85; overflow-wrap: anywhere; }
 .markdown > :first-child { margin-top: 1.5rem; }
 .markdown h1, .markdown h2, .markdown h3 { line-height: 1.4; margin: 1.8rem 0 .75rem; }
 .markdown h1 { font-size: 1.7rem; }
@@ -82,7 +82,7 @@
   .welcome { min-height: 240px; }
 }
 @media (max-width: 560px) {
-  .library { padding: 1.5rem .75rem 3rem; }
+  .library { width: 100%; }
   .heading { align-items: start; flex-direction: column; gap: .5rem; }
   .sidebar, .list, .reader { padding: .85rem; }
   .categoryHeading { align-items: flex-start; }

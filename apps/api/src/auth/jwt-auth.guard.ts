@@ -24,14 +24,13 @@ export class JwtAuthGuard implements CanActivate {
     const token: unknown = request.cookies?.[ACCESS_COOKIE];
     if (typeof token !== 'string' || !token) throw new UnauthorizedException();
 
-    let payload: { sub?: unknown; role?: unknown; exp?: unknown };
+    let payload: { sub?: unknown; role?: unknown };
     try {
       payload = await this.tokens.verifyAsync(token);
       if (
         typeof payload.sub !== 'string' ||
         !payload.sub ||
-        !['USER', 'MODERATOR', 'ADMIN'].includes(payload.role as string) ||
-        typeof payload.exp !== 'number'
+        !['USER', 'MODERATOR', 'ADMIN'].includes(payload.role as string)
       )
         throw new UnauthorizedException();
     } catch {

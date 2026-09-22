@@ -19,7 +19,7 @@ import { RolesGuard } from './roles.guard.js';
         if (!secret?.trim()) throw new Error('JWT_SECRET must be configured');
         return {
           secret,
-          signOptions: { expiresIn: '15m', algorithm: 'HS256' },
+          signOptions: { algorithm: 'HS256' },
           verifyOptions: { algorithms: ['HS256'] },
         };
       },
