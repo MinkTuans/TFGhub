@@ -16,6 +16,10 @@ describe('JwtAuthGuard', () => {
 
     await expect(new JwtAuthGuard(tokens as never, auth as never).canActivate(context)).resolves.toBe(true);
 
+    expect(tokens.verifyAsync).toHaveBeenCalledWith(
+      'persistent-token',
+      expect.objectContaining({ ignoreExpiration: true }),
+    );
     expect(request.user).toEqual({ id: 'user-1', email: 'dev@example.com', role: 'USER' });
   });
 });

@@ -26,7 +26,7 @@ export class JwtAuthGuard implements CanActivate {
 
     let payload: { sub?: unknown; role?: unknown };
     try {
-      payload = await this.tokens.verifyAsync(token);
+      payload = await this.tokens.verifyAsync(token, { ignoreExpiration: true });
       if (
         typeof payload.sub !== 'string' ||
         !payload.sub ||

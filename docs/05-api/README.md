@@ -4,7 +4,7 @@ The NestJS API listens on port `3001` by default. Local development calls routes
 
 ## Authentication and request policy
 
-Successful registration/login sets the `indieforge_access` HTTP-only, `SameSite=Lax` JWT cookie without a time-based expiration. A valid session remains usable until the user explicitly logs out; inactive accounts are still rejected. It is `Secure` in production unless an operator explicitly sets `COOKIE_SECURE=false` for an HTTP preview. Protected routes do not accept a bearer-token alternative.
+Successful registration/login sets the `indieforge_access` HTTP-only, `SameSite=Lax` JWT cookie without a time-based expiration. A valid session remains usable until the user explicitly logs out; legacy session expiry claims are also ignored, while inactive accounts are still rejected. It is `Secure` in production unless an operator explicitly sets `COOKIE_SECURE=false` for an HTTP preview. Protected routes do not accept a bearer-token alternative.
 
 Browser mutations must provide an `Origin` exactly equal to `WEB_ORIGIN`. Fetch-metadata browser requests without an origin are rejected. Mutation bodies use `application/json`, except the explicit multipart upload routes for game ZIPs, covers, and project assets.
 
