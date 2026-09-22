@@ -92,6 +92,12 @@ test("suppresses the expected root hydration warning from the theme bootstrap", 
   expect(layout.props.suppressHydrationWarning).toBe(true);
 });
 
+test("renders the one-time demo introduction from RootLayout", async () => {
+  render(await RootLayout({ children: <main>Trang chủ</main> }));
+
+  expect(await screen.findByRole("dialog", { name: "Giới thiệu TFG" })).toBeVisible();
+});
+
 test("keeps form boundaries on the dedicated high-contrast control token", () => {
   expect(globalStyles.match(/--control-border:/g)).toHaveLength(3);
   expect(globalStyles).toMatch(

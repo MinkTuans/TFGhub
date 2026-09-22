@@ -11,6 +11,7 @@
 | Studio | Scenes, objects, history, recovery, Canvas2D, hierarchy, inspector | File/code authoring, actual sandbox play, mobile task access, guide |
 | Assets | Validation, thumbnail, list, rename, tombstone, retained reads | GC has no production scheduler |
 | Deployment | Compose, Caddy, migrations, backup/restore | `/health` is liveness only |
+| Presenter introduction | Four-slide full-screen TFG introduction for demonstrations | Client-only; opens once per browser using `tfg-demo-introduction-seen` and does not change accounts or workflows |
 
 Not implemented: advanced ENGINE animation/tilemap/minigame runtime and separate GameRelease execution, production asset-GC scheduling, malware scanning, donations, or a generative-AI integration. Database tables and historical plans alone do not make a feature delivered.
 
