@@ -160,7 +160,6 @@ export function DemoIntroduction() {
               <p className="eyebrow">{current.eyebrow}</p>
               <h2 id="demo-introduction-title">{current.title}</h2>
               <p>{current.description}</p>
-              <Link className="button" href="/discover" onClick={close}>Khám phá website <Glyph name="arrow" /></Link>
             </div>
           )}
         </div>
