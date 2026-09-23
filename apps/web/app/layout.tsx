@@ -7,7 +7,6 @@ import { TfgLogo } from "../components/tfg-logo";
 import { ThemeToggle } from "../components/theme-toggle";
 import { optionalSession } from "../lib/session";
 import { MobileNavigation } from "../components/mobile-navigation";
-import { DemoIntroduction } from "../components/demo-introduction";
 import "./globals.css";
 import "./reference-world.css";
 import "./creator-reference.css";
@@ -60,7 +59,6 @@ export default async function RootLayout({
         {children}
         <SiteFooter session={session} />
         <MobileNavigation authenticated={!!session} />
-        <DemoIntroduction />
       </body>
     </html>
   );
